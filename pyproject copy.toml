@@ -1,6 +1,6 @@
 [tool.poetry]
 name = "quoptuna"
-version = "0.0.2"
+version = "0.0.1"
 description = "Qoptuna is a proposed open-source project that combines quantum computing with Optuna's hyperparameter optimization framework."
 authors = [
     "Edwin Jose <edwinjose900@gmail.com>",
@@ -95,14 +95,12 @@ classmethod-decorators = [
 ]
 
 [tool.pytest.ini_options]
-minversion = "6.0"
-testpaths = ["tests"]
-console_output_style = "progress"
-filterwarnings = ["ignore::DeprecationWarning", "ignore::ResourceWarning"]
-log_cli = true
-log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
-log_cli_date_format = "%Y-%m-%d %H:%M:%S"
-
+addopts = """\
+    --cov quoptuna \
+    --cov tests \
+    --cov-report term-missing \
+    --no-cov-on-fail \
+"""
 
 [tool.coverage.report]
 fail_under = 100
@@ -112,12 +110,9 @@ exclude_lines = [
 ]
 
 [tool.mypy]
-plugins = ["pydantic.mypy"]
-follow_imports = "skip"
-disable_error_code = ["type-var"]
-namespace_packages = true
-mypy_path = "quoptuna"
-ignore_missing_imports = true
+# This is the global mypy configuration.
+# Avoid changing this!
+strict = true  # See all the enabled flags `mypy --help | grep -A 10 'Strict mode'`
 disallow_any_unimported = true
 
 # If you need to ignore something for some specific module,
