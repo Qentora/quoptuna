@@ -14,9 +14,16 @@
 
 """Module containing data generating functions for classification tasks."""
 
-from qml_benchmarks.data.bars_and_stripes import generate_bars_and_stripes
-from qml_benchmarks.data.hidden_manifold import generate_hidden_manifold_model
-from qml_benchmarks.data.hyperplanes import generate_hyperplanes_parity
-from qml_benchmarks.data.linearly_separable import generate_linearly_separable
-from qml_benchmarks.data.two_curves import generate_two_curves
-           
+from .bars_and_stripes import generate_bars_and_stripes
+from .hidden_manifold import generate_hidden_manifold_model
+from .hyperplanes import generate_hyperplanes_parity
+from .linearly_separable import generate_linearly_separable
+from .two_curves import generate_two_curves
+
+__all__ = [
+    "generate_bars_and_stripes",
+    "generate_hidden_manifold_model",
+    "generate_hyperplanes_parity",
+    "generate_linearly_separable",
+    "generate_two_curves",
+]

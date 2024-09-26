@@ -13,10 +13,16 @@
 # limitations under the License.
 
 import jax
+import jax.numpy as jnp
 import numpy as np
+import optax
 import pennylane as qml
-from pennylane_models.qml_benchmarks.model_utils import chunk_vmapped_fn, train
 from sklearn.base import BaseEstimator, ClassifierMixin
+
+from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import (
+    chunk_vmapped_fn,
+    train,
+)
 
 jax.config.update("jax_enable_x64", True)
 
@@ -117,7 +123,6 @@ class CircuitCentricClassifier(BaseEstimator, ClassifierMixin):
         return jax.random.PRNGKey(self.rng.integers(1000000))
 
     def construct_model(self):
-
         dev = qml.device(self.dev_type, wires=self.n_qubits_)
 
         @qml.qnode(dev, **self.qnode_kwargs)
@@ -258,3 +263,8 @@ class CircuitCentricClassifier(BaseEstimator, ClassifierMixin):
             X_padded, np.expand_dims(np.linalg.norm(X_padded, axis=1), axis=1)
         )
         return X_normalised
+
+
+if __name__ == "__main__":
+    model = CircuitCentricClassifier()
+    print(model)

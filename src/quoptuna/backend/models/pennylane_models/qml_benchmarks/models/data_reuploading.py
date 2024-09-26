@@ -21,8 +21,10 @@ import optax
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.utils.validation import check_is_fitted
 from sklearn.preprocessing import MinMaxScaler
-from qml_benchmarks.model_utils import train
-from qml_benchmarks.model_utils import chunk_vmapped_fn
+from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import train
+from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import (
+    chunk_vmapped_fn,
+)
 
 jax.config.update("jax_enable_x64", True)
 
@@ -327,7 +329,6 @@ class DataReuploadingClassifier(BaseEstimator, ClassifierMixin):
 
 
 class DataReuploadingClassifierNoScaling(DataReuploadingClassifier):
-
     def construct_model(self):
         """Construct the quantum circuit used in the model."""
 
@@ -389,7 +390,6 @@ class DataReuploadingClassifierNoScaling(DataReuploadingClassifier):
 
 
 class DataReuploadingClassifierNoTrainableEmbedding(DataReuploadingClassifier):
-
     def construct_model(self):
         """Construct the quantum circuit used in the model."""
 
@@ -461,7 +461,6 @@ class DataReuploadingClassifierNoTrainableEmbedding(DataReuploadingClassifier):
 
 
 class DataReuploadingClassifierNoCost(DataReuploadingClassifier):
-
     def fit(self, X, y):
         """Fit the model to data X and labels y.
 
@@ -500,7 +499,6 @@ class DataReuploadingClassifierNoCost(DataReuploadingClassifier):
 
 
 class DataReuploadingClassifierSeparable(DataReuploadingClassifier):
-
     def construct_model(self):
         """Construct the quantum circuit used in the model."""
 

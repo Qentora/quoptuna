@@ -33,7 +33,6 @@ def generate_mnist(
     digitA, digitB, preprocessing, n_features=None, n_samples=None, height=None
 ):
     if preprocessing == "cg":
-
         mnist_train = torchvision.datasets.MNIST(
             "mnist_original/", download=True, train=True
         )
@@ -80,7 +79,6 @@ def generate_mnist(
         return X_train_flat, X_test_flat, y_train, y_test
 
     if preprocessing in ["pca", "pca-"]:
-
         (X_train_original, y_train), (X_test_original, y_test) = mnist.load_data()
 
         # subselect a binary classification task

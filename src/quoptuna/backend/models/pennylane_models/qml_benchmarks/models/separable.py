@@ -15,7 +15,7 @@
 from sklearn.base import BaseEstimator, ClassifierMixin
 import pennylane as qml
 import numpy as np
-from qml_benchmarks.model_utils import *
+from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import *
 from sklearn.svm import SVC
 from sklearn.preprocessing import MinMaxScaler
 
@@ -91,7 +91,6 @@ class SeparableVariationalClassifier(BaseEstimator, ClassifierMixin):
         return jax.random.PRNGKey(self.rng.integers(1000000))
 
     def construct_model(self):
-
         dev = qml.device(self.dev_type, wires=1)
 
         @qml.qnode(dev, **self.qnode_kwargs)

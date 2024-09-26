@@ -23,7 +23,9 @@ from sklearn.utils.extmath import softmax
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import StandardScaler
 from sklearn.preprocessing import MinMaxScaler
-from qml_benchmarks.model_utils import chunk_vmapped_fn
+from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import (
+    chunk_vmapped_fn,
+)
 
 
 class QuantumKitchenSinks(BaseEstimator, ClassifierMixin):
@@ -128,7 +130,6 @@ class QuantumKitchenSinks(BaseEstimator, ClassifierMixin):
 
         @qml.qnode(dev, **self.qnode_kwargs)
         def circuit(Q):
-
             for i, q in enumerate(Q):
                 qml.RX(q, wires=i)
             qml.broadcast(qml.CNOT, wires=range(self.n_qubits_), pattern="double")

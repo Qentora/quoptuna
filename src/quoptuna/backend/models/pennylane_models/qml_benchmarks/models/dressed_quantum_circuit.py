@@ -16,7 +16,7 @@ import pennylane as qml
 import numpy as np
 from sklearn.preprocessing import StandardScaler
 from sklearn.base import BaseEstimator, ClassifierMixin
-from qml_benchmarks.model_utils import *
+from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import *
 
 
 class DressedQuantumCircuitClassifier(BaseEstimator, ClassifierMixin):
@@ -259,7 +259,6 @@ class DressedQuantumCircuitClassifier(BaseEstimator, ClassifierMixin):
 
 
 class DressedQuantumCircuitClassifierOnlyNN(DressedQuantumCircuitClassifier):
-
     def construct_model(self):
         def dressed_circuit(params, x):
             x = self.input_transform(params, x)

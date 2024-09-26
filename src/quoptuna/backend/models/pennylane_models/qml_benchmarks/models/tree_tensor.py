@@ -18,8 +18,10 @@ import jax
 import jax.numpy as jnp
 import optax
 from sklearn.base import BaseEstimator, ClassifierMixin
-from qml_benchmarks.model_utils import train
-from qml_benchmarks.model_utils import chunk_vmapped_fn
+from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import train
+from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import (
+    chunk_vmapped_fn,
+)
 
 jax.config.update("jax_enable_x64", True)
 

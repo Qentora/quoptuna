@@ -24,6 +24,7 @@ class CircuitConfig:
     dev_type: str = "default.qubit.jax"
     qnode_kwargs: dict = field(default_factory=lambda: {"interface": "jax-jit"})
 
+
 class CircuitCentricClassifier(BaseEstimator, ClassifierMixin):
     def __init__(self, config: CircuitConfig = None):
         if config is None:
