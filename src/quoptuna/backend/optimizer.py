@@ -32,6 +32,10 @@ class Optimizer:
         self.test_X = test_X
         self.train_y = train_y
         self.test_y = test_y
+        self.data_path = f"db/{self.db_name}.db"
+        if not os.path.exists("db"):
+            os.makedirs("db")
+        self.storage_location = f"sqlite:///{self.data_path}"
 
     def load_and_preprocess_data(self):
         self.X, self.y = load_data(self.data_path)
@@ -155,17 +159,13 @@ class Optimizer:
         ):
             self.load_and_preprocess_data()
         # database  stored in a db folder "db"
-        if not os.path.exists("db"):
-            os.makedirs("db")
+
         # sqllite database
 
-        data_path = f"db/{self.db_name}.db"
-        storage_location = f"sqlite:///{data_path}"
         study = create_study(
-            storage=storage_location,
+            storage=self.storage_location,
             sampler=TPESampler(),
             directions=["maximize", "maximize", "maximize"],
         )
         study.optimize(self.objective, n_trials=n_trials)
-        # get the best trial
-        return study.best_trial
+        return study

@@ -77,3 +77,9 @@ venv.bak/
 
 # IDEs
 .idea/
+
+# database files
+db/
+*.db
+db/CrystalData.db
+*.db
