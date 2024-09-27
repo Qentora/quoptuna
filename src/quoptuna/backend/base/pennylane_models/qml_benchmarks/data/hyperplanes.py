@@ -42,8 +42,7 @@ def predict(x, weights, biases):
     n_ones = np.sum(preds)
     if n_ones % 2 == 0:
         return 1
-    else:
-        return -1
+    return -1
 
 
 def generate_hyperplanes_parity(n_samples, n_features, n_hyperplanes, dim_hyperplanes):

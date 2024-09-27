@@ -20,7 +20,7 @@ import optax
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
 
-from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import train
+from quoptuna.backend.base.pennylane_models.qml_benchmarks.model_utils import train
 
 jax.config.update("jax_enable_x64", True)
 

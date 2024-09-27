@@ -45,6 +45,7 @@ seaborn = "^0.13.2"
 scipy = "^1.14.1"
 optuna = "^4.0.0"
 optuna-dashboard = "^0.16.2"
+streamlit = "^1.38.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -60,7 +61,8 @@ python-kacl = "*"
 ruff = ">=0.2.0"
 
 [tool.poetry.scripts]
-quoptuna = "quoptuna.backend.main:main"
+qoptuna = "quoptuna.backend.main:app"
+run = "streamlit run app.py"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -78,7 +80,9 @@ select = ["ALL"]
 ignore = [
     "ANN",      # Type hints related, let mypy handle these.
     "D",        # Docstrings related, way too strict to our taste
-    ]
+    "COM812",   # Added to ignore list
+    "ISC001",   # Added to ignore list
+]
 
 [tool.ruff.lint.per-file-ignores]
 "tests/**" = [

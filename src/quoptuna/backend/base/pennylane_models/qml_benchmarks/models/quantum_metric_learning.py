@@ -13,14 +13,16 @@
 # limitations under the License.
 
 import warnings
-import pennylane as qml
-import numpy as np
+
 import jax
-from jax import numpy as jnp
+import numpy as np
 import optax
+import pennylane as qml
+from jax import numpy as jnp
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import MinMaxScaler
-from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import (
+
+from quoptuna.backend.base.pennylane_models.qml_benchmarks.model_utils import (
     chunk_vmapped_fn,
     train,
 )

@@ -15,6 +15,7 @@
 """Utility functions for hyperparameter search"""
 
 import csv
+
 import numpy as np
 import pandas as pd
 
@@ -68,7 +69,7 @@ def csv_to_dict(file_path):
         file_path (str): path to csv file
     """
     dict = {}
-    with open(file_path, "r") as csvfile:
+    with open(file_path) as csvfile:
         csvreader = csv.reader(csvfile)
         # Skip the first line
         next(csvreader)

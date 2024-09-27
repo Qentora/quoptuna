@@ -1,13 +1,15 @@
-from sklearn.base import BaseEstimator, ClassifierMixin
+import itertools
+
 import jax
 import jax.numpy as jnp
-import optax
 import numpy as np
-from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import train
+import optax
+from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import StandardScaler
-import itertools
-from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import (
+
+from quoptuna.backend.base.pennylane_models.qml_benchmarks.model_utils import (
     chunk_vmapped_fn,
+    train,
 )
 
 jax.config.update("jax_enable_x64", True)
@@ -52,7 +54,7 @@ class QuantumBoltzmannMachine(BaseEstimator, ClassifierMixin):
         The model works as follows
         1. One prepares a gibbs state :math:`e^{-H(\vec{theta},x)/K_b T}/Z`, where :math:`H(\theta,x)` is a parameterised n_qubit
             Hamiltonian and :math:`Z` is the partition function normalisation. Here we take n_qubits equal to the number of features
-        2. A :math:`\pm1` valued observable :math:`O` is measured on a subset of qubits (called 'visible qubits'). The forward
+        2. A :math:`\\pm1` valued observable :math:`O` is measured on a subset of qubits (called 'visible qubits'). The forward
             function of the model is then
 
         .. maths::
@@ -65,7 +67,7 @@ class QuantumBoltzmannMachine(BaseEstimator, ClassifierMixin):
 
         .. maths::
 
-            H(x, \theta) = \sum_i Z_i \theta_i\cdot x + \sum_i X_i \theta_{i+n_qubits}\cdot x + \sum_{ij} Z_iZ_j \theta_{i+2*n_qubits}\cdot x
+            H(x, \theta) = \\sum_i Z_i \theta_i\\cdot x + \\sum_i X_i \theta_{i+n_qubits}\\cdot x + \\sum_{ij} Z_iZ_j \theta_{i+2*n_qubits}\\cdot x
 
         The observable use can be either a sum or tensor product of Z operators on the visible qubits.
 
@@ -292,7 +294,7 @@ class QuantumBoltzmannMachineSeparable(QuantumBoltzmannMachine):
             )
             if self.observable_type == "sum":
                 return jnp.mean(expvals)
-            elif self.observable_type == "product":
+            if self.observable_type == "product":
                 return jnp.prod(expvals)
 
         if self.jit:

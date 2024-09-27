@@ -14,14 +14,15 @@
 
 """Utility functions shared by models."""
 
-import operator
-from functools import reduce
 import logging
+import operator
 import time
-import numpy as np
-import optax
+from functools import reduce
+
 import jax
 import jax.numpy as jnp
+import numpy as np
+import optax
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.utils import gen_batches
 
@@ -91,7 +92,7 @@ def train(
         logging.debug(f"{step} - loss: {loss_val}")
 
         if np.isnan(loss_val):
-            logging.info(f"nan encountered. Training aborted.")
+            logging.info("nan encountered. Training aborted.")
             break
 
         # decide convergence
@@ -228,8 +229,7 @@ def chunk_vmapped_fn(vmapped_fn, start, max_vmap):
                 res[-1], [(0, diff), *[(0, 0)] * (len(res[-1].shape) - 1)]
             )
             return jnp.concatenate(res)[:-diff]
-        else:
-            return jnp.concatenate(res)
+        return jnp.concatenate(res)
 
     return chunked_fn
 

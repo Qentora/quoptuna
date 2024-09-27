@@ -19,7 +19,7 @@ import optax
 import pennylane as qml
 from sklearn.base import BaseEstimator, ClassifierMixin
 
-from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import (
+from quoptuna.backend.base.pennylane_models.qml_benchmarks.model_utils import (
     chunk_vmapped_fn,
     train,
 )

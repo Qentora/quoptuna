@@ -13,14 +13,16 @@
 # limitations under the License.
 
 import time
-import pennylane as qml
-import numpy as np
+
 import jax
 import jax.numpy as jnp
+import numpy as np
+import pennylane as qml
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.svm import SVC
 from sklearn.preprocessing import MinMaxScaler
-from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import (
+from sklearn.svm import SVC
+
+from quoptuna.backend.base.pennylane_models.qml_benchmarks.model_utils import (
     chunk_vmapped_fn,
 )
 

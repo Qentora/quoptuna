@@ -13,17 +13,18 @@
 # limitations under the License.
 
 import time
-import pennylane as qml
-import numpy as np
+
 import jax
+import numpy as np
+import pennylane as qml
 
 jax.config.update("jax_enable_x64", True)
 from sklearn.base import BaseEstimator, ClassifierMixin
-from sklearn.utils.extmath import softmax
 from sklearn.linear_model import LogisticRegression
-from sklearn.preprocessing import StandardScaler
-from sklearn.preprocessing import MinMaxScaler
-from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import (
+from sklearn.preprocessing import MinMaxScaler, StandardScaler
+from sklearn.utils.extmath import softmax
+
+from quoptuna.backend.base.pennylane_models.qml_benchmarks.model_utils import (
     chunk_vmapped_fn,
 )
 
@@ -119,7 +120,7 @@ class QuantumKitchenSinks(BaseEstimator, ClassifierMixin):
         This is a simple generalisation of the circuit in Fig 2(c).
         """
 
-        pattern = [[i, i + 2] for i in range(0, self.n_qubits_ - 2)]
+        pattern = [[i, i + 2] for i in range(self.n_qubits_ - 2)]
 
         dev = qml.device(
             self.dev_type,

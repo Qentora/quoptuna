@@ -12,18 +12,19 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import numpy as np
-import pennylane as qml
+import flax.linen as nn
 import jax
 import jax.numpy as jnp
+import numpy as np
 import optax
-import flax.linen as nn
-from sklearn.preprocessing import MinMaxScaler
+import pennylane as qml
 from sklearn.base import BaseEstimator, ClassifierMixin
-from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import (
+from sklearn.preprocessing import MinMaxScaler
+
+from quoptuna.backend.base.pennylane_models.qml_benchmarks.model_utils import (
     chunk_vmapped_fn,
+    train,
 )
-from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import train
 
 jax.config.update("jax_enable_x64", True)
 

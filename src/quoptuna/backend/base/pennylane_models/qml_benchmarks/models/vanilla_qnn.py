@@ -12,50 +12,42 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pennylane as qml
 import numpy as np
+import pennylane as qml
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import MinMaxScaler
-from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import *
+
+from quoptuna.backend.base.pennylane_models.qml_benchmarks.model_utils import *
+
+jax.config.update("jax_enable_x64", True)
 
 
-class IQPVariationalClassifier(BaseEstimator, ClassifierMixin):
+class VanillaQNN(BaseEstimator, ClassifierMixin):
     def __init__(
         self,
-        repeats=1,
-        n_layers=10,
-        learning_rate=0.001,
+        embedding_layers=2,
+        variational_layers=3,
+        learning_rate=0.01,
         batch_size=32,
         max_vmap=None,
         jit=True,
         max_steps=10000,
-        convergence_interval=200,
+        convergence_threshold=1e-6,
         random_state=42,
         scaling=1.0,
         dev_type="default.qubit.jax",
         qnode_kwargs={"interface": "jax"},
     ):
-        r"""
-        Variational verison of the classifier from https://arxiv.org/pdf/1804.11326v2.pdf.
-        The model is a standard variational quantum classifier
-
-        .. math::
-
-            f(x)=\langle 0 \vert U^\dagger(x)V^\dagger(\theta) H V(\theta)U(x)\vert 0 \rangle
-
-        where the data embedding unitary :math:`U(x)` is based on an IQP circuit stucture and implemented via
-        pennylane.IQPEmbedding, and the trainable unitay :math:`V(\theta)` is implemented via
-        pennylane.StronglyEntanglingLayers.
-
-        The model is trained using a linear loss function equivalent to the probability of incorrect classification.
+        """
+        A vanilla implementation of a quantum neural network with layer-wise angle embedding and a layered
+        variational circuit.
 
         Args:
-            repeats (int): Number of times to repeat the IQP embedding circuit structure.
-            n_layers (int): Number of layers in the variational part of the circuit.
-            learning_rate (float): Learning rate for gradient descent.
-            batch_size (int): Size of batches used for computing paraemeter updates.
-            max_vmap (int or None): The maximum size of a chunk to vectorise over. Lower values use less memory.
-                must divide batch_size.
+            embedding_layers (int): number of times to repeat the embedding circuit structure.
+            variational_layers (int): number of layers in the variational part of the circuit.
+            learning_rate (float): learning rate for gradient descent.
+            batch_size (int): Number of data points to subsample.
+            max_vmap (int): The largest size of vmap used (to control memory)
             jit (bool): Whether to use just in time compilation.
             convergence_threshold (float): If loss changes less than this threshold for 10 consecutive steps we stop training.
             max_steps (int): Maximum number of training steps. A warning will be raised if training did not converge.
@@ -65,12 +57,12 @@ class IQPVariationalClassifier(BaseEstimator, ClassifierMixin):
         """
 
         # attributes that do not depend on data
-        self.repeats = repeats
-        self.n_layers = n_layers
+        self.embedding_layers = embedding_layers
+        self.variational_layers = variational_layers
         self.learning_rate = learning_rate
         self.batch_size = batch_size
         self.max_steps = max_steps
-        self.convergence_interval = convergence_interval
+        self.convergence_threshold = convergence_threshold
         self.batch_size = batch_size
         self.dev_type = dev_type
         self.qnode_kwargs = qnode_kwargs
@@ -103,11 +95,16 @@ class IQPVariationalClassifier(BaseEstimator, ClassifierMixin):
             The variational circuit from the plots. Uses an IQP data embedding.
             We use the same observable as in the plots.
             """
-            qml.IQPEmbedding(x, wires=range(self.n_qubits_), n_repeats=self.repeats)
+            for i in range(self.embedding_layers):
+                for j in range(self.n_qubits_):
+                    qml.RX(x[j], wires=j)
+                for i in range(self.n_qubits_):
+                    qml.CNOT(wires=[i, (i + 1) % self.n_qubits_])
+
             qml.StronglyEntanglingLayers(
                 params["weights"], wires=range(self.n_qubits_), imprimitive=qml.CZ
             )
-            return qml.expval(qml.PauliZ(0) @ qml.PauliZ(1))
+            return qml.expval(qml.PauliZ(0))
 
         self.circuit = circuit
 
@@ -133,6 +130,7 @@ class IQPVariationalClassifier(BaseEstimator, ClassifierMixin):
         assert self.n_classes_ == 2
         assert 1 in self.classes_ and -1 in self.classes_
 
+        self.n_features = n_features
         self.n_qubits_ = n_features
         self.initialize_params()
         self.construct_model()
@@ -143,7 +141,8 @@ class IQPVariationalClassifier(BaseEstimator, ClassifierMixin):
             2
             * jnp.pi
             * jax.random.uniform(
-                shape=(self.n_layers, self.n_qubits_, 3), key=self.generate_key()
+                shape=(self.variational_layers, self.n_qubits_, 3),
+                key=self.generate_key(),
             )
         )
         self.params_ = {"weights": weights}
@@ -165,21 +164,14 @@ class IQPVariationalClassifier(BaseEstimator, ClassifierMixin):
         optimizer = optax.adam
 
         def loss_fn(params, X, y):
-            expvals = self.forward(params, X)
-            probs = (1 - expvals * y) / 2  # the probs of incorrect classification
-            return jnp.mean(probs)
+            # we multiply by 6 because a relevant domain of the sigmoid function is [-6,6]
+            vals = self.forward(params, X) * 6
+            y = jax.nn.relu(y)  # convert to 0,1
+            return jnp.mean(optax.sigmoid_binary_cross_entropy(vals, y))
 
         if self.jit:
             loss_fn = jax.jit(loss_fn)
-        self.params_ = train(
-            self,
-            loss_fn,
-            optimizer,
-            X,
-            y,
-            self.generate_key,
-            convergence_interval=self.convergence_interval,
-        )
+        self.params_ = train(self, loss_fn, optimizer, X, y, self.generate_key)
 
         return self
 

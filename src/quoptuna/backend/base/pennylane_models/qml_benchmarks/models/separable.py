@@ -12,12 +12,13 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-from sklearn.base import BaseEstimator, ClassifierMixin
-import pennylane as qml
 import numpy as np
-from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import *
-from sklearn.svm import SVC
+import pennylane as qml
+from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.preprocessing import MinMaxScaler
+from sklearn.svm import SVC
+
+from quoptuna.backend.base.pennylane_models.qml_benchmarks.model_utils import *
 
 jax.config.update("jax_enable_x64", True)
 

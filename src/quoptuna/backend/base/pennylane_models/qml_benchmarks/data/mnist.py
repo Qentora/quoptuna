@@ -20,13 +20,14 @@ The return type differs from other data generators since we want to reproduce th
 MNIST train/test split.
 """
 
-import torchvision
-import torchvision.transforms as transforms
-from keras.datasets import mnist
 from random import choices
+
 import numpy as np
+import torchvision
+from keras.datasets import mnist
 from sklearn.decomposition import PCA
 from sklearn.preprocessing import StandardScaler
+from torchvision import transforms
 
 
 def generate_mnist(

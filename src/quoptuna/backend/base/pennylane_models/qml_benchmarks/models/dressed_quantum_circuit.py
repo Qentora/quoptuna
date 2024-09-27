@@ -12,11 +12,12 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
-import pennylane as qml
 import numpy as np
-from sklearn.preprocessing import StandardScaler
+import pennylane as qml
 from sklearn.base import BaseEstimator, ClassifierMixin
-from quoptuna.backend.models.pennylane_models.qml_benchmarks.model_utils import *
+from sklearn.preprocessing import StandardScaler
+
+from quoptuna.backend.base.pennylane_models.qml_benchmarks.model_utils import *
 
 
 class DressedQuantumCircuitClassifier(BaseEstimator, ClassifierMixin):
