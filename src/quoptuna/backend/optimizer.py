@@ -128,12 +128,12 @@ class Optimizer:
                 trial,
             )
 
-            return score, f_score_, acc_  # noqa: TRY300
+            return f_score_  # noqa: TRY300
         except Exception:
             import logging
 
             logging.exception("An error occurred")  # Use logging instead of print
-            return 0, 0, 0
+            return 0
 
     def log_user_attributes(self, model_type, eval_scores, trial):
         if model_type in ["SVC", "SVClinear", "MLPClassifier", "Perceptron"]:
@@ -166,7 +166,7 @@ class Optimizer:
         study = create_study(
             storage=self.storage_location,
             sampler=TPESampler(),
-            directions=["maximize", "maximize", "maximize"],
+            directions=["maximize"],
             study_name=self.study_name,
         )
         self.study = study

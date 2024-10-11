@@ -69,20 +69,20 @@ def open_dashboard(optimizer, port):
 
 def initialize_session_state():
     """Initialize session state keys."""
-    keys = [
-        "uploaded_file",
-        "uploaded_file_name",
-        "file_location",
-        "x_columns",
-        "y_column",
-        "DB_NAME",
-        "study_name",
-        "n_trials",
-        "optimizer",
-        "process_running",
-    ]
-    defaults = [None, None, None, None, None, None, None, 100, None, False]
-    for key, default in zip(keys, defaults):
+    session_defaults = {
+        "uploaded_file": None,
+        "uploaded_file_name": None,
+        "file_location": None,
+        "x_columns": None,
+        "y_column": None,
+        "DB_NAME": None,
+        "study_name": None,
+        "n_trials": 100,
+        "optimizer": None,
+        "process_running": False,
+        "start_visualization": False,
+    }
+    for key, default in session_defaults.items():
         if key not in st.session_state:
             st.session_state[key] = default
 
@@ -93,6 +93,7 @@ def handle_sidebar():
     st.write("Please upload your data file below.")
     data = upload_and_display_data()
     if data is not None:
+        st.markdown("### Select Features")
         x_columns, y_column = select_columns(data)
         if x_columns and y_column:
             x = data[x_columns]
@@ -101,10 +102,18 @@ def handle_sidebar():
             session_state = {
                 "x_columns": x_columns,
                 "y_column": y_column,
-                "DB_NAME": st.text_input("Enter database name"),
-                "study_name": st.text_input("Enter study name"),
+                "DB_NAME": st.text_input(
+                    "Enter database name", help="Name of the database to store results"
+                ),
+                "study_name": st.text_input(
+                    "Enter study name", help="Name of the study for optimization"
+                ),
                 "n_trials": st.number_input(
-                    "Number of trials", min_value=1, max_value=100, value=100
+                    "Number of trials",
+                    min_value=1,
+                    max_value=100,
+                    value=100,
+                    help="Number of optimization trials",
                 ),
             }
             data_dict = {
@@ -125,23 +134,72 @@ def handle_sidebar():
                 )
                 st.session_state["optimizer"] = optimizer
                 port = find_free_port()
-                if st.button("Run Optimization"):
+                st.markdown("### Actions")
+                if st.button("Run Optimization", help="Start the optimization process"):
                     run_optimization_in_background(optimizer, session_state["n_trials"])
-                if st.button("Open Dashboard"):
+                if st.button(
+                    "Open Dashboard",
+                    help="Open the Optuna dashboard to visualize the study",
+                ):
                     open_dashboard(optimizer, port)
 
 
 def update_plot():
     """Update the plot with the latest optimization results."""
     optimizer = st.session_state["optimizer"]
-    plot_placeholder = st.empty()
-    while True:
-        loaded_study = optuna.load_study(
-            study_name=optimizer.study_name, storage=optimizer.storage_location
-        )
-        fig = optuna.visualization.plot_timeline(loaded_study)
-        plot_placeholder.plotly_chart(fig)
-        time.sleep(10)
+    study_name = st.session_state["study_name"]
+    if study_name:
+        st.markdown("### Study Control Panel")
+        st.text_input("Study name", value=study_name, disabled=True)
+        col1, col2 = st.columns([1, 1])
+        with col1:
+            st.button(
+                "Start Visualization",
+                on_click=lambda: st.session_state.update({"start_visualization": True}),
+                help="Start the visualization with the latest data.",
+            )
+        with col2:
+            st.button(
+                "Stop Visualization",
+                on_click=lambda: st.session_state.update(
+                    {"start_visualization": False}
+                ),
+                help="Stop the visualization updates.",
+            )
+
+        plot_placeholder_timeline = st.empty()
+        plot_placeholder_importances = st.empty()
+        plot_placeholder_optimization_history = st.empty()
+
+        while st.session_state["start_visualization"]:
+            loaded_study = optuna.load_study(
+                study_name=study_name, storage=optimizer.storage_location
+            )
+            try:
+                fig_timeline = optuna.visualization.plot_timeline(loaded_study)
+                plot_placeholder_timeline.plotly_chart(fig_timeline)
+            except ValueError as e:
+                st.error(f"Error in plotting timeline: {e}")
+
+            try:
+                fig_importances = optuna.visualization.plot_param_importances(
+                    loaded_study
+                )
+                plot_placeholder_importances.plotly_chart(fig_importances)
+            except ValueError as e:
+                st.error(f"Error in plotting parameter importances: {e}")
+
+            try:
+                fig_optimization_history = (
+                    optuna.visualization.plot_optimization_history(loaded_study)
+                )
+                plot_placeholder_optimization_history.plotly_chart(
+                    fig_optimization_history
+                )
+            except ValueError as e:
+                st.error(f"Error in plotting optimization history: {e}")
+
+            time.sleep(10)
 
 
 def main():
