@@ -1,7 +1,7 @@
 import logging
 import os
+from typing import Optional
 
-import numpy as np
 from optuna import Trial, create_study
 from optuna.samplers import TPESampler
 from sklearn.metrics import accuracy_score, f1_score
@@ -17,29 +17,30 @@ class Optimizer:
         self,
         db_name: str,
         dataset_name: str = "",
-        train_X: np.ndarray = None,
-        test_X: np.ndarray = None,
-        train_y: np.ndarray = None,
-        test_y: np.ndarray = None,
+        data: Optional[dict] = None,  # noqa: FA100
+        study_name: str = "",
     ):
         self.db_name = db_name
         self.dataset_name = dataset_name
-        if self.dataset_name:
+        if len(self.dataset_name) > 0:
             self.data_path = f"notebook/{self.dataset_name}.csv"
         else:
-            self.data_path = None
-        self.train_X = train_X
-        self.test_X = test_X
-        self.train_y = train_y
-        self.test_y = test_y
+            self.data_path = ""
+        self.data = data or {}  # Use an empty dictionary if no data is provided
+        self.train_x = self.data.get("train_x")
+        self.test_x = self.data.get("test_x")
+        self.train_y = self.data.get("train_y")
+        self.test_y = self.data.get("test_y")
         self.data_path = f"db/{self.db_name}.db"
-        if not os.path.exists("db"):
-            os.makedirs("db")
+        if not os.path.exists("db"):  # noqa: PTH110
+            os.makedirs("db")  # noqa: PTH103
         self.storage_location = f"sqlite:///{self.data_path}"
+        self.study_name = study_name
+        self.study = None
 
     def load_and_preprocess_data(self):
         self.X, self.y = load_data(self.data_path)
-        self.train_X, self.test_X, self.train_y, self.test_y = preprocess_data(
+        self.train_x, self.test_x, self.train_y, self.test_y = preprocess_data(
             self.X, self.y
         )
 
@@ -115,11 +116,11 @@ class Optimizer:
 
             model = create_model(model_type, **params)
 
-            model.fit(self.train_X, self.train_y)
-            score = model.score(self.test_X, self.test_y)
+            model.fit(self.train_x, self.train_y)
+            score = model.score(self.test_x, self.test_y)
 
-            f_score_ = f1_score(self.test_y, model.predict(self.test_X))
-            acc_ = accuracy_score(self.test_y, model.predict(self.test_X))
+            f_score_ = f1_score(self.test_y, model.predict(self.test_x))
+            acc_ = accuracy_score(self.test_y, model.predict(self.test_x))
 
             self.log_user_attributes(
                 model_type,
@@ -127,11 +128,11 @@ class Optimizer:
                 trial,
             )
 
-            return score, f_score_, acc_
-        except Exception as e:
+            return score, f_score_, acc_  # noqa: TRY300
+        except Exception:
             import logging
 
-            logging.exception(e)  # Use logging instead of print
+            logging.exception("An error occurred")  # Use logging instead of print
             return 0, 0, 0
 
     def log_user_attributes(self, model_type, eval_scores, trial):
@@ -152,8 +153,8 @@ class Optimizer:
 
     def optimize(self, n_trials=100):
         if (
-            self.train_X is None
-            or self.test_X is None
+            self.train_x is None
+            or self.test_x is None
             or self.train_y is None
             or self.test_y is None
         ):
@@ -166,6 +167,8 @@ class Optimizer:
             storage=self.storage_location,
             sampler=TPESampler(),
             directions=["maximize", "maximize", "maximize"],
+            study_name=self.study_name,
         )
+        self.study = study
         study.optimize(self.objective, n_trials=n_trials)
-        return study
+        return study, study.best_trials

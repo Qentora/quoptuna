@@ -46,6 +46,10 @@ scipy = "^1.14.1"
 optuna = "^4.0.0"
 optuna-dashboard = "^0.16.2"
 streamlit = "^1.38.0"
+python-fasthtml = "^0.6.9"
+streamlit-elements = "^0.1.0"
+plotly = "^5.24.1"
+pydantic = "^2.9.2"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -62,7 +66,7 @@ ruff = ">=0.2.0"
 
 [tool.poetry.scripts]
 qoptuna = "quoptuna.backend.main:app"
-run = "streamlit run app.py"
+run = "streamlit run app:main"
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]
@@ -90,6 +94,7 @@ ignore = [
     "ARG",      # "Unused function argument". Fixtures are often unused.
     "S105",     # "Possible hardcoded password".
 ]
+"src/quoptuna/backend/base/pennylane_models/**" = ["ALL"]
 
 [tool.ruff.lint.mccabe]
 max-complexity = 10
@@ -120,22 +125,23 @@ exclude_lines = [
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]
-follow_imports = "skip"
+follow_imports = "normal"
 disable_error_code = ["type-var"]
 namespace_packages = true
 mypy_path = "quoptuna"
 ignore_missing_imports = true
 disallow_any_unimported = true
+exclude = "src/quoptuna/backend/base/pennylane_models/.*"
 
 # If you need to ignore something for some specific module,
 # add overrides for them. Avoid changing the global config!
 # For example:
-# [[tool.mypy.overrides]]
-# module = [
-#  "my_unpyted_dependency1.*",
-#  "my_unpyted_dependency2.*"
-# ]
-# ignore_missing_imports = true
+[[tool.mypy.overrides]]
+module = [
+  "src.quoptuna.backend.base.pennylane_models.*",
+  "src.quoptuna.backend.base.pennylane_models.*.*"
+]
+ignore_missing_imports = true
 
 # [[tool.mypy.overrides]]
 # module = [

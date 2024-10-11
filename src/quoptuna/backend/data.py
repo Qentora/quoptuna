@@ -9,18 +9,18 @@ from sklearn.preprocessing import StandardScaler
 
 
 def load_data(file_path):
-    df = pd.read_csv(file_path)
-    y = df["Crystal"]
-    X = df.drop(columns=["Crystal"])
-    return X, y
+    data_frame = pd.read_csv(file_path)
+    y = data_frame["Crystal"]
+    x = data_frame.drop(columns=["Crystal"])
+    return x, y
 
 
-def preprocess_data(X, y):
+def preprocess_data(x, y):
     scaler = StandardScaler()
-    X = scaler.fit_transform(X)
+    x = scaler.fit_transform(x)
     classes = np.unique(y)
     y = np.where(y == classes[0], 1, -1)
-    return train_test_split(X, y, random_state=42)
+    return train_test_split(x, y, random_state=42)
 
 
 # find a port number that is not in use and returns the port number
@@ -33,8 +33,7 @@ def find_free_port():
         if result == 0:
             sock.close()
             continue
-        else:
-            return port
+        return port
     return None
 
 

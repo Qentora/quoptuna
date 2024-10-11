@@ -30,7 +30,7 @@ install_backend:
 	$(POETRY) install
 
 run_backend:
-	$(POETRY) run streamlit run src/quoptuna/backend/app.py
+	$(POETRY) run streamlit run src/quoptuna/frontend/app.py
 
 dev:
 	# Add dev environment setup commands here
