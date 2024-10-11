@@ -1,4 +1,5 @@
 import os
+import sys
 import threading
 import time
 import webbrowser
@@ -6,10 +7,10 @@ import webbrowser
 import optuna
 import pandas as pd
 import streamlit as st
+from streamlit.web import cli as stcli
 
 from quoptuna import Optimizer
 from quoptuna.backend.data import (
-    find_free_port,
     preprocess_data,
     start_optuna_dashboard,
 )
@@ -22,15 +23,12 @@ def upload_and_display_data():
     """Handles file upload and displays the data."""
     uploaded_file = st.file_uploader("Choose a CSV file", type=["csv"])
     if uploaded_file:
-        # save the  uploaded file to local file system in uploaded_data folder
         if not os.path.exists("./uploaded_data"):  # noqa: PTH110
             os.makedirs("./uploaded_data")  # noqa: PTH103
         with open(f"./uploaded_data/{uploaded_file.name}", "wb") as f:  # noqa: PTH123
             f.write(uploaded_file.getvalue())
-        # also keep the uploaded data in session state
         st.session_state["uploaded_file"] = uploaded_file
         st.session_state["uploaded_file_name"] = uploaded_file.name
-        # file location
         file_location = f"./uploaded_data/{uploaded_file.name}"
         st.session_state["file_location"] = file_location
         return pd.read_csv(file_location)
@@ -52,10 +50,9 @@ def run_optimization_in_background(optimizer, n_trials):
         for trial in best_trials:
             st.write(str(trial))
 
-    # Start the optimization in a new thread
     optimization_thread = threading.Thread(target=optimization_task)
     optimization_thread.start()
-    st.write("Optimization started")
+    st.success("Optimization started successfully.")
     st.session_state["process_running"] = True
 
 
@@ -133,15 +130,27 @@ def handle_sidebar():
                     study_name=session_state["study_name"],
                 )
                 st.session_state["optimizer"] = optimizer
-                port = find_free_port()
                 st.markdown("### Actions")
                 if st.button("Run Optimization", help="Start the optimization process"):
-                    run_optimization_in_background(optimizer, session_state["n_trials"])
-                if st.button(
-                    "Open Dashboard",
-                    help="Open the Optuna dashboard to visualize the study",
-                ):
-                    open_dashboard(optimizer, port)
+                    try:
+                        run_optimization_in_background(
+                            optimizer, session_state["n_trials"]
+                        )
+                    except Exception as e:  # noqa: BLE001
+                        st.error(f"Failed to start optimization: {e}")
+                        st.error(f"Exception type: {type(e).__name__}")
+
+                if not st.session_state["start_visualization"]:
+                    st.button(
+                        "Start Visualization",
+                        on_click=lambda: st.session_state.update(
+                            {"start_visualization": True}
+                        ),
+                        help="Start the visualization with the latest data.",
+                    )
+                    st.info("Click to start visualization.")
+                else:
+                    st.success("Visualization is already running.")
 
 
 def update_plot():
@@ -157,6 +166,7 @@ def update_plot():
                 "Start Visualization",
                 on_click=lambda: st.session_state.update({"start_visualization": True}),
                 help="Start the visualization with the latest data.",
+                key="start_visualization_button",  # Add a unique key
             )
         with col2:
             st.button(
@@ -165,12 +175,13 @@ def update_plot():
                     {"start_visualization": False}
                 ),
                 help="Stop the visualization updates.",
+                key="stop_visualization_button",  # Add a unique key
             )
 
         plot_placeholder_timeline = st.empty()
         plot_placeholder_importances = st.empty()
         plot_placeholder_optimization_history = st.empty()
-
+        trials_placeholder = st.empty()
         while st.session_state["start_visualization"]:
             loaded_study = optuna.load_study(
                 study_name=study_name, storage=optimizer.storage_location
@@ -199,16 +210,41 @@ def update_plot():
             except ValueError as e:
                 st.error(f"Error in plotting optimization history: {e}")
 
+            trials = loaded_study.get_trials(deepcopy=False)
+            trials_data = [
+                {
+                    "Trial Number": trial.number,
+                    "State": trial.state,
+                    "Value": trial.value,
+                    "Params": trial.params,
+                    "Start Time": trial.datetime_start,
+                    "End Time": trial.datetime_complete,
+                }
+                for trial in trials
+            ]
+            trials_placeholder.dataframe(trials_data)
+
             time.sleep(10)
 
 
 def main():
-    initialize_session_state()
-    with st.sidebar:
-        handle_sidebar()
-    if st.session_state["optimizer"] and st.session_state["process_running"]:
-        update_plot()
+    if "run" in sys.argv:
+        sys.argv = ["streamlit", "run", "src/quoptuna/frontend/app.py"]
+        stcli.main()
+    if "--start" in sys.argv:
+        sys.argv = ["streamlit", "run", "src/quoptuna/frontend/app.py"]
+        stcli.main()
+    else:
+        # Existing main function logic
+        initialize_session_state()
+        with st.sidebar:
+            handle_sidebar()
+        if (
+            st.session_state["optimizer"] and st.session_state["process_running"]
+        ) or st.session_state["start_visualization"]:
+            update_plot()
 
 
+# Ensure this is the entry point
 if __name__ == "__main__":
     main()

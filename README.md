@@ -16,7 +16,7 @@
 
 ---
 
-Qoptuna is a proposed open-source project that combines quantum computing with Optuna's hyperparameter optimization framework.
+quoptuna is a proposed open-source project that combines quantum computing with Optuna's hyperparameter optimization framework.
 
 ## Installation
 

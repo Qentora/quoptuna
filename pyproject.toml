@@ -1,7 +1,7 @@
 [tool.poetry]
 name = "quoptuna"
 version = "0.0.2"
-description = "Qoptuna is a proposed open-source project that combines quantum computing with Optuna's hyperparameter optimization framework."
+description = "quoptuna is a proposed open-source project that combines quantum computing with Optuna's hyperparameter optimization framework."
 authors = [
     "Edwin Jose <edwinjose900@gmail.com>",
 ]
@@ -65,8 +65,8 @@ python-kacl = "*"
 ruff = ">=0.2.0"
 
 [tool.poetry.scripts]
-qoptuna = "quoptuna.backend.main:app"
-run = "streamlit run app:main"
+quoptuna = "quoptuna.frontend.app:main"
+
 
 [build-system]
 requires = ["poetry-core>=1.0.0"]

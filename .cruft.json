@@ -10,7 +10,7 @@
       "project_name": "QuOptuna",
       "project_slug": "quoptuna",
       "package_name": "quoptuna",
-      "project_short_description": "Qoptuna is a proposed open-source project that combines quantum computing with Optuna's hyperparameter optimization framework.",
+      "project_short_description": "quoptuna is a proposed open-source project that combines quantum computing with Optuna's hyperparameter optimization framework.",
       "_template": "https://github.com/woltapp/wolt-python-package-cookiecutter"
     }
   },
