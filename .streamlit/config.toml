@@ -1,0 +1,7 @@
+[theme]
+base = "dark"
+primaryColor = "#8e44ad"  # Darker Purple
+backgroundColor = "#121212"  # Darker background
+secondaryBackgroundColor = "#1c1c1c"  # Slightly lighter dark background
+textColor = "#dcdcdc"  # Softer light grey text
+font = "sans serif"

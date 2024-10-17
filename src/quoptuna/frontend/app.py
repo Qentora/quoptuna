@@ -10,13 +10,39 @@ import streamlit as st
 from streamlit.web import cli as stcli
 
 from quoptuna import Optimizer
-from quoptuna.backend.data import (
-    preprocess_data,
-    start_optuna_dashboard,
-)
+from quoptuna.backend.data import preprocess_data, start_optuna_dashboard
 
 # Set wide mode and dark mode as default for Streamlit
-st.set_page_config(page_title="QuOptuna", page_icon="🌙", layout="wide")
+st.set_page_config(page_title="QuOptuna", page_icon="⭕", layout="wide")
+
+# Apply custom CSS for dark theme with purple accents and hover effects
+st.markdown(
+    """
+    <style>
+    .main-title {
+        font-size: 3em;
+        color: #9b59b6; /* Purple */
+        text-align: center;
+        margin-top: 20px;
+    }
+    .description {
+        font-size: 1.2em;
+        color: #ecf0f1; /* Light grey */
+        text-align: center;
+        margin-bottom: 20px;
+    }
+    .stButton>button {
+        background-color: #9b59b6; /* Purple */
+        color: #ecf0f1; /* Light grey */
+        transition: background-color 0.3s ease;
+    }
+    .stButton>button:hover {
+        background-color: #8e44ad; /* Darker Purple */
+    }
+    </style>
+    """,
+    unsafe_allow_html=True,
+)
 
 
 def upload_and_display_data():
@@ -182,13 +208,16 @@ def update_plot():
         plot_placeholder_importances = st.empty()
         plot_placeholder_optimization_history = st.empty()
         trials_placeholder = st.empty()
+        counter = 0  # Initialize a counter for unique keys
         while st.session_state["start_visualization"]:
             loaded_study = optuna.load_study(
                 study_name=study_name, storage=optimizer.storage_location
             )
             try:
                 fig_timeline = optuna.visualization.plot_timeline(loaded_study)
-                plot_placeholder_timeline.plotly_chart(fig_timeline)
+                plot_placeholder_timeline.plotly_chart(
+                    fig_timeline, key=f"timeline_chart_{counter}"
+                )
             except ValueError as e:
                 st.error(f"Error in plotting timeline: {e}")
 
@@ -196,7 +225,9 @@ def update_plot():
                 fig_importances = optuna.visualization.plot_param_importances(
                     loaded_study
                 )
-                plot_placeholder_importances.plotly_chart(fig_importances)
+                plot_placeholder_importances.plotly_chart(
+                    fig_importances, key=f"importances_chart_{counter}"
+                )
             except ValueError as e:
                 st.error(f"Error in plotting parameter importances: {e}")
 
@@ -205,7 +236,8 @@ def update_plot():
                     optuna.visualization.plot_optimization_history(loaded_study)
                 )
                 plot_placeholder_optimization_history.plotly_chart(
-                    fig_optimization_history
+                    fig_optimization_history,
+                    key=f"optimization_history_chart_{counter}",
                 )
             except ValueError as e:
                 st.error(f"Error in plotting optimization history: {e}")
@@ -224,7 +256,21 @@ def update_plot():
             ]
             trials_placeholder.dataframe(trials_data)
 
+            counter += 1  # Increment the counter for the next iteration
             time.sleep(10)
+
+
+def main_page():
+    """This is the main page of the app. It will be displayed before the plots get updated."""  # noqa: E501
+    st.markdown(
+        '<div class="main-title">QuOptuna: Optimizing Quantum Models with Optuna</div>',
+        unsafe_allow_html=True,
+    )
+    st.markdown(
+        '<div class="description">Welcome to QuOptuna! This app helps you optimize quantum models using Optuna. The plots will be updated shortly.</div>',  # noqa: E501
+        unsafe_allow_html=True,
+    )
+    # Display a loading spinner until the visualization starts
 
 
 def main():
@@ -237,6 +283,7 @@ def main():
     else:
         # Existing main function logic
         initialize_session_state()
+        main_page()
         with st.sidebar:
             handle_sidebar()
         if (
