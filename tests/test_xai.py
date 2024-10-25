@@ -2,6 +2,26 @@ import pytest
 import shap
 from sklearn.datasets import load_iris
 
+from quoptuna.backend.base.pennylane_models import (
+    CircuitCentricClassifier,
+    ConvolutionalNeuralNetwork,
+    DataReuploadingClassifier,
+    DataReuploadingClassifierSeparable,
+    DressedQuantumCircuitClassifier,
+    DressedQuantumCircuitClassifierSeparable,
+    IQPKernelClassifier,
+    # ParallelGradients,
+    ProjectedQuantumKernel,
+    QuantumBoltzmannMachine,
+    QuantumBoltzmannMachineSeparable,
+    QuantumKitchenSinks,
+    QuantumMetricLearner,
+    QuanvolutionalNeuralNetwork,
+    SeparableKernelClassifier,
+    SeparableVariationalClassifier,
+    TreeTensorClassifier,
+    WeiNet,
+)
 from quoptuna.backend.models import MLPClassifier
 from quoptuna.backend.xai import XAI
 
@@ -26,7 +46,7 @@ def test_xai_initialization(trained_model, iris_data):
     xai = XAI(model=trained_model, data=iris_data)
     assert xai.model == trained_model
     assert xai.data == iris_data
-    assert xai.explainer_type == "shap-permutation"
+    assert xai.explainer_type == "shap-auto"
 
 
 def test_get_explainer(trained_model, iris_data):
@@ -47,3 +67,109 @@ def test_invalid_model():
     msg = "Model does not have a predict_proba method"
     with pytest.raises(ValueError, match=msg):
        XAI(model=None, data={})  # Instantiate the XAI object
+
+
+# test the shap-auto explainer with all models in the backend.models module
+def test_xai_circuit_centric_classifier(iris_data):
+    model = CircuitCentricClassifier()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+
+def test_xai_convolutional_neural_network(iris_data):
+    model = ConvolutionalNeuralNetwork()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+
+def test_xai_data_reuploading_classifier(iris_data):
+    model = DataReuploadingClassifier()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+def test_xai_data_reuploading_classifier_separable(iris_data):
+    model = DataReuploadingClassifierSeparable()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+def test_xai_dressed_quantum_circuit_classifier(iris_data):
+    model = DressedQuantumCircuitClassifier()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+def test_xai_dressed_quantum_circuit_classifier_separable(iris_data):
+    model = DressedQuantumCircuitClassifierSeparable()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+def test_xai_iqp_kernel_classifier(iris_data):
+    model = IQPKernelClassifier()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+def test_xai_projected_quantum_kernel(iris_data):
+    model = ProjectedQuantumKernel()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+def test_xai_quantum_boltzmann_machine(iris_data):
+    model = QuantumBoltzmannMachine()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+def test_xai_quantum_boltzmann_machine_separable(iris_data):
+    model = QuantumBoltzmannMachineSeparable()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+def test_xai_quantum_kitchen_sinks(iris_data):
+    model = QuantumKitchenSinks()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+def test_xai_quantum_metric_learner(iris_data):
+    model = QuantumMetricLearner()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+def test_xai_quanvolutional_neural_network(iris_data):
+    model = QuanvolutionalNeuralNetwork()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+def test_xai_separable_kernel_classifier(iris_data):
+    model = SeparableKernelClassifier()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+def test_xai_separable_variational_classifier(iris_data):
+    model = SeparableVariationalClassifier()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+def test_xai_tree_tensor_classifier(iris_data):
+    model = TreeTensorClassifier()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
+
+def test_xai_weinet(iris_data):
+    model = WeiNet()
+    xai = XAI(model=model, data=iris_data)
+    explainer = xai.get_explainer()
+    assert isinstance(explainer, shap.Explainer)
