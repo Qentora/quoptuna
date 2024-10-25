@@ -2,7 +2,7 @@ import logging
 import os
 from typing import Optional
 
-from optuna import Trial, create_study
+from optuna import Trial, create_study, load_study
 from optuna.samplers import TPESampler
 from sklearn.metrics import accuracy_score, f1_score
 
@@ -150,6 +150,13 @@ class Optimizer:
             trial.set_user_attr("Classical_accuracy", 0)
             trial.set_user_attr("Classical_f1_score", 0)
             trial.set_user_attr("Classical_score", 0)
+
+    def load_study(self):
+        # load the study from the database
+        self.study = load_study(
+            storage=self.storage_location,
+            study_name=self.study_name,
+        )
 
     def optimize(self, n_trials=100):
         if (

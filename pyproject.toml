@@ -50,6 +50,7 @@ python-fasthtml = "^0.6.9"
 streamlit-elements = "^0.1.0"
 plotly = "^5.24.1"
 pydantic = "^2.9.2"
+shap = "^0.46.0"
 
 
 [tool.poetry.group.dev.dependencies]
