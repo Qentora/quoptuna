@@ -1,4 +1,3 @@
-from . import model_typing, pennylane_models
+from . import pennylane_models
 
-__all__ = ["pennylane_models", "model_typing"]
-
+__all__ = ["pennylane_models"]
