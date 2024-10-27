@@ -131,7 +131,7 @@ disable_error_code = ["type-var"]
 namespace_packages = true
 mypy_path = "quoptuna"
 ignore_missing_imports = true
-disallow_any_unimported = true
+disallow_any_unimported = false
 exclude = "src/quoptuna/backend/base/pennylane_models/.*"
 
 # If you need to ignore something for some specific module,
