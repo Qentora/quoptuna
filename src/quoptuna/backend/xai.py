@@ -86,6 +86,14 @@ class XAI:
             raise TypeError(msg)
         return {c: shap_values[:, :, i] for i, c in self.classes.items()}
 
+    def get_bar_plot(self):
+        if self.shap_values.values.ndim == EXPECTED_SHAP_VALUES_DIM:  # noqa: PD011
+            return shap.plots.bar(self.shap_values, max_display=20)
+        first_class = next(iter(self.classes))
+        return shap.plots.bar(
+            self.shap_values_each_class[first_class], max_display=20, show=False
+        )
+
 
 if __name__ == "__main__":
     from quoptuna.backend.models import MLPClassifier
@@ -104,3 +112,5 @@ if __name__ == "__main__":
     data = load_data()
     model = trained_model(data)
     xai = XAI(model=model, data=data)
+    bar_plot = xai.get_bar_plot()
+    
