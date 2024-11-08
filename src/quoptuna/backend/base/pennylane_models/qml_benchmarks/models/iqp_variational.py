@@ -143,9 +143,7 @@ class IQPVariationalClassifier(BaseEstimator, ClassifierMixin):
         weights = (
             2
             * jnp.pi
-            * jax.random.uniform(
-                shape=(self.n_layers, self.n_qubits_, 3), key=self.generate_key()
-            )
+            * jax.random.uniform(shape=(self.n_layers, self.n_qubits_, 3), key=self.generate_key())
         )
         self.params_ = {"weights": weights}
 

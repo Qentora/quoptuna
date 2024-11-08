@@ -76,9 +76,7 @@ def handle_sidebar():
             if not st.session_state.get("start_visualization", False):
                 st.button(
                     "Start Visualization",
-                    on_click=lambda: st.session_state.update(
-                        {"start_visualization": True}
-                    ),
+                    on_click=lambda: st.session_state.update({"start_visualization": True}),
                     help="Start the visualization with the latest data.",
                 )
                 st.info("Click to start visualization.")

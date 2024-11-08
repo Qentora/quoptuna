@@ -76,9 +76,7 @@ def update_plot():
 def handle_input():
     """Handles input for optimizer, study name, and database name."""
     optimizer = st.session_state["optimizer"]
-    study_name = st.session_state.get(
-        "study_name", ""
-    )  # Get study_name from session state
+    study_name = st.session_state.get("study_name", "")  # Get study_name from session state
     db_name = st.session_state.get("DB_NAME", "")  # Get DB_NAME from session state
 
     with st.expander("Load Optimizer", expanded=(optimizer is None)):
@@ -107,9 +105,7 @@ def handle_input():
             optimizer = Optimizer(db_name=db_name, study_name=study_name)
             st.session_state["optimizer"] = optimizer
             st.session_state["DB_NAME"] = db_name
-            st.session_state["study_name"] = (
-                study_name  # Store study_name in session state
-            )
+            st.session_state["study_name"] = study_name  # Store study_name in session state
             st.session_state["data_loaded_from_file"] = True
     return optimizer, study_name, db_name
 
@@ -150,14 +146,10 @@ def plot_visualization(optimizer, study_name):
     best_trials_title = st.empty()
     counter = 0  # Initialize a counter for unique keys
     while st.session_state["start_visualization"]:
-        loaded_study = optuna.load_study(
-            study_name=study_name, storage=optimizer.storage_location
-        )
+        loaded_study = optuna.load_study(study_name=study_name, storage=optimizer.storage_location)
         try:
             fig_timeline = optuna.visualization.plot_timeline(loaded_study)
-            plot_placeholder_timeline.plotly_chart(
-                fig_timeline, key=f"timeline_chart_{counter}"
-            )
+            plot_placeholder_timeline.plotly_chart(fig_timeline, key=f"timeline_chart_{counter}")
         except ValueError as e:
             st.error(f"Error in plotting timeline: {e}")
 
@@ -170,9 +162,7 @@ def plot_visualization(optimizer, study_name):
             st.error(f"Error in plotting parameter importances: {e}")
 
         try:
-            fig_optimization_history = optuna.visualization.plot_optimization_history(
-                loaded_study
-            )
+            fig_optimization_history = optuna.visualization.plot_optimization_history(loaded_study)
             plot_placeholder_optimization_history.plotly_chart(
                 fig_optimization_history,
                 key=f"optimization_history_chart_{counter}",
@@ -233,9 +223,7 @@ def plot_visualization(optimizer, study_name):
                 }
                 for trial in best_trial
             ]
-            best_trials_placeholder.dataframe(
-                best_trials_data, use_container_width=True
-            )
+            best_trials_placeholder.dataframe(best_trials_data, use_container_width=True)
         counter += 1  # Increment the counter for the next iteration
         if not st.session_state["process_running"]:
             break

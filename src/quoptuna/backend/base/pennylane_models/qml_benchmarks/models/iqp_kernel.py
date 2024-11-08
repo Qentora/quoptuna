@@ -136,9 +136,7 @@ class IQPKernelClassifier(BaseEstimator, ClassifierMixin):
         dim2 = len(X2)
 
         # concatenate all pairs of vectors
-        Z = jnp.array(
-            [np.concatenate((X1[i], X2[j])) for i in range(dim1) for j in range(dim2)]
-        )
+        Z = jnp.array([np.concatenate((X1[i], X2[j])) for i in range(dim1) for j in range(dim2)])
 
         circuit = self.construct_circuit()
         self.batched_circuit = chunk_vmapped_fn(
@@ -179,9 +177,7 @@ class IQPKernelClassifier(BaseEstimator, ClassifierMixin):
         """
 
         self.svm.random_state = int(
-            jax.random.randint(
-                self.generate_key(), shape=(1,), minval=0, maxval=1000000
-            )
+            jax.random.randint(self.generate_key(), shape=(1,), minval=0, maxval=1000000)
         )
 
         self.initialize(X.shape[1], np.unique(y))

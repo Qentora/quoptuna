@@ -27,9 +27,7 @@ from sklearn.exceptions import ConvergenceWarning
 from sklearn.utils import gen_batches
 
 
-def train(
-    model, loss_fn, optimizer, X, y, random_key_generator, convergence_interval=200
-):
+def train(model, loss_fn, optimizer, X, y, random_key_generator, convergence_interval=200):
     """
     Trains a model using an optimizer and a loss function via gradient descent. We assume that the loss function
     is of the form `loss(params, X, y)` and that the trainable parameters are stored in model.params_ as a dictionary
@@ -99,15 +97,11 @@ def train(
         if step > 2 * convergence_interval:
             # get means of last two intervals and standard deviation of last interval
             average1 = np.mean(loss_history[-convergence_interval:])
-            average2 = np.mean(
-                loss_history[-2 * convergence_interval : -convergence_interval]
-            )
+            average2 = np.mean(loss_history[-2 * convergence_interval : -convergence_interval])
             std1 = np.std(loss_history[-convergence_interval:])
             # if the difference in averages is small compared to the statistical fluctuations, stop training.
             if np.abs(average2 - average1) <= std1 / np.sqrt(convergence_interval) / 2:
-                logging.info(
-                    f"Model {model.__class__.__name__} converged after {step} steps."
-                )
+                logging.info(f"Model {model.__class__.__name__} converged after {step} steps.")
                 converged = True
                 break
 
@@ -140,9 +134,7 @@ def get_batch(X, y, rnd_key, batch_size=32):
         array[float]: A batch of target labels shaped (batch_size,)
     """
     all_indices = jnp.array(range(len(X)))
-    rnd_indices = jax.random.choice(
-        key=rnd_key, a=all_indices, shape=(batch_size,), replace=True
-    )
+    rnd_indices = jax.random.choice(key=rnd_key, a=all_indices, shape=(batch_size,), replace=True)
     return X[rnd_indices], y[rnd_indices]
 
 
@@ -225,9 +217,7 @@ def chunk_vmapped_fn(vmapped_fn, start, max_vmap):
         # jnp.concatenate needs to act on arrays with the same shape, so pad the last array if necessary
         if batch_len / max_vmap % 1 != 0.0:
             diff = max_vmap - len(res[-1])
-            res[-1] = jnp.pad(
-                res[-1], [(0, diff), *[(0, 0)] * (len(res[-1].shape) - 1)]
-            )
+            res[-1] = jnp.pad(res[-1], [(0, diff), *[(0, 0)] * (len(res[-1].shape) - 1)])
             return jnp.concatenate(res)[:-diff]
         return jnp.concatenate(res)
 
@@ -261,9 +251,7 @@ def chunk_grad(grad_fn, max_vmap):
             set_in_dict(
                 grad_dict,
                 key_list,
-                jnp.mean(
-                    jnp.array([get_from_dict(grad, key_list) for grad in grads]), axis=0
-                ),
+                jnp.mean(jnp.array([get_from_dict(grad, key_list) for grad in grads]), axis=0),
             )
         return grad_dict
 
@@ -286,9 +274,7 @@ def chunk_loss(loss_fn, max_vmap):
 
     def chunked_loss(params, X, y):
         batch_slices = list(gen_batches(len(X), max_vmap))
-        res = jnp.array(
-            [loss_fn(params, *[X[slice], y[slice]]) for slice in batch_slices]
-        )
+        res = jnp.array([loss_fn(params, *[X[slice], y[slice]]) for slice in batch_slices])
         return jnp.mean(res)
 
     return chunked_loss
