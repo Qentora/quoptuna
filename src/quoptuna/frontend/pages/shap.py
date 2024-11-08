@@ -58,11 +58,7 @@ if isinstance(optimizer, Optimizer):
             if classical_f1_score != 0
             else "N/A"
         )
-        return (
-            f"Trial {trial.number} "
-            f"{trial.params.get('model_type')} "
-            f"F1-Score {f1_score}"
-        )
+        return f"Trial {trial.number} " f"{trial.params.get('model_type')} " f"F1-Score {f1_score}"
 
     best_trial_dropdown = st.selectbox(
         "Select Best Trial",
@@ -98,8 +94,6 @@ if isinstance(optimizer, Optimizer):
                 # Optionally, you can add more SHAP visualizations
                 st.subheader("SHAP Dependence Plot")
                 feature: str
-                feature = st.selectbox(
-                    "Select feature for dependence plot", x_train.columns
-                )
+                feature = st.selectbox("Select feature for dependence plot", x_train.columns)
                 shap.dependence_plot(feature, shap_values.values, x_train, show=False)
                 st.pyplot(bbox_inches="tight")
