@@ -114,24 +114,3 @@ class XAI:
         return plt.gcf()
 
 
-if __name__ == "__main__":
-    from quoptuna.backend.models import MLPClassifier
-
-    def load_data() -> DataSet:
-        # Load the Iris dataset
-        x, y = shap.datasets.adult(n_points=100)
-        return {"x_train": x, "y_train": y}
-
-    def trained_model(data: DataSet) -> MLPClassifier:
-        # Train a simple model on the Iris dataset
-        model = MLPClassifier()
-        model.fit(data["x_train"], data["y_train"])
-        return model
-
-    data = load_data()
-    model = trained_model(data)
-    xai = XAI(model=model, data=data)
-    shap_values = xai.shap_values
-
-    beeswarm_plot = xai.get_beeswarm_plot()
-    beeswarm_plot.show()
