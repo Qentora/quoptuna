@@ -3,13 +3,9 @@ from __future__ import annotations
 from typing import TYPE_CHECKING
 
 import matplotlib.pyplot as plt
-import numpy as np
 import pandas as pd
 import shap
 from shap import Explainer
-from shap.plots import colors
-
-from quoptuna.backend.xai.constants import labels
 
 if TYPE_CHECKING:
     from sklearn.base import BaseEstimator
@@ -94,11 +90,14 @@ class XAI:
             return self.custom_shap_bar_plot(self.shap_values, max_display=20)
         first_class = next(iter(self.classes))
         return self.custom_shap_bar_plot(self.shap_values_each_class[first_class], max_display=20)
+
     def get_beeswarm_plot(self):
         if self.shap_values.values.ndim == EXPECTED_SHAP_VALUES_DIM:  # noqa: PD011
             return self.custom_shap_beeswarm_plot(self.shap_values, max_display=20)
         first_class = next(iter(self.classes))
-        return self.custom_shap_beeswarm_plot(self.shap_values_each_class[first_class], max_display=20)
+        return self.custom_shap_beeswarm_plot(
+            self.shap_values_each_class[first_class], max_display=20
+        )
 
     def custom_shap_beeswarm_plot(self, shap_values, max_display=20):
         # Call the original shap.plots.beeswarm function
@@ -106,13 +105,13 @@ class XAI:
 
         # Capture the current figure
         return plt.gcf()
+
     def custom_shap_bar_plot(self, shap_values, max_display=20):
         # Call the original shap.plots.bar function
         shap.plots.bar(shap_values, max_display=max_display)
 
         # Capture the current figure
         return plt.gcf()
-
 
 
 if __name__ == "__main__":
