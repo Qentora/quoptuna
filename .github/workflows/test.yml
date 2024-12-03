@@ -46,10 +46,15 @@ jobs:
           python-version: ${{ matrix.python-version }}
       # - run: poetry run pytest
       - name: Run tests
-        run: poetry run pytest --cov --cov-report=xml
+        run: poetry run pytest --cov --cov-report=xml --junitxml=junit.xml -o junit_family=legacy
         continue-on-error: true
       - name: Upload results to Codecov
         uses: codecov/codecov-action@v5
+        with:
+          token: ${{ secrets.CODECOV_TOKEN }}
+      - name: Upload test results to Codecov
+        if: ${{ !cancelled() }}
+        uses: codecov/test-results-action@v1
         with:
           token: ${{ secrets.CODECOV_TOKEN }}
 
