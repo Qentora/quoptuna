@@ -44,7 +44,7 @@ jobs:
       - uses: ./.github/actions/python-poetry-env
         with:
           python-version: ${{ matrix.python-version }}
-      - run: poetry run pytest
+      # - run: poetry run pytest
       - name: Run tests
         run: poetry run pytest --cov --cov-report=xml
       - name: Upload results to Codecov
