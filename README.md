@@ -1,43 +1,72 @@
 # QuOptuna
 
-[![PyPI Version](https://img.shields.io/pypi/v/quoptuna?style=flat-round)](https://pypi.org/project/quoptuna/)
-[![Python Versions](https://img.shields.io/pypi/pyversions/quoptuna?style=flat-round)](https://pypi.org/project/quoptuna/)
-[![License](https://img.shields.io/pypi/l/quoptuna?style=flat-round)](https://pypi.org/project/quoptuna/)
-[![Documentation Status](https://readthedocs.org/projects/quoptuna/badge/?version=latest)](https://Qentora.github.io/quoptuna)
-[![codecov](https://codecov.io/gh/Qentora/quoptuna/graph/badge.svg?token=6QE861D1CB)](https://codecov.io/gh/Qentora/quoptuna)
-
-
-<!-- [![Build Status](https://github.com/Qentora/quoptuna/actions/workflows/build.yml/badge.svg)](https://github.com/Qentora/quoptuna/actions) -->
-QuOptuna integrates quantum computing with [Optuna](https://optuna.org/), enhancing hyperparameter optimization through quantum algorithms.
+<div align="center">
+  <img src="assets/logo.png" alt="logo" width="200" height="auto" />
+  <h1>QuOptuna</h1>
+  <p>
+    Integrating quantum computing with Optuna for enhanced hyperparameter optimization.
+  </p>
+  <p>
+    <a href="https://img.shields.io/pypi/v/quoptuna?style=flat-round">
+      <img src="https://img.shields.io/pypi/v/quoptuna?style=flat-round" alt="PyPI Version" />
+    </a>
+    <a href="https://img.shields.io/pypi/pyversions/quoptuna?style=flat-round">
+      <img src="https://img.shields.io/pypi/pyversions/quoptuna?style=flat-round" alt="Python Versions" />
+    </a>
+    <a href="https://img.shields.io/pypi/l/quoptuna?style=flat-round">
+      <img src="https://img.shields.io/pypi/l/quoptuna?style=flat-round" alt="License" />
+    </a>
+    <a href="https://readthedocs.org/projects/quoptuna/badge/?version=latest">
+      <img src="https://readthedocs.org/projects/quoptuna/badge/?version=latest" alt="Documentation Status" />
+    </a>
+    <a href="https://codecov.io/gh/Qentora/quoptuna">
+      <img src="https://codecov.io/gh/Qentora/quoptuna/graph/badge.svg?token=6QE861D1CB" alt="codecov" />
+    </a>
+    <a href="https://github.com/Qentora/quoptuna/graphs/contributors">
+      <img src="https://img.shields.io/github/contributors/Qentora/quoptuna" alt="contributors" />
+    </a>
+    <a href="https://github.com/Qentora/quoptuna/network/members">
+      <img src="https://img.shields.io/github/forks/Qentora/quoptuna" alt="forks" />
+    </a>
+    <a href="https://github.com/Qentora/quoptuna/stargazers">
+      <img src="https://img.shields.io/github/stars/Qentora/quoptuna" alt="stars" />
+    </a>
+    <a href="https://github.com/Qentora/quoptuna/issues/">
+      <img src="https://img.shields.io/github/issues/Qentora/quoptuna" alt="open issues" />
+    </a>
+    <a href="https://github.com/Qentora/quoptuna/blob/master/LICENSE">
+      <img src="https://img.shields.io/github/license/Qentora/quoptuna.svg" alt="license" />
+    </a>
+  </p>
+</div>
 
 ---
 
-## Table of Contents
+## :notebook_with_decorative_cover: Table of Contents
 
-- [Features](#features)
-- [Installation](#installation)
-- [Quick Start](#quick-start)
-- [Documentation](#documentation)
-- [Development](#development)
-  - [Testing](#testing)
-  - [Building Documentation](#building-documentation)
-  - [Releasing](#releasing)
-  - [Pre-commit Hooks](#pre-commit-hooks)
-- [Contributing](#contributing)
-- [License](#license)
-- [Acknowledgments](#acknowledgments)
+- [About the Project](#star2-about-the-project)
+- [Features](#dart-features)
+- [Installation](#gear-installation)
+- [Quick Start](#eyes-quick-start)
+- [Documentation](#book-documentation)
+- [Development](#toolbox-development)
+- [Contributing](#wave-contributing)
+- [License](#warning-license)
+- [Acknowledgments](#gem-acknowledgments)
 
 ---
 
-## Features
+## :star2: About the Project
+
+QuOptuna combines quantum computing with advanced hyperparameter optimization to push the boundaries of machine learning and computational tasks.
+
+### :dart: Features
 
 - **Quantum Optimization**: Leverage quantum algorithms for enhanced hyperparameter tuning.
 - **Seamless Integration**: Compatible with Optuna's workflow.
 - **Extensible**: Supports multiple quantum backends and custom algorithms.
 
----
-
-## Installation
+## :gear: Installation
 
 Install QuOptuna using pip:
 
@@ -45,7 +74,7 @@ Install QuOptuna using pip:
 pip install quoptuna
 ```
 
-## Quick Start
+## :eyes: Quick Start
 
 Here’s how you can get started:
 
@@ -62,16 +91,11 @@ study.optimize(objective, n_trials=100)
 print("Best trial:", study.best_trial)
 ```
 
-For more examples, visit the examples directory.
+## :book: Documentation
 
-## Documentation
+Comprehensive documentation is available at [https://Qentora.github.io/quoptuna](https://Qentora.github.io/quoptuna).
 
-Comprehensive documentation is available at [https://Qentora.github.io/quoptuna](https://Qentora.github.io/quoptuna). It includes:
-- Tutorials
-- API references
-- Usage guides
-
-## Development
+## :toolbox: Development
 
 To contribute to QuOptuna, follow these steps:
 
@@ -111,37 +135,7 @@ To check code coverage:
 pytest --cov=quoptuna
 ```
 
-### Building Documentation
-
-Generate and preview documentation locally:
-
-```sh
-mkdocs serve
-```
-
-### Releasing
-
-1. Trigger the Draft Release Workflow by clicking Run workflow.
-2. Publish the draft release from GitHub releases.
-3. The release workflow will automatically:
-   - Publish to PyPI.
-   - Deploy updated documentation.
-
-### Pre-commit Hooks
-
-Install pre-commit hooks to ensure consistent code quality:
-
-```sh
-pre-commit install
-```
-
-To manually run hooks:
-
-```sh
-pre-commit run --all-files
-```
-
-## Contributing
+## :wave: Contributing
 
 We welcome contributions! To get started:
 1. Fork the repository.
@@ -152,14 +146,12 @@ We welcome contributions! To get started:
 
 Refer to the Contributing Guidelines for more details.
 
-## License
+## :warning: License
 
 This project is licensed under the MIT License. See the LICENSE file for details.
 
-## Acknowledgments
+## :gem: Acknowledgments
 
 This project was generated using the [wolt-python-package-cookiecutter](https://github.com/woltapp/wolt-python-package-cookiecutter) template.
-
-QuOptuna combines quantum computing with advanced hyperparameter optimization to push the boundaries of machine learning and computational tasks.
 
 ---
