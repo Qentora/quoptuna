@@ -1,6 +1,6 @@
 repos:
 -   repo: https://github.com/pre-commit/pre-commit-hooks
-    rev: v4.0.1
+    rev: v5.0.0
     hooks:
       - id: check-ast
       - id: check-added-large-files
@@ -24,8 +24,7 @@ repos:
         types: [ python ]
       - id: ruff
         name: ruff
-        # Add --fix, in case you want it to autofix when this hook runs
-        entry: poetry run ruff check --force-exclude
+        entry: poetry run ruff check --force-exclude --fix
         require_serial: true
         language: system
         types: [ python ]
