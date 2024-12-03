@@ -1,42 +1,97 @@
 # QuOptuna
 
-[![PyPI](https://img.shields.io/pypi/v/quoptuna?style=flat-square)](https://pypi.python.org/pypi/quoptuna/)
-[![PyPI - Python Version](https://img.shields.io/pypi/pyversions/quoptuna?style=flat-square)](https://pypi.python.org/pypi/quoptuna/)
-[![PyPI - License](https://img.shields.io/pypi/l/quoptuna?style=flat-square)](https://pypi.python.org/pypi/quoptuna/)
-[![Coookiecutter - Wolt](https://img.shields.io/badge/cookiecutter-Wolt-00c2e8?style=flat-square&logo=cookiecutter&logoColor=D4AA00&link=https://github.com/woltapp/wolt-python-package-cookiecutter)](https://github.com/woltapp/wolt-python-package-cookiecutter)
+[![PyPI Version](https://img.shields.io/pypi/v/quoptuna?style=flat-round)](https://pypi.org/project/quoptuna/)
+[![Python Versions](https://img.shields.io/pypi/pyversions/quoptuna?style=flat-round)](https://pypi.org/project/quoptuna/)
+[![License](https://img.shields.io/pypi/l/quoptuna?style=flat-round)](https://pypi.org/project/quoptuna/)
+[![Documentation Status](https://readthedocs.org/projects/quoptuna/badge/?version=latest)](https://Qentora.github.io/quoptuna)
+[![codecov](https://codecov.io/gh/Qentora/quoptuna/graph/badge.svg?token=6QE861D1CB)](https://codecov.io/gh/Qentora/quoptuna)
 
 
----
-
-**Documentation**: [https://Qentora.github.io/quoptuna](https://Qentora.github.io/quoptuna)
-
-**Source Code**: [https://github.com/Qentora/quoptuna](https://github.com/Qentora/quoptuna)
-
-**PyPI**: [https://pypi.org/project/quoptuna/](https://pypi.org/project/quoptuna/)
+<!-- [![Build Status](https://github.com/Qentora/quoptuna/actions/workflows/build.yml/badge.svg)](https://github.com/Qentora/quoptuna/actions) -->
+QuOptuna integrates quantum computing with [Optuna](https://optuna.org/), enhancing hyperparameter optimization through quantum algorithms.
 
 ---
 
-quoptuna is a proposed open-source project that combines quantum computing with Optuna's hyperparameter optimization framework.
+## Table of Contents
+
+- [Features](#features)
+- [Installation](#installation)
+- [Quick Start](#quick-start)
+- [Documentation](#documentation)
+- [Development](#development)
+  - [Testing](#testing)
+  - [Building Documentation](#building-documentation)
+  - [Releasing](#releasing)
+  - [Pre-commit Hooks](#pre-commit-hooks)
+- [Contributing](#contributing)
+- [License](#license)
+- [Acknowledgments](#acknowledgments)
+
+---
+
+## Features
+
+- **Quantum Optimization**: Leverage quantum algorithms for enhanced hyperparameter tuning.
+- **Seamless Integration**: Compatible with Optuna's workflow.
+- **Extensible**: Supports multiple quantum backends and custom algorithms.
+
+---
 
 ## Installation
+
+Install QuOptuna using pip:
 
 ```sh
 pip install quoptuna
 ```
 
+## Quick Start
+
+Here’s how you can get started:
+
+```python
+import quoptuna as qo
+
+def objective(trial):
+    # Define your optimization logic here
+    return trial.suggest_float('x', -10, 10) ** 2
+
+study = qo.create_study()
+study.optimize(objective, n_trials=100)
+
+print("Best trial:", study.best_trial)
+```
+
+For more examples, visit the examples directory.
+
+## Documentation
+
+Comprehensive documentation is available at [https://Qentora.github.io/quoptuna](https://Qentora.github.io/quoptuna). It includes:
+- Tutorials
+- API references
+- Usage guides
+
 ## Development
 
-* Clone this repository
-* Requirements:
-  * [Poetry](https://python-poetry.org/)
-  * Python 3.8+
-* Create a virtual environment and install the dependencies
+To contribute to QuOptuna, follow these steps:
+
+### Clone the Repository
+
+```sh
+git clone https://github.com/Qentora/quoptuna.git
+cd quoptuna
+```
+
+### Install Requirements
+
+1. Ensure Poetry and Python 3.8+ are installed.
+2. Install dependencies:
 
 ```sh
 poetry install
 ```
 
-* Activate the virtual environment
+3. Activate the virtual environment:
 
 ```sh
 poetry shell
@@ -44,48 +99,67 @@ poetry shell
 
 ### Testing
 
+Run tests with:
+
 ```sh
 pytest
 ```
 
-### Documentation
+To check code coverage:
 
-The documentation is automatically generated from the content of the [docs directory](https://github.com/Qentora/quoptuna/tree/master/docs) and from the docstrings
- of the public signatures of the source code. The documentation is updated and published as a [Github Pages page](https://pages.github.com/) automatically as part each release.
+```sh
+pytest --cov=quoptuna
+```
+
+### Building Documentation
+
+Generate and preview documentation locally:
+
+```sh
+mkdocs serve
+```
 
 ### Releasing
 
-Trigger the [Draft release workflow](https://github.com/Qentora/quoptuna/actions/workflows/draft_release.yml)
-(press _Run workflow_). This will update the changelog & version and create a GitHub release which is in _Draft_ state.
+1. Trigger the Draft Release Workflow by clicking Run workflow.
+2. Publish the draft release from GitHub releases.
+3. The release workflow will automatically:
+   - Publish to PyPI.
+   - Deploy updated documentation.
 
-Find the draft release from the
-[GitHub releases](https://github.com/Qentora/quoptuna/releases) and publish it. When
- a release is published, it'll trigger [release](https://github.com/Qentora/quoptuna/blob/master/.github/workflows/release.yml) workflow which creates PyPI
- release and deploys updated documentation.
+### Pre-commit Hooks
 
-### Pre-commit
-
-Pre-commit hooks run all the auto-formatting (`ruff format`), linters (e.g. `ruff` and `mypy`), and other quality
- checks to make sure the changeset is in good shape before a commit/push happens.
-
-You can install the hooks with (runs for each commit):
+Install pre-commit hooks to ensure consistent code quality:
 
 ```sh
 pre-commit install
 ```
 
-Or if you want them to run only for each push:
-
-```sh
-pre-commit install -t pre-push
-```
-
-Or if you want e.g. want to run all checks manually for all files:
+To manually run hooks:
 
 ```sh
 pre-commit run --all-files
 ```
 
----
+## Contributing
+
+We welcome contributions! To get started:
+1. Fork the repository.
+2. Create a new branch (`git checkout -b feature-branch`).
+3. Make your changes and commit them (`git commit -m 'Add new feature'`).
+4. Push to the branch (`git push origin feature-branch`).
+5. Open a pull request.
+
+Refer to the Contributing Guidelines for more details.
+
+## License
+
+This project is licensed under the MIT License. See the LICENSE file for details.
+
+## Acknowledgments
 
 This project was generated using the [wolt-python-package-cookiecutter](https://github.com/woltapp/wolt-python-package-cookiecutter) template.
+
+QuOptuna combines quantum computing with advanced hyperparameter optimization to push the boundaries of machine learning and computational tasks.
+
+---
