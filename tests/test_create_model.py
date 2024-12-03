@@ -102,9 +102,7 @@ def test_create_projected_quantum_kernel():
 
 
 def test_create_quantum_kitchen_sinks():
-    model = create_model(
-        "QuantumKitchenSinks", max_vmap=1, n_qfeatures=5, n_episodes=10
-    )
+    model = create_model("QuantumKitchenSinks", max_vmap=1, n_qfeatures=5, n_episodes=10)
     assert isinstance(model, QuantumKitchenSinks)
 
 
@@ -144,9 +142,7 @@ def test_create_quantum_boltzmann_machine_separable():
 
 
 def test_create_tree_tensor_classifier():
-    model = create_model(
-        "TreeTensorClassifier", max_vmap=1, batch_size=32, learning_rate=0.01
-    )
+    model = create_model("TreeTensorClassifier", max_vmap=1, batch_size=32, learning_rate=0.01)
     assert isinstance(model, TreeTensorClassifier)
 
 

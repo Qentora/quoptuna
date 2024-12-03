@@ -2,7 +2,7 @@ import logging
 import os
 from typing import Optional
 
-from optuna import Trial, create_study
+from optuna import Trial, create_study, load_study
 from optuna.samplers import TPESampler
 from sklearn.metrics import accuracy_score, f1_score
 
@@ -40,9 +40,7 @@ class Optimizer:
 
     def load_and_preprocess_data(self):
         self.X, self.y = load_data(self.data_path)
-        self.train_x, self.test_x, self.train_y, self.test_y = preprocess_data(
-            self.X, self.y
-        )
+        self.train_x, self.test_x, self.train_y, self.test_y = preprocess_data(self.X, self.y)
 
     def objective(self, trial: Trial):
         try:
@@ -50,12 +48,8 @@ class Optimizer:
             params = {
                 "max_vmap": trial.suggest_categorical("max_vmap", [1]),
                 "batch_size": trial.suggest_categorical("batch_size", [32]),
-                "learning_rate": trial.suggest_categorical(
-                    "learning_rate", [0.001, 0.01, 0.1]
-                ),
-                "n_input_copies": trial.suggest_categorical(
-                    "n_input_copies", [1, 2, 3]
-                ),
+                "learning_rate": trial.suggest_categorical("learning_rate", [0.001, 0.01, 0.1]),
+                "n_input_copies": trial.suggest_categorical("n_input_copies", [1, 2, 3]),
                 "n_layers": trial.suggest_categorical("n_layers", [1, 5, 10]),
                 "observable_type": trial.suggest_categorical(
                     "observable_type", ["single", "half", "full"]
@@ -65,19 +59,13 @@ class Optimizer:
                 "gamma_factor": trial.suggest_categorical("gamma_factor", [0.1, 1, 10]),
                 "trotter_steps": trial.suggest_categorical("trotter_steps", [1, 3, 5]),
                 "t": trial.suggest_categorical("t", [0.01, 0.1, 1.0]),
-                "n_qfeatures": trial.suggest_categorical(
-                    "n_qfeatures", ["full", "half"]
-                ),
-                "n_episodes": trial.suggest_categorical(
-                    "n_episodes", [10, 100, 500, 2000]
-                ),
+                "n_qfeatures": trial.suggest_categorical("n_qfeatures", ["full", "half"]),
+                "n_episodes": trial.suggest_categorical("n_episodes", [10, 100, 500, 2000]),
                 "visible_qubits": trial.suggest_categorical(
                     "visible_qubits", ["single", "half", "full"]
                 ),
                 "temperature": trial.suggest_categorical("temperature", [1, 10, 100]),
-                "encoding_layers": trial.suggest_categorical(
-                    "encoding_layers", [1, 3, 5, 10]
-                ),
+                "encoding_layers": trial.suggest_categorical("encoding_layers", [1, 3, 5, 10]),
                 "degree": trial.suggest_categorical("degree", [2, 3, 4]),
                 "n_qchannels": trial.suggest_categorical("n_qchannels", [1, 5, 10]),
                 "qkernel_shape": trial.suggest_categorical("qkernel_shape", [2, 3]),
@@ -150,6 +138,13 @@ class Optimizer:
             trial.set_user_attr("Classical_accuracy", 0)
             trial.set_user_attr("Classical_f1_score", 0)
             trial.set_user_attr("Classical_score", 0)
+
+    def load_study(self):
+        # load the study from the database
+        self.study = load_study(
+            storage=self.storage_location,
+            study_name=self.study_name,
+        )
 
     def optimize(self, n_trials=100):
         if (

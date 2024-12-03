@@ -50,6 +50,9 @@ python-fasthtml = "^0.6.9"
 streamlit-elements = "^0.1.0"
 plotly = "^5.24.1"
 pydantic = "^2.9.2"
+shap = "^0.46.0"
+pytest = "^8.3.4"
+pytest-cov = "^6.0.0"
 
 
 [tool.poetry.group.dev.dependencies]
@@ -74,6 +77,8 @@ build-backend = "poetry.core.masonry.api"
 
 [tool.ruff]
 target-version = "py38" # The lowest supported version
+line-length = 100 
+fix = true
 
 [tool.ruff.lint]
 # By default, enable all the lint rules.
@@ -130,7 +135,7 @@ disable_error_code = ["type-var"]
 namespace_packages = true
 mypy_path = "quoptuna"
 ignore_missing_imports = true
-disallow_any_unimported = true
+disallow_any_unimported = false
 exclude = "src/quoptuna/backend/base/pennylane_models/.*"
 
 # If you need to ignore something for some specific module,

@@ -129,12 +129,7 @@ class QuantumBoltzmannMachine(BaseEstimator, ClassifierMixin):
 
         if self.observable_type == "sum":
             obs = (
-                sum(
-                    [
-                        tensor_ops([sigmaZ], (i,), self.n_qubits)
-                        for i in range(self.n_visible)
-                    ]
-                )
+                sum([tensor_ops([sigmaZ], (i,), self.n_qubits) for i in range(self.n_visible)])
                 / self.n_visible
             )
         elif self.observable_type == "product":
@@ -146,13 +141,9 @@ class QuantumBoltzmannMachine(BaseEstimator, ClassifierMixin):
             H = jnp.zeros([2**self.n_qubits, 2**self.n_qubits])
             count = 0
             for idxs in singles:
-                H = H + tensor_ops([sigmaZ], idxs, self.n_qubits) * jnp.dot(
-                    thetas[count], x
-                )
+                H = H + tensor_ops([sigmaZ], idxs, self.n_qubits) * jnp.dot(thetas[count], x)
                 count = count + 1
-                H = H + tensor_ops([sigmaX], idxs, self.n_qubits) * jnp.dot(
-                    thetas[count], x
-                )
+                H = H + tensor_ops([sigmaX], idxs, self.n_qubits) * jnp.dot(thetas[count], x)
                 count = count + 1
 
             for idxs in doubles:
@@ -203,9 +194,7 @@ class QuantumBoltzmannMachine(BaseEstimator, ClassifierMixin):
 
     def initialize_params(self):
         # initialise the trainable parameters
-        params = jax.random.normal(
-            shape=(self.n_params_, self.n_qubits), key=self.generate_key()
-        )
+        params = jax.random.normal(shape=(self.n_params_, self.n_qubits), key=self.generate_key())
         self.params_ = {"thetas": params}
 
     def fit(self, X, y):
@@ -286,12 +275,9 @@ class QuantumBoltzmannMachineSeparable(QuantumBoltzmannMachine):
 
         def model(thetas, x):
             gibbs_states = [
-                qubit_gibbs_state(thetas[2 * i : 2 * i + 2, :], x)
-                for i in range(self.n_visible)
+                qubit_gibbs_state(thetas[2 * i : 2 * i + 2, :], x) for i in range(self.n_visible)
             ]
-            expvals = jnp.array(
-                [jnp.trace(jnp.matmul(state, sigmaZ)) for state in gibbs_states]
-            )
+            expvals = jnp.array([jnp.trace(jnp.matmul(state, sigmaZ)) for state in gibbs_states])
             if self.observable_type == "sum":
                 return jnp.mean(expvals)
             if self.observable_type == "product":
