@@ -112,5 +112,3 @@ class XAI:
 
         # Capture the current figure
         return plt.gcf()
-
-

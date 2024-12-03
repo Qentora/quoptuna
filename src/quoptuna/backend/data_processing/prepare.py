@@ -12,18 +12,21 @@ if TYPE_CHECKING:
 
 
 class DataPreparation:
-
-    def __init__(self,
-                 dataset: DataSet = None,
-                 file_path: str | None = None,
-                 x_cols: list[str] | None = None,
-                 y_col: str | None = None,
-                 scaler=None):
+    def __init__(
+        self,
+        dataset: DataSet | None = None,
+        file_path: str | None = None,
+        x_cols: list[str] | None = None,
+        y_col: str | None = None,
+        scaler=None,
+    ):
         if dataset is not None:
             self.dataset = dataset
         elif file_path is not None:
-            self.dataset = self.create_dataset(self.read_csv(file_path),
-                                               x_cols, y_col)
+            if x_cols is None or y_col is None:
+                msg = "x_cols and y_col must be provided when file_path is used"
+                raise ValueError(msg)
+            self.dataset = self.create_dataset(self.read_csv(file_path), x_cols, y_col)
         else:
             msg = "Either dataset or file_path must be provided"
             raise ValueError(msg)
@@ -49,12 +52,7 @@ class DataPreparation:
         return train_test_split(x, y, random_state=42)
 
     def prepare_data_dict(self, x_train, y_train, x_test, y_test):
-        return {
-            "x_train": x_train,
-            "x_test": x_test,
-            "y_train": y_train,
-            "y_test": y_test
-        }
+        return {"x_train": x_train, "x_test": x_test, "y_train": y_train, "y_test": y_test}
 
     def prepare_data(self):
         """Selects columns and preprocesses the data."""
@@ -70,8 +68,7 @@ class DataPreparation:
         return pd.read_csv(file_path)
 
     @staticmethod
-    def create_dataset(raw_data: pd.DataFrame, x_cols: list[str],
-                       y_col: str) -> DataSet:
+    def create_dataset(raw_data: pd.DataFrame, x_cols: list[str], y_col: str) -> DataSet:
         """Creates a dataset from raw data."""
         x = raw_data[x_cols]
         y = raw_data[y_col]
