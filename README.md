@@ -148,10 +148,12 @@ Refer to the Contributing Guidelines for more details.
 
 ## :warning: License
 
-This project is licensed under the MIT License. See the LICENSE file for details.
+This project is licensed under the Apache 2.0 License. See the LICENSE file for details [here](https://github.com/Qentora/quoptuna?tab=Apache-2.0-1-ov-file).
 
 ## :gem: Acknowledgments
 
-This project was generated using the [wolt-python-package-cookiecutter](https://github.com/woltapp/wolt-python-package-cookiecutter) template.
+This project was generated using the [wolt-python-package-cookiecutter](https://github.com/woltapp/wolt-python-package-cookiecutter) template. 
+
+This project includes code from the [qml-benchmarks project by XanaduAI](https://github.com/XanaduAI/qml-benchmarks). Licensed under the Apache License, Version 2.0.
 
 ---
