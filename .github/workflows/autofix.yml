@@ -1,0 +1,24 @@
+name: autofix.ci
+
+on:
+  workflow_call:
+  pull_request:
+  push:
+    branches: [ "main" ]
+
+permissions:
+  contents: read
+
+jobs:
+  autofix:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: ./.github/actions/python-poetry-env
+      
+      # Fix lint errors using pre-commit
+      - name: Run pre-commit auto-fix
+        run: poetry run pre-commit run --all-files
+      
+      - uses: autofix-ci/action@ff86a557419858bb967097bfc916833f5647fa8c 
