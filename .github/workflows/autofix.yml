@@ -1,0 +1,26 @@
+name: autofix.ci
+
+on:
+  pull_request:
+    paths:
+      - "**/*.py"
+
+env:
+  POETRY_VERSION: "1.8.4"
+
+jobs:
+  lint:
+    name: Run Ruff Check and Format
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      
+      - uses: ./.github/actions/python-poetry-env
+      
+      - name: Run Ruff Check with auto-fix
+        run: poetry run ruff check --fix-only .
+      
+      - name: Run Ruff Format
+        run: poetry run ruff format .
+      
+      - uses: autofix-ci/action@ff86a557419858bb967097bfc916833f5647fa8c
