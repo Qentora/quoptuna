@@ -64,6 +64,7 @@ pytest-github-actions-annotate-failures = "*"
 pytest-cov = "*"
 python-kacl = "*"
 ruff = ">=0.2.0"
+ipykernel = "^6.29.5"
 
 [tool.poetry.scripts]
 quoptuna = "quoptuna.frontend.app:main"
