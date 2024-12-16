@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import shap
 from shap import Explainer
+from sklearn.base import BaseEstimator
+
+from quoptuna.backend.data_typing import DataSet
 
 if TYPE_CHECKING:
     from sklearn.base import BaseEstimator
@@ -47,8 +50,7 @@ class XAI:
 
     def get_classes(self) -> dict[int, str]:
         if not hasattr(self.model, "classes_"):
-            msg = "Model does not have a classes_ attribute"
-            raise TypeError(msg)
+            raise TypeError("Model does not have a classes_ attribute")
         return dict(enumerate(self.model.classes_))
 
     def get_explainer(self) -> Explainer:
