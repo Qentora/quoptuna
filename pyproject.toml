@@ -1,4 +1,5 @@
 [project]
+[project]
 name = "quoptuna"
 version = "0.0.2"
 description = "quoptuna is a proposed open-source project that combines quantum computing with Optuna's hyperparameter optimization framework."
