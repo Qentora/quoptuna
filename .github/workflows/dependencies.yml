@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/python-poetry-env
+      - uses: ./.github/actions/python-uv-env
 
       - name: Install tabulate
         run: python -m pip install tabulate
@@ -17,7 +17,7 @@ jobs:
       - name: Gather outdated dependencies
         id: check_for_outdated_dependencies
         run: |
-          body=$(poetry show -o -n)
+          body=$(uv show -o -n)
           echo ::set-output name="body::$body"
 
       - name: Format PR message
@@ -25,7 +25,7 @@ jobs:
         id: get_outdated_dependencies
         shell: bash
         run: |
-          body=$(poetry show -o -n | sed 's/(!)//' | awk 'BEGIN {print "Package","Used","Update"}; {print $1,$2,$3}' | tabulate --header --format github -)
+          body=$(uv show -o -n | sed 's/(!)//' | awk 'BEGIN {print "Package","Used","Update"}; {print $1,$2,$3}' | tabulate --header --format github -)
           body=$(cat <<EOF
           The following packages are outdated
 
@@ -39,7 +39,7 @@ jobs:
 
       - name: Update outdated packages
         if: ${{ steps.check_for_outdated_dependencies.outputs.body != 0 }}
-        run: poetry lock
+        run: uv lock
 
       # behaviour if PR already exists: https://github.com/marketplace/actions/create-pull-request#action-behaviour
       - name: Create Pull Request

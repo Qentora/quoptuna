@@ -1,17 +1,17 @@
 .PHONY: all init format lint build run_backend dev help tests coverage clean_python_cache clean_all
 
 # Configurations
-POETRY := poetry
-RUFF := $(POETRY) run ruff
-MYPY := $(POETRY) run mypy
-PRE_COMMIT := $(POETRY) run pre-commit
+UV := uv
+RUFF := $(UV) run ruff
+MYPY := $(UV) run mypy
+PRE_COMMIT := $(UV) run pre-commit
 
 # Targets
 
 all: help
 
 init: clean_python_cache
-	$(POETRY) install
+	$(UV) install
 
 format:
 	$(RUFF) format .
@@ -24,13 +24,13 @@ lint-fix:
 	$(RUFF) check --fix .
 
 build:
-	$(POETRY) build
+	$(UV) build
 
 install_backend:
-	$(POETRY) install
+	$(UV) install
 
 run_backend:
-	$(POETRY) run streamlit run src/quoptuna/frontend/app.py
+	$(UV) run streamlit run src/quoptuna/frontend/app.py
 
 dev:
 	# Add dev environment setup commands here
@@ -51,11 +51,11 @@ help:
 	@echo "  clean_all         - Clean all caches"
 
 tests:
-	$(POETRY) run pytest
+	$(UV) run pytest
 
 coverage:
-	$(POETRY) run coverage run -m pytest
-	$(POETRY) run coverage report
+	$(UV) run coverage run -m pytest
+	$(UV) run coverage report
 
 clean_python_cache:
 	find . -type d -name '__pycache__' -exec rm -rf {} +

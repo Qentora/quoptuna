@@ -15,7 +15,7 @@ jobs:
           python-version: "3.12"
 
       - name: Install dependencies
-        run: python -m pip install cruft poetry jello tabulate
+        run: python -m pip install cruft jello tabulate uv
 
       - name: Update project structure
         run: |
@@ -28,9 +28,9 @@ jobs:
       - name: apply additional changes and fixes
         if: steps.changes.outputs.changed > 0
         run: |
-          poetry lock --no-update  # add new dependencies
-          poetry install
-          poetry run pre-commit run -a || true  # we have to fix other issues manually
+          uv lock --no-update  # add new dependencies
+          uv install
+          uv run pre-commit run -a || true  # we have to fix other issues manually
 
       - name: Get template versions
         id: get_versions

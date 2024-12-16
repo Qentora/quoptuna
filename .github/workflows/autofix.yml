@@ -13,17 +13,17 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       
-      - uses: ./.github/actions/python-poetry-env
+      - uses: ./.github/actions/python-uv-env
       
     #   # Fix lint errors using pre-commit
     #   - name: Run pre-commit auto-fix
-    #     run: poetry run pre-commit run --all-files
+    #     run: uv run pre-commit run --all-files
         
       - name: Run Ruff Check with auto-fix
-        run: poetry run ruff check --fix-only .
+        run: uv run ruff check --fix-only .
 
       - name: Run Ruff Format
-        run: poetry run ruff format .
+        run: uv run ruff format .
       
       - uses: autofix-ci/action@ff86a557419858bb967097bfc916833f5647fa8c 
 

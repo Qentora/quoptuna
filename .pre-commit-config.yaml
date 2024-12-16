@@ -18,26 +18,26 @@ repos:
     hooks:
       - id: ruff-format
         name: ruff-format
-        entry: poetry run ruff format
+        entry: uv run ruff format
         require_serial: true
         language: system
         types: [ python ]
       - id: ruff
         name: ruff
-        entry: poetry run ruff check --force-exclude --fix
+        entry: uv run ruff check --force-exclude --fix
         require_serial: true
         language: system
         types: [ python ]
       - id: mypy
         name: mypy
-        entry: poetry run mypy .
+        entry: uv run mypy .
         require_serial: true
         language: system
         types: [python]
         pass_filenames: false
       - id: kacl-verify
         name: kacl-verify
-        entry: poetry run kacl-cli verify
+        entry: uv run kacl-cli verify
         language: system
         files: 'CHANGELOG.md'
         pass_filenames: false
