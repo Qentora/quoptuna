@@ -30,6 +30,7 @@ dependencies = [
     "pytest-cov>=6.0.0,<7.0.0",
     "ruff>=0.8.3",
     "mypy>=1.13.0",
+    "codeflash>=0.8.3",
 ]
 readme = "README.md"
 classifiers = [
@@ -71,9 +72,6 @@ dev = [
 
 [tool.pdm.build]
 includes = ["src/quoptuna", "src/quoptuna/*", "src/quoptuna/**/*"]
-[build-system]
-requires = ["setuptools", "wheel"]
-build-backend = "setuptools.build_meta"
 
 [tool.ruff]
 target-version = "py38" # The lowest supported version
@@ -111,6 +109,7 @@ classmethod-decorators = [
     "pydantic.root_validator",
 ]
 
+
 [tool.pytest.ini_options]
 minversion = "6.0"
 testpaths = ["tests"]
@@ -122,12 +121,14 @@ log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 addopts = "--cov --cov-report=xml --cov-fail-under=35"
 
 
+
 [tool.coverage.report]
 fail_under = 100
 exclude_lines = [
     'if TYPE_CHECKING:',
     'pragma: no cover'
 ]
+
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]
@@ -154,3 +155,16 @@ ignore_missing_imports = true
 #   "tests/my_thing/test_my_thing",
 # ]
 # disallow_untyped_defs = false
+
+[tool.codeflash]
+# All paths are relative to this pyproject.toml's directory.
+module-root = "src"
+tests-root = "tests"
+test-framework = "pytest"
+ignore-paths = []
+formatter-cmds = ["ruff check --exit-zero --fix $file", "ruff format $file"]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
