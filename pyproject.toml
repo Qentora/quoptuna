@@ -31,6 +31,7 @@ dependencies = [
     "ruff>=0.8.3",
     "mypy>=1.13.0",
     "codeflash>=0.8.3",
+    "pre-commit>=4.0.1",
 ]
 readme = "README.md"
 classifiers = [
@@ -167,4 +168,3 @@ formatter-cmds = ["ruff check --exit-zero --fix $file", "ruff format $file"]
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
-

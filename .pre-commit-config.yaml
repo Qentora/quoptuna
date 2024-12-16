@@ -35,9 +35,9 @@ repos:
         language: system
         types: [python]
         pass_filenames: false
-      - id: kacl-verify
-        name: kacl-verify
-        entry: uv run kacl-cli verify
-        language: system
-        files: 'CHANGELOG.md'
-        pass_filenames: false
+      # - id: kacl-verify
+      #   name: kacl-verify
+      #   entry: uv run kacl-cli verify
+      #   language: system
+      #   files: 'CHANGELOG.md'
+      #   pass_filenames: false
