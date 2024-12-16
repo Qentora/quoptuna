@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import shap
 from shap import Explainer
+from sklearn.base import BaseEstimator
+
+from quoptuna.backend.data_typing import DataSet
 
 if TYPE_CHECKING:
     from sklearn.base import BaseEstimator
@@ -46,10 +49,7 @@ class XAI:
         return self.get_shap_values_each_class(self.shap_values)
 
     def get_classes(self) -> dict[int, str]:
-        if not hasattr(self.model, "classes_"):
-            msg = "Model does not have a classes_ attribute"
-            raise TypeError(msg)
-        return dict(enumerate(self.model.classes_))
+        return self.classes
 
     def get_explainer(self) -> Explainer:
         predict_method = self.model.predict_proba if self.use_proba else self.model.predict
@@ -92,7 +92,7 @@ class XAI:
         return self.custom_shap_bar_plot(self.shap_values_each_class[first_class], max_display=20)
 
     def get_beeswarm_plot(self):
-        if self.shap_values.values.ndim == EXPECTED_SHAP_VALUES_DIM:  # noqa: PD011
+        if self.shap_values.values.ndim == EXPECTED_SHAP_VALUES_DIM:
             return self.custom_shap_beeswarm_plot(self.shap_values, max_display=20)
         first_class = next(iter(self.classes))
         return self.custom_shap_beeswarm_plot(
@@ -112,3 +112,41 @@ class XAI:
 
         # Capture the current figure
         return plt.gcf()
+
+    def get_classes(self):
+        return self.classes
+
+    def validate_predict_proba(self):
+        """Validate if the model supports predict_proba."""
+        return hasattr(self.model, "predict_proba")
+
+    def get_explainer(self):
+        """Initialize and return the SHAP explainer."""
+        return shap.Explainer(self.model, self.data)
+
+    def get_shap_values(self):
+        """Compute and return the SHAP values."""
+        return self.explainer(self.data)
+
+    def set_shap_values_classes(self):
+        """Set shap values for each class if they exist."""
+        shap_values_each_class = {}
+        for i, class_name in enumerate(self.classes):
+            shap_values_each_class[class_name] = self.shap_values[i]
+        return shap_values_each_class
+
+    def validate_predict_proba(self) -> None:
+        if not hasattr(self.model, "predict_proba"):
+            raise TypeError("Model does not support probability predictions")
+
+    def get_explainer(self):
+        # Placeholder for actual implementation
+        pass
+
+    def get_shap_values(self):
+        # Placeholder for actual implementation
+        pass
+
+    def set_shap_values_classes(self):
+        # Placeholder for actual implementation
+        pass
