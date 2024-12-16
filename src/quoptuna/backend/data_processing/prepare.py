@@ -7,6 +7,8 @@ import pandas as pd
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
+from quoptuna.backend.data_typing import DataSet
+
 if TYPE_CHECKING:
     from quoptuna.backend.data_typing import DataSet
 
@@ -38,11 +40,8 @@ class DataPreparation:
     def select_columns(self):
         """Selects specified columns and splits the dataset into features and target."""
         if self.x_cols is None or self.y_col is None:
-            msg = "x_cols and y_col must be provided"
-            raise ValueError(msg)
-        x = self.dataset["x_train"]
-        y = self.dataset["y_train"]
-        return x, y
+            raise ValueError("x_cols and y_col must be provided")
+        return self.dataset["x_train"], self.dataset["y_train"]
 
     def preprocess(self, x, y):
         """Preprocess the features and target."""
