@@ -166,7 +166,7 @@ ignore_missing_imports = true
 module-root = "src"
 tests-root = "tests"
 test-framework = "pytest"
-ignore-paths = []
+ignore-paths = ["src/quoptuna/backend/base"]
 formatter-cmds = ["ruff check --exit-zero --fix $file", "ruff format $file"]
 
 [build-system]
