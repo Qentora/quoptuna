@@ -1,3 +1,4 @@
+import socket
 import threading
 from wsgiref.simple_server import make_server
 
@@ -25,15 +26,15 @@ def preprocess_data(x, y):
 
 # find a port number that is not in use and returns the port number
 def find_free_port():
-    import socket
+    sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
 
     for port in range(6000, 7000):
-        sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
         result = sock.connect_ex(("localhost", port))
-        if result == 0:
+        if result != 0:
             sock.close()
-            continue
-        return port
+            return port
+
+    sock.close()
     return None
 
 
