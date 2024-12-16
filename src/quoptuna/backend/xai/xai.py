@@ -6,6 +6,9 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import shap
 from shap import Explainer
+from sklearn.base import BaseEstimator
+
+from quoptuna.backend.data_typing import DataSet
 
 if TYPE_CHECKING:
     from sklearn.base import BaseEstimator
@@ -61,8 +64,7 @@ class XAI:
 
     def validate_predict_proba(self) -> bool:
         if not hasattr(self.model, "predict_proba"):
-            msg = "Model does not have a predict_proba method"
-            raise TypeError(msg)
+            raise TypeError("Model does not have a predict_proba method")
         return True
 
     def get_shap_values(self) -> shap.Explanation:
