@@ -85,3 +85,5 @@ db/CrystalData.db
 *.db
 GaN Crystallinity.csv
 db/CrystalData.db
+*.xml
+*.db

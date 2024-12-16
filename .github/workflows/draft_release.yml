@@ -13,21 +13,21 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/python-poetry-env
+      - uses: ./.github/actions/python-uv-env
       - name: Update version
         id: updated_version
         shell: bash
         run: |
-          poetry version ${{ github.event.inputs.version }}
-          version=$(poetry version --short)
+          uv version ${{ github.event.inputs.version }}
+          version=$(uv version --short)
           echo ::set-output name="version::$version"
       - name: Update changelog
         id: changelog
         shell: bash
         run: |
-          poetry run kacl-cli release ${{ steps.updated_version.outputs.version }} --modify --auto-link
+          uv run kacl-cli release ${{ steps.updated_version.outputs.version }} --modify --auto-link
           echo "" >> CHANGELOG.md
-          body=$(poetry run kacl-cli get ${{ steps.updated_version.outputs.version }})
+          body=$(uv run kacl-cli get ${{ steps.updated_version.outputs.version }})
           body="${body//'%'/'%25'}"
           body="${body//$'\n'/'%0A'}"
           body="${body//$'\r'/'%0D'}"
