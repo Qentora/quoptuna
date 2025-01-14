@@ -6,7 +6,7 @@ from optuna import Trial, create_study, load_study
 from optuna.samplers import TPESampler
 from sklearn.metrics import accuracy_score, f1_score
 
-from quoptuna.backend.data import load_data, preprocess_data
+from quoptuna.backend.data import load_data, preprocess_data, retrieve_data
 from quoptuna.backend.models import create_model
 
 logging.getLogger().setLevel(logging.INFO)
@@ -19,6 +19,7 @@ class Optimizer:
         dataset_name: str = "",
         data: Optional[dict] = None,  # noqa: FA100
         study_name: str = "",
+        data_id: str = None,
     ):
         self.db_name = db_name
         self.dataset_name = dataset_name
@@ -37,10 +38,21 @@ class Optimizer:
         self.storage_location = f"sqlite:///{self.data_path}"
         self.study_name = study_name
         self.study = None
+        self.data_id = data_id
+        if self.data_id:
+            self.load_data_by_id()
 
     def load_and_preprocess_data(self):
         self.X, self.y = load_data(self.data_path)
         self.train_x, self.test_x, self.train_y, self.test_y = preprocess_data(self.X, self.y)
+
+    def load_data_by_id(self):
+        data = retrieve_data(self.data_id)
+        if data:
+            self.train_x = data.get("train_x")
+            self.test_x = data.get("test_x")
+            self.train_y = data.get("train_y")
+            self.test_y = data.get("test_y")
 
     def objective(self, trial: Trial):
         try:

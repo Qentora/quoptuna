@@ -7,6 +7,8 @@ from optuna_dashboard import wsgi
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
+data_storage = {}
+
 
 def load_data(file_path):
     data_frame = pd.read_csv(file_path)
@@ -21,6 +23,14 @@ def preprocess_data(x, y):
     classes = np.unique(y)
     y = np.where(y == classes[0], 1, -1)
     return train_test_split(x, y, random_state=42)
+
+
+def store_data(data_id, data):
+    data_storage[data_id] = data
+
+
+def retrieve_data(data_id):
+    return data_storage.get(data_id)
 
 
 # find a port number that is not in use and returns the port number

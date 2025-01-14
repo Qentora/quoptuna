@@ -1,3 +1,27 @@
+from datetime import datetime
+from typing import Optional
+
+from sqlmodel import Field, SQLModel
+
+
+class Task(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    task_id: str
+    status: str
+    progress: float
+    result: Optional[str] = None
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
+class DataReference(SQLModel, table=True):
+    id: Optional[int] = Field(default=None, primary_key=True)
+    data_id: str
+    file_path: str
+    created_at: datetime = Field(default_factory=datetime.utcnow)
+    updated_at: datetime = Field(default_factory=datetime.utcnow)
+
+
 # import sklearn models
 import ast
 
