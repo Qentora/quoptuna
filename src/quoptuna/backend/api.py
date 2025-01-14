@@ -1,14 +1,14 @@
-from fastapi import FastAPI, BackgroundTasks, UploadFile, File, HTTPException
-from pydantic import BaseModel
-import optuna
 import asyncio
 import uuid
-import os
-import pandas as pd
 from typing import Dict
-from sqlmodel import SQLModel, create_engine, Session
+
+import pandas as pd
+from fastapi import BackgroundTasks, FastAPI, File, HTTPException, UploadFile
+from pydantic import BaseModel
+from sqlmodel import Session, SQLModel, create_engine
+
+from quoptuna.backend.models import DataReference, Task
 from quoptuna.backend.optimizer import Optimizer
-from quoptuna.backend.models import Task, DataReference
 
 app = FastAPI()
 tasks: Dict[str, dict] = {}
@@ -18,29 +18,32 @@ DATABASE_URL = "sqlite:///./test.db"
 engine = create_engine(DATABASE_URL)
 SQLModel.metadata.create_all(engine)
 
+
 class OptimizationTask(BaseModel):
     task_id: str
     status: str
     progress: float
     result: dict = None
 
+
 def objective(trial):
-    x = trial.suggest_float('x', -10, 10)
+    x = trial.suggest_float("x", -10, 10)
     return (x - 2) ** 2
+
 
 async def run_optimization(task_id: str, data_id: str):
     optimizer = Optimizer(db_name="test", data_id=data_id)
     tasks[task_id].status = "Running"
-    
+
     for i in range(100):
         optimizer.optimize(n_trials=1)
         tasks[task_id].progress = (i + 1) / 100
         await asyncio.sleep(0.1)
-    
+
     tasks[task_id].status = "Completed"
     tasks[task_id].result = {
         "best_params": optimizer.study.best_params,
-        "best_value": optimizer.study.best_value
+        "best_value": optimizer.study.best_value,
     }
 
     with Session(engine) as session:
@@ -49,6 +52,7 @@ async def run_optimization(task_id: str, data_id: str):
         task.result = str(tasks[task_id].result)
         session.add(task)
         session.commit()
+
 
 @app.post("/upload")
 async def upload_data(file: UploadFile = File(...)):
@@ -63,6 +67,7 @@ async def upload_data(file: UploadFile = File(...)):
         session.commit()
 
     return {"data_id": data_id, "message": "Data uploaded successfully"}
+
 
 @app.post("/preprocess/{data_id}")
 async def preprocess_data(data_id: str):
@@ -81,6 +86,7 @@ async def preprocess_data(data_id: str):
 
     return {"data_id": data_id, "message": "Data preprocessed successfully"}
 
+
 @app.post("/optimize/{data_id}")
 async def start_optimization(data_id: str, background_tasks: BackgroundTasks):
     if data_id not in data_storage:
@@ -95,6 +101,7 @@ async def start_optimization(data_id: str, background_tasks: BackgroundTasks):
         session.commit()
 
     return {"task_id": task_id, "message": "Optimization task started"}
+
 
 @app.get("/task/{task_id}")
 async def get_task_status(task_id: str):
