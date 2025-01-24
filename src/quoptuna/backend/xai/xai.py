@@ -49,7 +49,7 @@ class XAI:
         if not hasattr(self.model, "classes_"):
             msg = "Model does not have a classes_ attribute"
             raise TypeError(msg)
-        return dict(enumerate(self.model.classes_))
+        return self.model.classes_
 
     def get_explainer(self) -> Explainer:
         predict_method = self.model.predict_proba if self.use_proba else self.model.predict
