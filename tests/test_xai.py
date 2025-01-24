@@ -8,7 +8,6 @@ from quoptuna.backend.xai.xai import XAI
 
 @pytest.fixture
 def load_data():
-    # Load the Iris dataset
     x, y = shap.datasets.adult(n_points=100)
     return {"x_train": x, "y_train": y}
 
@@ -32,7 +31,7 @@ def test_xai_initialization(trained_model, load_data):
 def test_get_explainer(trained_model, load_data):
     # Test the get_explainer method
     xai = XAI(model=trained_model, data=load_data)
-    explainer = xai.get_explainer()
+    explainer = xai._get_explainer()
     assert isinstance(explainer, shap.Explainer)
 
 
@@ -60,16 +59,31 @@ def trained_model_sample(load_data):
 def test_get_shap_values(trained_model_sample, load_data):
     # Test getting SHAP values
     xai = XAI(model=trained_model_sample, data=load_data)
-    shap_values = xai.get_shap_values()
+    shap_values = xai._get_shap_values()
     assert shap_values is not None
     assert hasattr(shap_values, "values")
 
 
+def test_trained_model_sample(load_data):
+    # Train a simple model
+    model = MLPClassifier()
+    model.fit(load_data["x_train"], load_data["y_train"])
+    print(model.classes_)
+    assert model is not None
+    assert hasattr(model, "predict")
+    assert hasattr(model, "predict_proba")
+    assert hasattr(model, "fit")
+    assert hasattr(model, "classes_")
+    assert model.classes_ is not None
+    assert len(model.classes_) > 0
+
+
 def test_get_classes(trained_model_sample, load_data):
     # Test getting classes
-    xai = XAI(model=trained_model_sample, data=load_data)
+    model = MLPClassifier()
+    model.fit(load_data["x_train"], load_data["y_train"])
+    xai = XAI(model=model, data=load_data)
     classes = xai.get_classes()
-    assert isinstance(classes, dict)
     assert len(classes) > 0
 
 

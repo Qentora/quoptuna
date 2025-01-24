@@ -97,6 +97,9 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+# Ignore assert usage and private access in test files
+"**/test_*.py" = ["S101", "SLF001"]
+"**/tests/**" = ["S101", "SLF001"]
 "tests/**" = [
     "S101",     # "Use of `assert` detected"
     "ARG",      # "Unused function argument". Fixtures are often unused.
@@ -114,6 +117,10 @@ classmethod-decorators = [
     "pydantic.root_validator",
 ]
 
+[tool.ruff.per-file-ignores]
+# Ignore assert usage and private access in test files
+"**/test_*.py" = ["S101", "SLF001"]
+"**/tests/**" = ["S101", "SLF001"]
 
 [tool.pytest.ini_options]
 minversion = "6.0"
@@ -125,15 +132,12 @@ log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(linen
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 addopts = "--cov --cov-report=xml --cov-fail-under=35"
 
-
-
 [tool.coverage.report]
 fail_under = 100
 exclude_lines = [
     'if TYPE_CHECKING:',
     'pragma: no cover'
 ]
-
 
 [tool.mypy]
 plugins = ["pydantic.mypy"]
