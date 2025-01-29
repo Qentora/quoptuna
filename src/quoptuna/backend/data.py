@@ -1,4 +1,5 @@
 import threading
+from pathlib import Path
 from wsgiref.simple_server import make_server
 
 import numpy as np
@@ -43,3 +44,11 @@ def start_optuna_dashboard(storage: str, port: int):
     thread = threading.Thread(target=httpd.serve_forever)
     thread.start()
     return f"http://localhost:{port}"
+
+
+def mock_csv_data(data, tmp_path, file_name=None):
+    dataframe = pd.DataFrame(data)
+    file_name = file_name if file_name else "mock_csv"
+    file_path = Path(tmp_path) / f"{file_name}.csv"
+    dataframe.to_csv(file_path, index=False)
+    return file_path
