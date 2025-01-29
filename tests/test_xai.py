@@ -27,6 +27,7 @@ def test_load_data(load_data):
     # check if all values in y are 0 or 1 or -1
     assert all(y in [0, 1, -1] for y in load_data["y_train"])
 
+
 def test_xai_initialization(trained_model, load_data):
     # Test the initialization of the XAI class
     xai = XAI(model=trained_model, data=load_data)
