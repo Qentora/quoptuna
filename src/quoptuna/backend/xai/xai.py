@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from functools import cached_property
 from typing import TYPE_CHECKING, Literal
 
 import matplotlib.pyplot as plt
@@ -105,14 +104,14 @@ class XAI:
         if shap_values.values.ndim < EXPECTED_SHAP_VALUES_DIM:  # noqa: PD011
             msg = "shap_values has less than 2 dimensions"
             raise TypeError(msg)
-        return {str(c): shap_values[:, :, i] for i, c in self.get_classes()}
+        return {str(i): shap_values[:, :, i] for i in self.get_classes()}
 
     def _validate_shap_values_class(self) -> shap.Explanation:
         """Validate and get SHAP values for class-specific case."""
         if self.shap_values_each_class is None:
             msg = "No class-specific SHAP values available"
             raise ValueError(msg)
-        first_class = next(iter(self.get_classes))
+        first_class = next(iter(self.get_classes()))
         return self.shap_values_each_class[str(first_class)]
 
     def _handle_plot_error(self, plot_type: PlotType, error: Exception) -> None:

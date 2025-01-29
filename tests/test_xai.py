@@ -9,6 +9,8 @@ from quoptuna.backend.xai.xai import XAI
 @pytest.fixture
 def load_data():
     x, y = shap.datasets.adult(n_points=100)
+    #  convert y to int bow y is a list of bool
+    y = y.astype(int)
     return {"x_train": x, "y_train": y}
 
 
@@ -19,6 +21,11 @@ def trained_model(load_data):
     model.fit(load_data["x_train"], load_data["y_train"])
     return model
 
+
+def test_load_data(load_data):
+    assert load_data is not None
+    # check if all values in y are 0 or 1 or -1
+    assert all(y in [0, 1, -1] for y in load_data["y_train"])
 
 def test_xai_initialization(trained_model, load_data):
     # Test the initialization of the XAI class
@@ -68,7 +75,6 @@ def test_trained_model_sample(load_data):
     # Train a simple model
     model = MLPClassifier()
     model.fit(load_data["x_train"], load_data["y_train"])
-    print(model.classes_)
     assert model is not None
     assert hasattr(model, "predict")
     assert hasattr(model, "predict_proba")
