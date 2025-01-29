@@ -85,3 +85,8 @@ db/CrystalData.db
 *.db
 GaN Crystallinity.csv
 db/CrystalData.db
+*.xml
+*.db
+*.csv
+*.pkl
+experiments/basic_dataset_test/data/dummy file
