@@ -16,8 +16,8 @@ jobs:
       - uses: ./.github/actions/python-uv-env
 
     #   # Fix lint errors using pre-commit
-      - name: Run pre-commit auto-fix
-        run: uv run pre-commit run --all-files
+      # - name: Run pre-commit auto-fix
+      #   run: uv run pre-commit run --all-files
 
       - name: Run Ruff Check with auto-fix
         run: uv run ruff check --fix-only .

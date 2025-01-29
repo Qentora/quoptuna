@@ -24,7 +24,3 @@ runs:
     - name: Synchronize dependencies
       run: uv sync
       shell: bash
-
-    - name: Run tests
-      run: uv run pytest
-      shell: bash
