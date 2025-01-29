@@ -1,17 +1,61 @@
 site_name: "QuOptuna"
 repo_url: https://github.com/Qentora/quoptuna
 
+# theme:
+#   name: material
+#   logo: assets/logo.png
+#   favicon: assets/logo.png
+#   palette:
+#     - scheme: default
+#       toggle:
+#         icon: material/toggle-switch-off-outline
+#         name: Switch to dark mode
+#     - scheme: slate
+#       toggle:
+#         icon: material/toggle-switch
+#         name: Switch to light mode
 theme:
   name: material
+  logo: assets/logo.png
+  favicon: assets/logo.png
+  font:
+    text: Merriweather Sans
+    code: Red Hat Mono
+  features:
+    - navigation.footer
+    - content.action.edit
+    - content.action.view
+    - content.code.annotate
+    - content.code.copy
+    - content.tooltips
+    - navigation.tabs
+    - navigation.sections
+    - navigation.footer
+    - navigation.indexes
+    - navigation.top
+    - navigation.tracking
+    - search.highlight
+    - search.share
+    - search.suggest
+    - toc.follow
   palette:
-    - scheme: default
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: purple
+      accent: deep orange
       toggle:
-        icon: material/toggle-switch-off-outline
+        icon: material/brightness-7
         name: Switch to dark mode
-    - scheme: slate
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: purple
+      accent: deep orange
       toggle:
-        icon: material/toggle-switch
+        icon: material/brightness-4
         name: Switch to light mode
+  font:
+    text: Roboto
+    code: Roboto Mono
 
 nav:
   - Introduction: 'index.md'
@@ -21,14 +65,82 @@ nav:
 markdown_extensions:
   - pymdownx.snippets:
       check_paths: true
+  - attr_list
+  - pymdownx.emoji:
+      emoji_index: !!python/name:material.extensions.emoji.twemoji
+      emoji_generator: !!python/name:material.extensions.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+  - pymdownx.inlinehilite
+  - pymdownx.snippets
+  - pymdownx.superfences
+  - admonition
+  - pymdownx.details
+  - pymdownx.superfences
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.arithmatex:
+      generic: true
+  - footnotes
+  - pymdownx.mark
+  - md_in_html
 
 plugins:
   - search:
+  - autorefs:
   - mkdocstrings:
       default_handler: python
       handlers:
         python:
           options:
-            show_signature_annotations: true
+            # show_signature_annotations: true
             show_source: true
             show_submodules: true
+            docstring_options:
+              ignore_init_summary: true
+            docstring_section_style: spacy
+            filters: ["!^_"]
+            heading_level: 2
+            inherited_members: true
+            merge_init_into_class: true
+            parameter_headings: true
+            preload_modules: [mkdocstrings]
+            relative_crossrefs: true
+            scoped_crossrefs: true
+            separate_signature: true
+            show_bases: true
+            show_inheritance_diagram: true
+            show_root_heading: true
+            show_root_full_path: false
+            show_signature_annotations: true
+            show_source: true
+            show_symbol_type_heading: true
+            show_symbol_type_toc: true
+            signature_crossrefs: true
+            summary: true
+            unwrap_annotated: true
+  - social
+  - tags
+  - offline
+  - glightbox:
+      touchNavigation: false
+      loop: false
+      effect: zoom
+      width: 100%
+      height: auto
+      zoomable: true
+      draggable: true
+
+
+# extra:
+#   social:
+#     - icon: simple/youtube
+#       link: https://youtube.com/
+#     - icon: fontawesome/brands/linkedin-in
+#       link: https://linkedin.com/in/edwinjosechittilappilly
+
+
+copyright: Copyright &copy; 2024 Edwin Jose Chittilappilly
