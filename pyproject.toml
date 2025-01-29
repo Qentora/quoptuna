@@ -6,7 +6,7 @@ authors = [
     {name = "Edwin Jose", email = "edwinjose900@gmail.com"},
 ]
 license = {text = "MIT"}
-requires-python = "<4.0,>=3.10"
+requires-python = "<4.0,>=3.11"
 dependencies = [
     "pennylane>=0.38.1,<1.0.0",
     "scikit-learn>=1.5.2,<2.0.0",
