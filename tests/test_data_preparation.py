@@ -2,7 +2,7 @@
 import pandas as pd
 import pytest
 
-from quoptuna.backend.utils.data.prepare import DataPreparation
+from quoptuna.backend.utils.data_utils.prepare import DataPreparation
 
 
 # Mock sample data
