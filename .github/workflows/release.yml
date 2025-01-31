@@ -13,7 +13,6 @@ jobs:
       - name: Publish to pypi
         env:
           PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
-        run: |
-          uv publish --build --no-interaction --token $PYPI_TOKEN
+        run: uv publish --build --no-interaction --token $PYPI_TOKEN
       - name: Deploy docs
         run: uv run mkdocs gh-deploy --force
