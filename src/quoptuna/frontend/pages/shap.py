@@ -9,7 +9,7 @@ import shap
 import streamlit as st
 
 from quoptuna.backend.models import create_model
-from quoptuna.backend.optimizer import Optimizer
+from quoptuna.backend.tuners.optimizer import Optimizer
 from quoptuna.frontend.sidebar import select_data
 from quoptuna.frontend.support import (
     handle_input,
@@ -58,7 +58,7 @@ if isinstance(optimizer, Optimizer):
             if classical_f1_score != 0
             else "N/A"
         )
-        return f"Trial {trial.number} " f"{trial.params.get('model_type')} " f"F1-Score {f1_score}"
+        return f"Trial {trial.number} {trial.params.get('model_type')} F1-Score {f1_score}"
 
     best_trial_dropdown = st.selectbox(
         "Select Best Trial",

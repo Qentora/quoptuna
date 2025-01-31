@@ -4,6 +4,10 @@ import pandas as pd
 
 
 class DataVariable(TypedDict):
+    """
+    DataVariable class for storing the data variables.
+    """
+
     x_train: pd.DataFrame
     y_train: pd.Series
 

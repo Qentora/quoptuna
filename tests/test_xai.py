@@ -2,8 +2,8 @@ import matplotlib.pyplot as plt
 import pytest
 import shap
 
+from quoptuna import XAI
 from quoptuna.backend.models import MLPClassifier
-from quoptuna.backend.xai.xai import XAI
 
 
 @pytest.fixture

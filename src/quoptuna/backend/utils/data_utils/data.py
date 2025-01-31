@@ -8,8 +8,15 @@ from optuna_dashboard import wsgi
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
+"""
+Data utils for loading and preprocessing the data.
+"""
+
 
 def load_data(file_path):
+    """
+    Load the data from the file path.
+    """
     data_frame = pd.read_csv(file_path)
     y = data_frame["Crystal"]
     x = data_frame.drop(columns=["Crystal"])
@@ -17,6 +24,9 @@ def load_data(file_path):
 
 
 def preprocess_data(x, y):
+    """
+    Preprocess the data.
+    """
     scaler = StandardScaler()
     x = scaler.fit_transform(x)
     classes = np.unique(y)
@@ -24,8 +34,10 @@ def preprocess_data(x, y):
     return train_test_split(x, y, random_state=42)
 
 
-# find a port number that is not in use and returns the port number
 def find_free_port():
+    """
+    Find a port number that is not in use and returns the port number.
+    """
     import socket
 
     for port in range(6000, 7000):

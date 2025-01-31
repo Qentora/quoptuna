@@ -6,8 +6,8 @@ from optuna import Trial, create_study, load_study
 from optuna.samplers import TPESampler
 from sklearn.metrics import accuracy_score, f1_score
 
-from quoptuna.backend.data import load_data, preprocess_data
 from quoptuna.backend.models import create_model
+from quoptuna.backend.utils.data_utils.data import load_data, preprocess_data
 
 logging.getLogger().setLevel(logging.INFO)
 
@@ -20,6 +20,33 @@ class Optimizer:
         data: Optional[dict] = None,  # noqa: FA100
         study_name: str = "",
     ):
+        """
+
+        Initialize the Optimizer class.
+
+        Args:
+            db_name (str): The name of the database to be used for storing optimization results.
+            dataset_name (str, optional): The name of the dataset.
+            If provided, the data will be loaded from a CSV file located in the 'notebook' directory.
+            Defaults to an empty string.
+            data (Optional[dict], optional): A dictionary containing training and testing data.
+            If not provided, an empty dictionary will be used.
+            Expected keys are 'train_x', 'test_x', 'train_y', and 'test_y'.
+            study_name (str, optional): The name of the study for Optuna. Defaults to an empty string.
+
+        Attributes:
+            db_name (str): The name of the database.
+            dataset_name (str): The name of the dataset.
+            data_path (str): The path to the dataset CSV file or an empty string if no dataset name is provided.
+            data (dict): The data dictionary containing training and testing data.
+            train_x (Optional[np.ndarray]): The training features.
+            test_x (Optional[np.ndarray]): The testing features.
+            train_y (Optional[np.ndarray]): The training labels.
+            test_y (Optional[np.ndarray]): The testing labels.
+            storage_location (str): The storage location for the Optuna study.
+            study_name (str): The name of the Optuna study.
+            study (Optional[Study]): The Optuna study object.
+        """
         self.db_name = db_name
         self.dataset_name = dataset_name
         if len(self.dataset_name) > 0:

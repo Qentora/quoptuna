@@ -8,7 +8,7 @@ from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 if TYPE_CHECKING:
-    from quoptuna.backend.data_typing import DataSet
+    from quoptuna.backend.typing.data_typing import DataSet
 
 
 class DataPreparation:

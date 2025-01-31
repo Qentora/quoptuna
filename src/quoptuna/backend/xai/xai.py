@@ -10,7 +10,7 @@ from shap import Explainer
 if TYPE_CHECKING:
     from sklearn.base import BaseEstimator
 
-    from quoptuna.backend.data_typing import DataSet
+    from quoptuna.backend.typing.data_typing import DataSet
 
 # Constants
 EXPECTED_SHAP_VALUES_DIM = 2
