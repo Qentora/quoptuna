@@ -18,7 +18,13 @@ jobs:
         id: updated_version
         shell: bash
         run: |
-          uv version ${{ github.event.inputs.version }}
+          if [[ "${{ github.event.inputs.version }}" =~ ^(patch|minor|major)$ ]]; then
+            uv version ${{ github.event.inputs.version }}
+          elif [[ "${{ github.event.inputs.version }}" =~ ^pre(patch|minor|major|release)$ ]]; then
+            uv version --pre ${{ github.event.inputs.version }}
+          else
+            uv version --new-version ${{ github.event.inputs.version }}
+          fi
           version=$(uv version --short)
           echo ::set-output name="version::$version"
       - name: Update changelog
