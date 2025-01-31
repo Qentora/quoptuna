@@ -5,7 +5,7 @@ description = "quoptuna is a proposed open-source project that combines quantum 
 authors = [
     {name = "Edwin Jose", email = "edwinjose900@gmail.com"},
 ]
-license = {text = "MIT"}
+license = {text = "Apache-2.0"}
 requires-python = "<4.0,>=3.11"
 dependencies = [
     "pennylane>=0.38.1,<1.0.0",
@@ -36,6 +36,8 @@ dependencies = [
     "mkdocs-material>=9.5.48",
     "mkdocstrings>=0.27.0",
     "mkdocstrings-python>=1.12.2",
+    "cairosvg>=2.7.1",
+    "mkdocs-glightbox>=0.4.0",
 ]
 readme = "README.md"
 classifiers = [
