@@ -9,7 +9,7 @@ import shap
 import streamlit as st
 
 from quoptuna.backend.models import create_model
-from quoptuna.backend.optimizer import Optimizer
+from quoptuna.backend.tuners.optimizer import Optimizer
 from quoptuna.frontend.sidebar import select_data
 from quoptuna.frontend.support import (
     handle_input,

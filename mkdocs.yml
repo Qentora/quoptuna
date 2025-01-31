@@ -100,10 +100,9 @@ plugins:
             show_source: true
             show_submodules: true
             docstring_options:
-              ignore_init_summary: true
+              ignore_init_summary: false
             docstring_section_style: spacy
             filters: ["!^_"]
-            # heading_level: 
             inherited_members: true
             merge_init_into_class: true
             parameter_headings: true
@@ -116,7 +115,6 @@ plugins:
             show_root_heading: true
             show_root_full_path: false
             show_signature_annotations: true
-            show_source: true
             show_symbol_type_heading: true
             show_symbol_type_toc: true
             signature_crossrefs: true
