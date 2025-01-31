@@ -12,6 +12,7 @@ from sklearn.preprocessing import StandardScaler
 Data utils for loading and preprocessing the data.
 """
 
+
 def load_data(file_path):
     """
     Load the data from the file path.
