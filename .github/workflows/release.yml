@@ -11,8 +11,9 @@ jobs:
       - uses: actions/checkout@v4
       - uses: ./.github/actions/python-uv-env
       - name: Publish to pypi
+        env:
+          PYPI_TOKEN: ${{ secrets.PYPI_TOKEN }}
         run: |
-          uv config pypi-token.pypi ${{ secrets.PYPI_TOKEN }}
-          uv publish --build --no-interaction
+          uv publish --build --no-interaction --token $PYPI_TOKEN
       - name: Deploy docs
         run: uv run mkdocs gh-deploy --force
