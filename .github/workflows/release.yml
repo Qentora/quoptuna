@@ -9,7 +9,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: ./.github/actions/python-poetry-env
+      - uses: ./.github/actions/python-uv-env
       - name: Publish to pypi
         run: |
           uv config pypi-token.pypi ${{ secrets.PYPI_TOKEN }}
