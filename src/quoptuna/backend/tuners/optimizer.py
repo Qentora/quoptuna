@@ -26,11 +26,11 @@ class Optimizer:
 
         Args:
             db_name (str): The name of the database to be used for storing optimization results.
-            dataset_name (str, optional): The name of the dataset. 
-            If provided, the data will be loaded from a CSV file located in the 'notebook' directory. 
+            dataset_name (str, optional): The name of the dataset.
+            If provided, the data will be loaded from a CSV file located in the 'notebook' directory.
             Defaults to an empty string.
             data (Optional[dict], optional): A dictionary containing training and testing data.
-            If not provided, an empty dictionary will be used. 
+            If not provided, an empty dictionary will be used.
             Expected keys are 'train_x', 'test_x', 'train_y', and 'test_y'.
             study_name (str, optional): The name of the study for Optuna. Defaults to an empty string.
 
