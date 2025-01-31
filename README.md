@@ -62,21 +62,29 @@ QuOptuna combines quantum computing with advanced hyperparameter optimization to
 
 ### :dart: Features
 
-- **Quantum Optimization**: Leverage quantum algorithms for enhanced hyperparameter tuning.
-- **Seamless Integration**: Compatible with Optuna's workflow.
-- **Extensible**: Supports multiple quantum backends and custom algorithms.
+- **Quantum-ML Optimization**: Specialized hyperparameter tuning for Quantum algorithms
+- **Multiple Model Support**: Compatible with both classical and quantum models, including:
+  - Quantum Models: Circuit-Centric Classifier, Data Reuploading Classifier, Quantum Kitchen Sinks, and more
+  - Classical Models: SVC, MLP Classifier, Perceptron
+- **Interactive Dashboard**: Visualize optimization progress in real-time
+- **Explainable AI**: Built-in tools for model interpretability
+- **Extensible Framework**: Easy integration with custom models and algorithms
 
 ## :gear: Installation
 
-Install QuOptuna using pip:
+Install QuOptuna using UV (recommended) or pip:
 
 ```sh
+# Using UV (recommended)
+uv pip install quoptuna
+
+# Using pip
 pip install quoptuna
 ```
 
 ## :eyes: Quick Start
 
-Here’s how you can get started:
+Here's how you can get started:
 
 ```python
 import quoptuna as qo
@@ -89,6 +97,14 @@ study = qo.create_study()
 study.optimize(objective, n_trials=100)
 
 print("Best trial:", study.best_trial)
+```
+
+### Interactive Dashboard
+
+QuOptuna includes a Streamlit-based dashboard for real-time optimization monitoring:
+
+```sh
+quoptuna --start
 ```
 
 ## :book: Documentation
@@ -108,17 +124,11 @@ cd quoptuna
 
 ### Install Requirements
 
-1. Ensure Poetry and Python 3.8+ are installed.
-2. Install dependencies:
+1. Ensure UV and Python 3.8+ are installed.
+2. Install development dependencies:
 
 ```sh
-poetry install
-```
-
-3. Activate the virtual environment:
-
-```sh
-poetry shell
+uv pip install -e ".[dev]"
 ```
 
 ### Testing
@@ -126,13 +136,22 @@ poetry shell
 Run tests with:
 
 ```sh
-pytest
+uv run pytest
 ```
 
 To check code coverage:
 
 ```sh
-pytest --cov=quoptuna
+uv run pytest --cov=quoptuna
+```
+
+### Code Quality
+
+Run linting and type checks:
+
+```sh
+uv run ruff check .
+uv run mypy .
 ```
 
 ## :wave: Contributing
