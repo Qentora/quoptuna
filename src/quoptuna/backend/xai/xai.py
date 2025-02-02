@@ -77,6 +77,8 @@ class XAI:
     def _get_explainer(self) -> Explainer:
         predict_method = self.model.predict_proba if self.use_proba else self.model.predict
         data = self._validate_and_get_data()
+        if self.onsubset:
+            data = data.iloc[:DEFAULT_SUBSET_SIZE]
         return Explainer(predict_method, data)
 
     def validate_predict_proba(self) -> bool:
