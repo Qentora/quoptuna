@@ -1,80 +1,84 @@
-[tool.poetry]
+[project]
 name = "quoptuna"
 version = "0.0.2"
 description = "quoptuna is a proposed open-source project that combines quantum computing with Optuna's hyperparameter optimization framework."
 authors = [
-    "Edwin Jose <edwinjose900@gmail.com>",
+    {name = "Edwin Jose", email = "edwinjose900@gmail.com"},
 ]
-license = "MIT"
+license = {text = "Apache-2.0"}
+requires-python = "<4.0,>=3.11"
+dependencies = [
+    "pennylane>=0.38.1,<1.0.0",
+    "scikit-learn>=1.5.2,<2.0.0",
+    "matplotlib>=3.9.2,<4.0.0",
+    "jax>=0.4.31,<1.0.0",
+    "jaxlib>=0.4.31,<1.0.0",
+    "flax>=0.9.0,<1.0.0",
+    "optax>=0.2.3,<1.0.0",
+    "pandas>=2.2.2,<3.0.0",
+    "seaborn>=0.13.2,<1.0.0",
+    "scipy>=1.14.1,<2.0.0",
+    "optuna>=4.0.0,<5.0.0",
+    "optuna-dashboard>=0.16.2,<1.0.0",
+    "streamlit>=1.38.0,<2.0.0",
+    "python-fasthtml>=0.6.9,<1.0.0",
+    "streamlit-elements>=0.1.0,<1.0.0",
+    "plotly>=5.24.1,<6.0.0",
+    "pydantic>=2.9.2,<3.0.0",
+    "shap>=0.46.0,<1.0.0",
+    "pytest>=8.3.4,<9.0.0",
+    "pytest-cov>=6.0.0,<7.0.0",
+    "ruff>=0.8.3",
+    "mypy>=1.13.0",
+    "codeflash>=0.8.3",
+    "pre-commit>=4.0.1",
+    "mkdocs>=1.6.1",
+    "mkdocs-material>=9.5.48",
+    "mkdocstrings>=0.27.0",
+    "mkdocstrings-python>=1.12.2",
+    "cairosvg>=2.7.1",
+    "mkdocs-glightbox>=0.4.0",
+]
 readme = "README.md"
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Developers",
+    "Operating System :: OS Independent",
+    "Programming Language :: Python",
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.8",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Programming Language :: Python :: 3.12",
+    "Topic :: Software Development :: Libraries :: Python Modules",
+    "Typing :: Typed",
+]
 
-documentation = "https://Qentora.github.io/quoptuna"
+[project.urls]
 homepage = "https://Qentora.github.io/quoptuna"
 repository = "https://github.com/Qentora/quoptuna"
+documentation = "https://Qentora.github.io/quoptuna"
 
-classifiers = [
-  "Development Status :: 4 - Beta",
-  "Intended Audience :: Developers",
-  "Operating System :: OS Independent",
-  "Programming Language :: Python",
-  "Programming Language :: Python :: 3",
-  "Programming Language :: Python :: 3.8",
-  "Programming Language :: Python :: 3.9",
-  "Programming Language :: Python :: 3.10",
-  "Programming Language :: Python :: 3.11",
-  "Programming Language :: Python :: 3.12",
-  "Topic :: Software Development :: Libraries :: Python Modules",
-  "Typing :: Typed",
-]
-
-packages = [
-    { include = "quoptuna", from = "src" }
-]
-include = [ "src/quoptuna/*", "src/quoptuna/**/*"]
-[tool.poetry.dependencies]
-python = ">=3.10, <4.0"
-pennylane = "^0.38.1"
-scikit-learn = "^1.5.2"
-matplotlib = "^3.9.2"
-jax = "^0.4.31"
-jaxlib = "^0.4.31"
-flax = "^0.9.0"
-optax = "^0.2.3"
-pandas = "^2.2.2"
-seaborn = "^0.13.2"
-scipy = "^1.14.1"
-optuna = "^4.0.0"
-optuna-dashboard = "^0.16.2"
-streamlit = "^1.38.0"
-python-fasthtml = "^0.6.9"
-streamlit-elements = "^0.1.0"
-plotly = "^5.24.1"
-pydantic = "^2.9.2"
-shap = "^0.46.0"
-pytest = "^8.3.4"
-pytest-cov = "^6.0.0"
-
-
-[tool.poetry.group.dev.dependencies]
-mkdocstrings = {version = ">=0.23", extras = ["python"]}
-mkdocs-material = "*"
-mypy = "*"
-pre-commit = "*"
-pymdown-extensions = "*"
-pytest = "*"
-pytest-github-actions-annotate-failures = "*"
-pytest-cov = "*"
-python-kacl = "*"
-ruff = ">=0.2.0"
-ipykernel = "^6.29.5"
-
-[tool.poetry.scripts]
+[project.scripts]
 quoptuna = "quoptuna.frontend.app:main"
 
+[tool.pdm.dev-dependencies]
+dev = [
+    "mkdocstrings[python]>=0.23",
+    "mkdocs-material",
+    "mypy",
+    "pre-commit",
+    "pymdown-extensions",
+    "pytest",
+    "pytest-github-actions-annotate-failures",
+    "pytest-cov",
+    "python-kacl",
+    "ruff>=0.2.0",
+]
 
-[build-system]
-requires = ["poetry-core>=1.0.0"]
-build-backend = "poetry.core.masonry.api"
+[tool.pdm.build]
+includes = ["src/quoptuna", "src/quoptuna/*", "src/quoptuna/**/*"]
 
 [tool.ruff]
 target-version = "py38" # The lowest supported version
@@ -95,6 +99,9 @@ ignore = [
 ]
 
 [tool.ruff.lint.per-file-ignores]
+# Ignore assert usage and private access in test files
+"**/test_*.py" = ["S101", "SLF001"]
+"**/tests/**" = ["S101", "SLF001"]
 "tests/**" = [
     "S101",     # "Use of `assert` detected"
     "ARG",      # "Unused function argument". Fixtures are often unused.
@@ -112,6 +119,8 @@ classmethod-decorators = [
     "pydantic.root_validator",
 ]
 
+
+
 [tool.pytest.ini_options]
 minversion = "6.0"
 testpaths = ["tests"]
@@ -121,7 +130,6 @@ log_cli = true
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
 log_cli_date_format = "%Y-%m-%d %H:%M:%S"
 addopts = "--cov --cov-report=xml --cov-fail-under=35"
-
 
 [tool.coverage.report]
 fail_under = 100
@@ -138,7 +146,7 @@ namespace_packages = true
 mypy_path = "quoptuna"
 ignore_missing_imports = true
 disallow_any_unimported = false
-exclude = "src/quoptuna/backend/base/pennylane_models/.*"
+exclude = ["src/quoptuna/backend/base/pennylane_models/.*","venv/"]
 
 # If you need to ignore something for some specific module,
 # add overrides for them. Avoid changing the global config!
@@ -155,3 +163,15 @@ ignore_missing_imports = true
 #   "tests/my_thing/test_my_thing",
 # ]
 # disallow_untyped_defs = false
+
+[tool.codeflash]
+# All paths are relative to this pyproject.toml's directory.
+module-root = "src"
+tests-root = "tests"
+test-framework = "pytest"
+ignore-paths = ["src/quoptuna/backend/base"]
+formatter-cmds = ["ruff check --exit-zero --fix $file", "ruff format $file"]
+
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
