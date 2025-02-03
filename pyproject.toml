@@ -19,7 +19,7 @@ dependencies = [
     "seaborn==0.13.2",
     "scipy==1.14.1",
     "optuna==4.0.0",
-    "optuna-dashboard==0.16.2",
+    "optuna-dashboard==0.17.0",
     "streamlit==1.38.0",
     "python-fasthtml==0.6.9",
     "streamlit-elements==0.1.0",
