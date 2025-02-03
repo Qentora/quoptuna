@@ -27,6 +27,10 @@ class XAI:
         data: DataSet,
         use_proba: bool = True,  # noqa: FBT001, FBT002
         onsubset: bool = True,  # noqa: FBT001, FBT002
+        feature_names: list[str] | None = None,
+        subset_size: int = DEFAULT_SUBSET_SIZE,
+        max_display: int = DEFAULT_MAX_DISPLAY,
+        data_key: str = DATA_KEY,
     ) -> None:
         if model is None:
             msg = "Model cannot be None"
@@ -34,8 +38,12 @@ class XAI:
         self.model = model
         self.data = data
         self.onsubset = onsubset
+        self.subset_size = subset_size
+        self.max_display = max_display
+        self.data_key = data_key
         self.use_proba = use_proba
         self._classes = self.get_classes  # Store the property value
+        self.feature_names = feature_names
         if self.use_proba:
             self.validate_predict_proba()
 
@@ -77,7 +85,9 @@ class XAI:
     def _get_explainer(self) -> Explainer:
         predict_method = self.model.predict_proba if self.use_proba else self.model.predict
         data = self._validate_and_get_data()
-        return Explainer(predict_method, data)
+        if self.onsubset:
+            data = data.iloc[: self.subset_size]
+        return Explainer(model=predict_method, masker=data, feature_names=self.feature_names)
 
     def validate_predict_proba(self) -> bool:
         if not hasattr(self.model, "predict_proba"):
@@ -95,7 +105,7 @@ class XAI:
     def _get_shap_values(self) -> shap.Explanation:
         data = self._validate_and_get_data()
         if self.onsubset:
-            data = data.iloc[:DEFAULT_SUBSET_SIZE]
+            data = data.iloc[: self.subset_size]
         return self.explainer(data)
 
     def _get_shap_values_each_class(
@@ -121,26 +131,51 @@ class XAI:
         msg = f"Error generating {plot_type} plot: {error!s}"
         raise RuntimeError(msg) from error
 
-    def get_plot(self, plot_type: PlotType, max_display: int = DEFAULT_MAX_DISPLAY):
+    def get_plot(
+        self,
+        plot_type: PlotType,
+        max_display: int = DEFAULT_MAX_DISPLAY,
+        class_index: int = -1,
+        index: int = 0,
+    ):
         """Generic method to get either bar or beeswarm plot."""
         try:
-            if self.shap_values.values.ndim == EXPECTED_SHAP_VALUES_DIM:  # noqa: PD011
-                values = self.shap_values
-            else:
-                values = self._validate_shap_values_class()
+            # Initialize values with default
+            values = self.shap_values
 
-            plot_func = {
-                "bar": shap.plots.bar,
-                "beeswarm": shap.plots.beeswarm,
-            }[plot_type]
+            # Override values if class-specific case
+            if self.shap_values.values.ndim > EXPECTED_SHAP_VALUES_DIM and class_index >= 0:  # noqa: PD011
+                values = self.shap_values_each_class[str(class_index)]
 
-            plot_func(values, max_display=max_display)
+            if plot_type != "waterfall":
+                plot_func = {
+                    "bar": shap.plots.bar,
+                    "beeswarm": shap.plots.beeswarm,
+                    "heatmap": shap.plots.heatmap,
+                    "violin": shap.plots.violin,
+                }[plot_type]
+
+                plot_func(values, max_display=max_display)
+                return plt.gcf()
+            plot_func = shap.plots.waterfall
+            plot_func(values[index])
             return plt.gcf()
         except (ValueError, TypeError, KeyError, RuntimeError) as e:
             self._handle_plot_error(plot_type, e)
 
-    def get_bar_plot(self, max_display: int = DEFAULT_MAX_DISPLAY):
-        return self.get_plot("bar", max_display)
+    def get_bar_plot(self, max_display: int = DEFAULT_MAX_DISPLAY, class_index: int = -1):
+        return self.get_plot("bar", max_display, class_index=class_index)
 
-    def get_beeswarm_plot(self, max_display: int = DEFAULT_MAX_DISPLAY):
-        return self.get_plot("beeswarm", max_display)
+    def get_beeswarm_plot(self, max_display: int = DEFAULT_MAX_DISPLAY, class_index: int = -1):
+        return self.get_plot("beeswarm", max_display, class_index=class_index)
+
+    def get_waterfall_plot(
+        self, max_display: int = DEFAULT_MAX_DISPLAY, index: int = 0, class_index: int = -1
+    ):
+        return self.get_plot("waterfall", max_display, index=index, class_index=class_index)
+
+    def get_violin_plot(self, max_display: int = DEFAULT_MAX_DISPLAY, class_index: int = -1):
+        return self.get_plot("violin", max_display, class_index=class_index)
+
+    def get_heatmap_plot(self, max_display: int = DEFAULT_MAX_DISPLAY, class_index: int = -1):
+        return self.get_plot("heatmap", max_display, class_index=class_index)
