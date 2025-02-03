@@ -115,11 +115,13 @@ def test_get_waterfall_plot(trained_model_sample, load_data):
     waterfall_plot = xai.get_waterfall_plot(index=0, class_index=0)
     assert isinstance(waterfall_plot, plt.Figure)  # Check if a figure is returned
 
+
 def test_get_violin_plot(trained_model_sample, load_data):
     # Test the get_violin_plot method
     xai = XAI(model=trained_model_sample, data=load_data, onsubset=True, subset_size=5)
     violin_plot = xai.get_violin_plot(class_index=0)
     assert isinstance(violin_plot, plt.Figure)  # Check if a figure is returned
+
 
 def test_get_heatmap_plot(trained_model_sample, load_data):
     # Test the get_heatmap_plot method
