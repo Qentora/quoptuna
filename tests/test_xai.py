@@ -66,7 +66,7 @@ def trained_model_sample(load_data):
 
 def test_get_shap_values(trained_model_sample, load_data):
     # Test getting SHAP values
-    xai = XAI(model=trained_model_sample, data=load_data)
+    xai = XAI(model=trained_model_sample, data=load_data, onsubset=True, subset_size=5)
     shap_values = xai._get_shap_values()
     assert shap_values is not None
     assert hasattr(shap_values, "values")
@@ -97,13 +97,34 @@ def test_get_classes(trained_model_sample, load_data):
 # Tests for plotting methods
 def test_get_bar_plot(trained_model_sample, load_data):
     # Test the get_bar_plot method
-    xai = XAI(model=trained_model_sample, data=load_data)
-    bar_plot = xai.get_bar_plot()
+    xai = XAI(model=trained_model_sample, data=load_data, onsubset=True, subset_size=5)
+    bar_plot = xai.get_bar_plot(class_index=0)
     assert isinstance(bar_plot, plt.Figure)  # Check if a figure is returned
 
 
 def test_get_beeswarm_plot(trained_model_sample, load_data):
     # Test the get_beeswarm_plot method
-    xai = XAI(model=trained_model_sample, data=load_data)
-    beeswarm_plot = xai.get_beeswarm_plot()
+    xai = XAI(model=trained_model_sample, data=load_data, onsubset=True, subset_size=5)
+    beeswarm_plot = xai.get_beeswarm_plot(class_index=0)
     assert isinstance(beeswarm_plot, plt.Figure)  # Check if a figure is returned
+
+
+def test_get_waterfall_plot(trained_model_sample, load_data):
+    # Test the get_waterfall_plot method
+    xai = XAI(model=trained_model_sample, data=load_data, onsubset=True, subset_size=5)
+    waterfall_plot = xai.get_waterfall_plot(index=0, class_index=0)
+    assert isinstance(waterfall_plot, plt.Figure)  # Check if a figure is returned
+
+
+def test_get_violin_plot(trained_model_sample, load_data):
+    # Test the get_violin_plot method
+    xai = XAI(model=trained_model_sample, data=load_data, onsubset=True, subset_size=5)
+    violin_plot = xai.get_violin_plot(class_index=0)
+    assert isinstance(violin_plot, plt.Figure)  # Check if a figure is returned
+
+
+def test_get_heatmap_plot(trained_model_sample, load_data):
+    # Test the get_heatmap_plot method
+    xai = XAI(model=trained_model_sample, data=load_data, onsubset=True, subset_size=5)
+    heatmap_plot = xai.get_heatmap_plot(class_index=0)
+    assert isinstance(heatmap_plot, plt.Figure)  # Check if a figure is returned
