@@ -1,10 +1,7 @@
 from __future__ import annotations
 
-import base64
-import io
 import pickle
 from pathlib import Path
-import random
 from typing import TYPE_CHECKING, Literal
 
 import matplotlib.pyplot as plt
@@ -215,14 +212,8 @@ class XAI:
             values = self.shap_values
 
             # Override values if class-specific case
-            if self.shap_values.values.ndim > EXPECTED_SHAP_VALUES_DIM :  # noqa: PD011
+            if self.shap_values.values.ndim > EXPECTED_SHAP_VALUES_DIM and class_index >= 0:  # noqa: PD011
                 values = self.shap_values_each_class[str(class_index)]
-                print("Class-specific case")
-                print(f"type of values: {type(values)}")
-                print(f"values: {values}")
-
-            plt.figure()  # Create a new figure for the plot
-            plt.title(plot_title)  # Add the title to the empty plot
 
             if plot_type != "waterfall":
                 plot_func = {
@@ -233,17 +224,17 @@ class XAI:
                 }[plot_type]
 
                 plot_func(values, max_display=max_display)
-                # if save_path and save_name:
-                #     # save the plot
-                #     plt.savefig(Path(save_path) / save_name, format=save_format, dpi=save_dpi)
+                # add a ployt title
+                plt.title(plot_title)
+                if save_path and save_name:
+                    # save the plot
+                    plt.savefig(Path(save_path) / save_name, format=save_format, dpi=save_dpi)
                 return plt.gcf()
             plot_func = shap.plots.waterfall
             plot_func(values[index])
             return plt.gcf()
         except (ValueError, TypeError, KeyError, RuntimeError) as e:
-            return values   
             self._handle_plot_error(plot_type, e)
-
 
     def get_bar_plot(self, max_display: int = DEFAULT_MAX_DISPLAY, class_index: int = -1):
         return self.get_plot("bar", max_display, class_index=class_index)
@@ -389,7 +380,7 @@ class XAI:
 
 
 
-    def generate_report_with_langchain(self, openai_api_key: str, model_name="gpt-4o", num_waterfall_plots: int = 5):
+    def generate_report_with_langchain(self, openai_api_key: str, model_name="gpt-3.5-turbo-16k", num_waterfall_plots: int = 5):
         """Generates a comprehensive report using LangChain and a multimodal LLM."""
 
         chat = ChatOpenAI(openai_api_key=openai_api_key, model_name=model_name)
@@ -407,17 +398,14 @@ class XAI:
                 fig.savefig(img_buf, format="png")
                 img_buf.seek(0)
                 img_base64 = base64.b64encode(img_buf.getvalue()).decode("utf-8")
-                images[plot_type] = f"data:image/png;base64,{img_base64}"
+                images[plot_type] = img_base64
                 plt.close(fig)  # Important: Close the figure
             except Exception as e:
                 print(f"Error generating or encoding {plot_type} plot: {e}")
 
         # --- Waterfall Plots (Selected Randomly) ---
         try:
-            if self.onsubset:
-                num_waterfall_plots = min(num_waterfall_plots, self.subset_size)
-            else:
-                num_waterfall_plots = min(num_waterfall_plots, len(self.x_test))
+            num_waterfall_plots = min(num_waterfall_plots, len(self.x_test)) # prevent index error
             indices = sorted(random.sample(range(len(self.x_test)), num_waterfall_plots))
             for i in indices:
                 fig = self.get_plot("waterfall", index=i)
@@ -425,8 +413,8 @@ class XAI:
                 fig.savefig(img_buf, format="png")
                 img_buf.seek(0)
                 img_base64 = base64.b64encode(img_buf.getvalue()).decode("utf-8")
-                images[f"waterfall_{i}"] = f"data:image/png;base64,{img_base64}"
-                plt.close(fig)
+                images[f"waterfall_{i}"] = img_base64
+                plt.close(fig)  # Important: Close the figure
         except Exception as e:
             print(f"Error generating or encoding waterfall plots: {e}")
 
@@ -437,34 +425,29 @@ class XAI:
             fig.savefig(img_buf, format="png")
             img_buf.seek(0)
             img_base64 = base64.b64encode(img_buf.getvalue()).decode("utf-8")
-            images["confusion_matrix"] = f"data:image/png;base64,{img_base64}"
-            plt.close(fig)
+            images["confusion_matrix"] = img_base64
+            plt.close(fig)  # Important: Close the figure
         except Exception as e:
             print(f"Error generating or encoding confusion matrix: {e}")
+
 
         # --- LangChain Prompt and LLM Call ---
         prompt_template = ChatPromptTemplate(
             messages=[
                 SystemMessage(
-                    content="You are an AI assistant that analyzes model evaluation reports and generates insightful summaries. You are provided with evaluation metrics and explanations of feature importance from SHAP values, along with visualizations. Use all of the available information to generate a comprehensive report. Be sure to explain what the metrics mean in context, and how they relate to the model's performance. For the SHAP values, explain which features are most important, and how they influence the model's predictions. For the confusion matrix, explain what the different quadrants represent, and what the overall accuracy is. If there are any potential problems with the model, be sure to point them out."
+                    content="You are an AI assistant that analyzes model evaluation reports and generates insightful summaries.  You are provided with evaluation metrics and explanations of feature importance from SHAP values, along with visualizations.  Use all of the available information to generate a comprehensive report.  Be sure to explain what the metrics mean in context, and how they relate to the model's performance.  For the SHAP values, explain which features are most important, and how they influence the model's predictions.  For the confusion matrix, explain what the different quadrants represent, and what the overall accuracy is.  If there are any potential problems with the model, be sure to point them out."
                 ),
                 HumanMessage(content="Model Evaluation Report:\n```\n{report}\n```"),
-                MessagesPlaceholder(variable_name="images"),
+                MessagesPlaceholder(variable_name="images"),  # Placeholder for images
             ]
         )
 
         image_messages = []
-        for plot_type, image_url in images.items():
+        for plot_type, image in images.items():
             image_messages.append(
                 HumanMessage(content=[
-                    {"type": "text", "text": f"Here is a {plot_type.replace('_', ' ')} plot:"},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": image_url,
-                            "detail": "auto"
-                        }
-                    }
+                    {"type": "text", "text": f"Here is a {plot_type.replace('_', ' ')} plot:"}, # make the plot name readable.
+                    {"type": "image_url", "image_url": f"data:image/png;base64,{image}"}
                 ])
             )
 
