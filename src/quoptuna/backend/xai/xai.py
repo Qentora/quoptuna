@@ -3,20 +3,18 @@ from __future__ import annotations
 import base64
 import io
 import pickle
-from pathlib import Path
 import random
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 import matplotlib.pyplot as plt
 import pandas as pd
 import shap
-from shap import Explainer
-from langchain_openai import ChatOpenAI
-from langchain_google_genai import ChatGoogleGenerativeAI
-
 from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
 from langchain.schema import HumanMessage, SystemMessage
-
+from langchain_google_genai import ChatGoogleGenerativeAI
+from langchain_openai import ChatOpenAI
+from shap import Explainer
 from sklearn.metrics import (
     average_precision_score,
     classification_report,
@@ -215,11 +213,8 @@ class XAI:
             values = self.shap_values
 
             # Override values if class-specific case
-            if self.shap_values.values.ndim > EXPECTED_SHAP_VALUES_DIM :  # noqa: PD011
+            if self.shap_values.values.ndim > EXPECTED_SHAP_VALUES_DIM:  # noqa: PD011
                 values = self.shap_values_each_class[str(class_index)]
-                print("Class-specific case")
-                print(f"type of values: {type(values)}")
-                print(f"values: {values}")
 
             plt.figure()  # Create a new figure for the plot
             plt.title(plot_title)  # Add the title to the empty plot
@@ -232,18 +227,31 @@ class XAI:
                     "violin": shap.plots.violin,
                 }[plot_type]
 
-                plot_func(values, max_display=max_display)
-                # if save_path and save_name:
-                #     # save the plot
-                #     plt.savefig(Path(save_path) / save_name, format=save_format, dpi=save_dpi)
-                return plt.gcf()
+                plot_func(values, max_display=max_display,show=False)
+                img_buf = io.BytesIO()
+                plt.savefig(img_buf, format="png")
+                img_buf.seek(0)
+                img_base64 = base64.b64encode(img_buf.getvalue()).decode("utf-8")
+                base64_code = f"data:image/png;base64,{img_base64}"
+                if save_path and save_name:
+                    # save the plot
+                    plt.savefig(Path(save_path) / save_name, format=save_format, dpi=save_dpi)
+                plt.close()
+                return base64_code
             plot_func = shap.plots.waterfall
-            plot_func(values[index])
-            return plt.gcf()
+            plot_func(values[index],show=False)
+            img_buf = io.BytesIO()
+            plt.savefig(img_buf, format="png")
+            img_buf.seek(0)
+            img_base64 = base64.b64encode(img_buf.getvalue()).decode("utf-8")
+            base64_code = f"data:image/png;base64,{img_base64}"
+            if save_path and save_name:
+                # save the plot
+                plt.savefig(Path(save_path) / save_name, format=save_format, dpi=save_dpi)
+            return base64_code
         except (ValueError, TypeError, KeyError, RuntimeError) as e:
-            return values   
+            return values
             self._handle_plot_error(plot_type, e)
-
 
     def get_bar_plot(self, max_display: int = DEFAULT_MAX_DISPLAY, class_index: int = -1):
         return self.get_plot("bar", max_display, class_index=class_index)
@@ -353,7 +361,7 @@ class XAI:
             try:
                 report[key] = func()
             except Exception as e:
-                report[key] = f"Error retrieving {key.replace('_', ' ')}: {str(e)}"
+                report[key] = f"Error retrieving {key.replace('_', ' ')}: {e!s}"
         return report
 
     def plot_confusion_matrix(
@@ -387,12 +395,17 @@ class XAI:
     def __str__(self):
         return str(self.get_report())
 
-
-
-    def generate_report_with_langchain(self, openai_api_key: str, model_name="gpt-4o", num_waterfall_plots: int = 5):
+    def generate_report_with_langchain(
+        self, api_key: str, model_name:str="gpt-4o",provider:str="google" ,num_waterfall_plots: int = 5
+    ):
         """Generates a comprehensive report using LangChain and a multimodal LLM."""
 
-        chat = ChatOpenAI(openai_api_key=openai_api_key, model_name=model_name)
+        if provider == "google":
+            chat = ChatGoogleGenerativeAI(google_api_key=api_key, model=model_name)
+        elif provider == "openai":
+            chat = ChatOpenAI(openai_api_key=api_key, model_name=model_name)
+        else:
+            raise ValueError(f"Invalid provider: {provider}")
 
         report = self.get_report()
         report_string = str(report)
@@ -402,15 +415,10 @@ class XAI:
         # --- Other Plots (Bar, Beeswarm, etc.) ---
         for plot_type in ["bar", "beeswarm", "violin", "heatmap"]:  # Exclude waterfall here
             try:
-                fig = self.get_plot(plot_type)
-                img_buf = io.BytesIO()
-                fig.savefig(img_buf, format="png")
-                img_buf.seek(0)
-                img_base64 = base64.b64encode(img_buf.getvalue()).decode("utf-8")
-                images[plot_type] = f"data:image/png;base64,{img_base64}"
-                plt.close(fig)  # Important: Close the figure
+                images[plot_type] = self.get_plot(plot_type)
             except Exception as e:
-                print(f"Error generating or encoding {plot_type} plot: {e}")
+                msg = f"Error generating or encoding {plot_type} plot: {e}"
+                raise ValueError(msg) from e
 
         # --- Waterfall Plots (Selected Randomly) ---
         try:
@@ -418,17 +426,12 @@ class XAI:
                 num_waterfall_plots = min(num_waterfall_plots, self.subset_size)
             else:
                 num_waterfall_plots = min(num_waterfall_plots, len(self.x_test))
-            indices = sorted(random.sample(range(len(self.x_test)), num_waterfall_plots))
+            indices = sorted(random.sample(range(num_waterfall_plots), num_waterfall_plots))
             for i in indices:
-                fig = self.get_plot("waterfall", index=i)
-                img_buf = io.BytesIO()
-                fig.savefig(img_buf, format="png")
-                img_buf.seek(0)
-                img_base64 = base64.b64encode(img_buf.getvalue()).decode("utf-8")
-                images[f"waterfall_{i}"] = f"data:image/png;base64,{img_base64}"
-                plt.close(fig)
+                images[f"waterfall_{i}"] =self.get_plot("waterfall", index=i)
         except Exception as e:
-            print(f"Error generating or encoding waterfall plots: {e}")
+            msg = f"Error generating or encoding waterfall plots: {e}"
+            raise ValueError(msg) from e
 
         # --- Confusion Matrix ---
         try:
@@ -440,42 +443,74 @@ class XAI:
             images["confusion_matrix"] = f"data:image/png;base64,{img_base64}"
             plt.close(fig)
         except Exception as e:
-            print(f"Error generating or encoding confusion matrix: {e}")
+            msg = f"Error generating or encoding confusion matrix: {e}"
+            raise ValueError(msg) from e
 
         # --- LangChain Prompt and LLM Call ---
+        prompt1 = """
+            You are an AI assistant that analyzes model evaluation reports and generates insightful summaries. 
+            You are provided with evaluation metrics and explanations of feature importance from SHAP values, along with visualizations. 
+            Use all of the available information to generate a comprehensive report. 
+            Be sure to explain what the metrics mean in context, and how they relate to the model's performance. 
+            For the SHAP values, explain which features are most important, and how they influence the model's predictions. 
+            For the confusion matrix, explain what the different quadrants represent, and what the overall accuracy is. 
+            If there are any potential problems with the model, be sure to point them out.   
+            """
+        prompt2 = """
+            System Role:
+            You are an AI assistant specializing in analyzing model evaluation reports to generate comprehensive, governance-oriented summaries. Your goal is to provide detailed, data-driven insights into the model’s performance, feature importance, and potential risks, aligning with AI governance principles such as transparency, fairness, and accountability.
+
+            Key Instructions for Model Evaluation Report:
+                1.	Evaluation Metrics Analysis:
+                •	Clearly explain each metric (e.g., True Positives (TP), False Negatives (FN), Precision, Recall, F1-score, Accuracy).
+                •	Interpret what these metrics indicate about the model’s performance, strengths, weaknesses, and potential biases.
+                •	Provide precise calculations where applicable, referencing actual values (e.g., confusion matrix counts, accuracy percentages).
+                2.	Detailed SHAP Value and Feature Importance Analysis:
+            Analyze SHAP visualizations and bar plots to identify key features:
+                •	For Each SHAP Plot (Bar Plot, Beeswarm Plot, Violin Plot, Heatmap, Waterfall Plot):
+                •	Describe the plot—what is shown visually.
+                •	Interpret the data accurately based on provided plots without adding extra assumptions.
+                •	Numerically quantify feature importance where applicable (e.g., “Feature X has a SHAP value of 0.45, indicating strong positive influence on predictions”).
+                •	In the Bar Plot, identify which features are most relevant to the model’s predictions and quantify how much they contribute (e.g., “Feature A contributes 30% of the total SHAP value importance”).
+                3.	Risk and Fairness Assessment:
+                •	Identify potential risks such as overfitting, bias, or data drift based on observed metrics and feature contributions.
+                •	Highlight any indications of unfair bias in feature importance, especially if certain features dominate the model’s decisions disproportionately.
+                •	Recommend further fairness audits where necessary.
+                4.	Governance and Compliance Recommendations:
+                •	Provide actionable recommendations for improving model robustness, fairness, and explainability.
+                •	Suggest best practices for validation, monitoring, and accountability, aligned with regulatory standards.
+                •	If perfect or near-perfect accuracy is observed, recommend robustness testing and cross-validation to rule out overfitting.
+                5.	Model Lifecycle Context:
+                •	Frame the report within the AI model lifecycle, including development, deployment, and monitoring phases.
+                •	Emphasize continuous model evaluation, with recommendations for regular performance audits.
+
+            Tone and Structure:
+                •	Maintain a formal, precise, and governance-compliant writing style.
+                •	Use clear section headers, bullet points, and actionable recommendations.
+                •	Only include insights based on provided data—do not infer or assume beyond what the evaluation metrics and plots reveal.
+
+            Primary Objective:
+            Deliver a report that promotes trust, transparency, and accountability in AI systems. Your analysis should support technical teams, compliance officers, and governance stakeholders in making informed, data-driven decisions based on the provided evaluation metrics and visualizations.
+            """
         prompt_template = ChatPromptTemplate(
             messages=[
-                SystemMessage(
-                    content="You are an AI assistant that analyzes model evaluation reports and generates insightful summaries. You are provided with evaluation metrics and explanations of feature importance from SHAP values, along with visualizations. Use all of the available information to generate a comprehensive report. Be sure to explain what the metrics mean in context, and how they relate to the model's performance. For the SHAP values, explain which features are most important, and how they influence the model's predictions. For the confusion matrix, explain what the different quadrants represent, and what the overall accuracy is. If there are any potential problems with the model, be sure to point them out."
-                ),
+                SystemMessage(content=prompt2),
                 HumanMessage(content="Model Evaluation Report:\n```\n{report}\n```"),
                 MessagesPlaceholder(variable_name="images"),
             ]
         )
-
         image_messages = []
         for plot_type, image_url in images.items():
             image_messages.append(
-                HumanMessage(content=[
-                    {"type": "text", "text": f"Here is a {plot_type.replace('_', ' ')} plot:"},
-                    {
-                        "type": "image_url",
-                        "image_url": {
-                            "url": image_url,
-                            "detail": "auto"
-                        }
-                    }
-                ])
+                HumanMessage(
+                    content=[
+                        {"type": "text", "text": f"Here is a {plot_type.replace('_', ' ')} plot:"},
+                        {"type": "image_url", "image_url": {"url": image_url, "detail": "auto"}},
+                    ]
+                )
             )
 
         final_prompt = prompt_template.format_messages(report=report_string, images=image_messages)
 
         response = chat(final_prompt)
         return response.content
-
-# import random  # Import random for selecting waterfall plot indices
-
-# # Example usage (assuming xai_instance is your XAI object):
-# # openai_api_key = "YOUR_OPENAI_API_KEY"  # Replace with your actual key
-# # report = xai_instance.generate_report_with_langchain(openai_api_key, num_waterfall_plots=3)
-# # print(report)
