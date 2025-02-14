@@ -227,7 +227,7 @@ class XAI:
                     "violin": shap.plots.violin,
                 }[plot_type]
 
-                plot_func(values, max_display=max_display,show=False)
+                plot_func(values, max_display=max_display, show=False)
                 img_buf = io.BytesIO()
                 plt.savefig(img_buf, format="png")
                 img_buf.seek(0)
@@ -239,7 +239,7 @@ class XAI:
                 plt.close()
                 return base64_code
             plot_func = shap.plots.waterfall
-            plot_func(values[index],show=False)
+            plot_func(values[index], show=False)
             img_buf = io.BytesIO()
             plt.savefig(img_buf, format="png")
             img_buf.seek(0)
@@ -396,7 +396,11 @@ class XAI:
         return str(self.get_report())
 
     def generate_report_with_langchain(
-        self, api_key: str, model_name:str="gpt-4o",provider:str="google" ,num_waterfall_plots: int = 5
+        self,
+        api_key: str,
+        model_name: str = "gpt-4o",
+        provider: str = "google",
+        num_waterfall_plots: int = 5,
     ):
         """Generates a comprehensive report using LangChain and a multimodal LLM."""
 
@@ -428,7 +432,7 @@ class XAI:
                 num_waterfall_plots = min(num_waterfall_plots, len(self.x_test))
             indices = sorted(random.sample(range(num_waterfall_plots), num_waterfall_plots))
             for i in indices:
-                images[f"waterfall_{i}"] =self.get_plot("waterfall", index=i)
+                images[f"waterfall_{i}"] = self.get_plot("waterfall", index=i)
         except Exception as e:
             msg = f"Error generating or encoding waterfall plots: {e}"
             raise ValueError(msg) from e
