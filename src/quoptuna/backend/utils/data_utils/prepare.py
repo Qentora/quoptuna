@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 import numpy as np
@@ -118,18 +117,3 @@ class DataPreparation:
 
     # Additional methods for SHAP preparation can be added here
     # Ensure pickle is imported for serialization
-
-    def save_state(self, file_path: str):
-"""Saves the state of the class and its variables in a JSON file."""
-state_dict = {k: v for k, v in self.__dict__.items()}
-with Path(file_path).open("w") as f:
-    json.dump(state_dict, f, default=lambda o: o.__dict__ if hasattr(o, '__dict__') else str(o), indent=4)
-
-    @classmethod
-    def load_state(cls, file_path: str):
-        """Loads the state of the class from a JSON file."""
-        with Path(file_path).open("r") as f:
-            state_dict = json.load(f)
-            instance = cls()
-            instance.__dict__.update(state_dict)
-            return instance

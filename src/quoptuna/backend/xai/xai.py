@@ -377,11 +377,11 @@ class XAI:
             "recall": self.get_recall,
         }
 
-        for key, func in metrics.items():
-            try:
+        try:
+            for key, func in metrics.items():
                 report[key] = func()
-            except (ValueError, TypeError) as e:
-                report[key] = str(e)
+        except (ValueError, TypeError) as e:
+            report[key] = str(e)
         return report
 
     def plot_confusion_matrix(self, plot_config: dict | None = None):
