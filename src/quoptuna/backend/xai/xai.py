@@ -235,7 +235,7 @@ class XAI:
                 base64_code = f"data:image/png;base64,{img_base64}"
                 if save_path and save_name:
                     # save the plot
-                    plt.savefig(Path(save_path) / save_name, format=save_format, dpi=save_dpi)
+                    plt.savefig(Path(save_path) / save_name, format=save_format, dpi=save_dpi, bbox_inches='tight')
                 plt.close()
                 return base64_code
             plot_func = shap.plots.waterfall
@@ -247,7 +247,7 @@ class XAI:
             base64_code = f"data:image/png;base64,{img_base64}"
             if save_path and save_name:
                 # save the plot
-                plt.savefig(Path(save_path) / save_name, format=save_format, dpi=save_dpi)
+                plt.savefig(Path(save_path) / save_name, format=save_format, dpi=save_dpi, bbox_inches='tight')
             return base64_code
         except (ValueError, TypeError, KeyError, RuntimeError) as e:
             return values
@@ -374,6 +374,11 @@ class XAI:
         colorbar=True,
         im_kw=None,
         text_kw=None,
+        save_path: str | None = None,
+        save_name: str | None = None,
+        save_format: str = "png",
+        save_dpi: int = 300,
+        plot_title: str = "Confusion Matrix",
     ):
         """Plot the confusion matrix of the model."""
         from sklearn.metrics import ConfusionMatrixDisplay
@@ -389,7 +394,12 @@ class XAI:
             im_kw=im_kw,
             text_kw=text_kw,
         )
-        plt.title("Confusion Matrix")
+
+        plt.title(plot_title)
+    
+        if save_path:
+            plt.savefig(Path(save_path) / save_name, format=save_format, dpi=save_dpi, bbox_inches='tight')
+
         return plt.gcf()
 
     def __str__(self):
