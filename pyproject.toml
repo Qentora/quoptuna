@@ -39,6 +39,9 @@ dependencies = [
     "cairosvg>=2.7.1",
     "mkdocs-glightbox>=0.4.0",
     "pmlb>=1.0.1.post3",
+    "langchain>=0.3.17",
+    "langchain-openai>=0.3.3",
+    "langchain-google-genai>=2.0.9",
 ]
 readme = "README.md"
 classifiers = [

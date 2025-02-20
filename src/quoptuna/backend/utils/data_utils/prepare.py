@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+import pickle
+from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 import numpy as np
@@ -116,3 +118,17 @@ class DataPreparation:
         return None
 
     # Additional methods for SHAP preparation can be added here
+    # Ensure pickle is imported for serialization
+
+    def save_state(self, file_path: str):
+        """Saves the state of the class and its variables in a pkl file."""
+        with Path(file_path).open("wb") as f:
+            pickle.dump(self, f)
+
+    @classmethod
+    def load_state(cls, file_path: str):
+        """Loads the state of the class from a pkl file.
+        Warning: Only use this method with trusted data sources as pickle can be unsafe.
+        """
+        with Path(file_path).open("rb") as f:
+            return pickle.load(f)  # noqa: S301
