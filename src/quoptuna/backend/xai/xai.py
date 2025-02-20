@@ -4,6 +4,7 @@ import base64
 import io
 import pickle
 import random
+from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
@@ -40,7 +41,22 @@ EXPECTED_SHAP_VALUES_DIM = 2
 DATA_KEY = "x_train"
 DEFAULT_MAX_DISPLAY = 20
 DEFAULT_SUBSET_SIZE = 100
-PlotType = Literal["bar", "beeswarm"]
+NON_CLASS_SHAP_PLOT_TYPES = Literal["bar", "beeswarm", "violin", "heatmap"]
+CLASS_SHAP_PLOT_TYPES = Literal["waterfall"]
+CONFUSION_MATRIX_PLOT_TYPES = Literal["confusion_matrix"]
+PlotType = Literal[NON_CLASS_SHAP_PLOT_TYPES, CLASS_SHAP_PLOT_TYPES, CONFUSION_MATRIX_PLOT_TYPES]
+
+
+@dataclass
+class XAIConfig:
+    use_proba: bool = True
+    onsubset: bool = True
+    feature_names: list[str] | None = None
+    subset_size: int = DEFAULT_SUBSET_SIZE
+    max_display: int = DEFAULT_MAX_DISPLAY
+    data_key: str = DATA_KEY
+    x_test_key: str = "x_test"
+    y_test_key: str = "y_test"
 
 
 class XAI:
@@ -48,34 +64,33 @@ class XAI:
         self,
         model: BaseEstimator,
         data: DataSet,
-        use_proba: bool = True,  # noqa: FBT001, FBT002
-        onsubset: bool = True,  # noqa: FBT001, FBT002
-        feature_names: list[str] | None = None,
-        subset_size: int = DEFAULT_SUBSET_SIZE,
-        max_display: int = DEFAULT_MAX_DISPLAY,
-        data_key: str = DATA_KEY,
-        x_test_key: str = "x_test",
-        y_test_key: str = "y_test",
+        config: XAIConfig | None = None,
     ) -> None:
         if model is None:
             msg = "Model cannot be None"
             raise TypeError(msg)
+
+        self.config = config or XAIConfig()
         self.model = model
         self.data = data
-        self.onsubset = onsubset
-        self.subset_size = subset_size
-        self.max_display = max_display
-        self.data_key = data_key
-        self.use_proba = use_proba
-        self._classes = self.get_classes  # Store the property value
-        if feature_names is None and isinstance(self.data.get(data_key), pd.DataFrame):
-            self.feature_names = list(self.data.get(data_key).columns)
-        else:
-            self.feature_names = feature_names
+
+        # Explicitly declare instance attributes
+        self.use_proba: bool = self.config.use_proba
+        self.onsubset: bool = self.config.onsubset
+        self.feature_names: list[str] | None = self.config.feature_names
+        self.subset_size: int = self.config.subset_size
+        self.max_display: int = self.config.max_display
+        self.data_key: str = self.config.data_key
+        self.x_test_key: str = self.config.x_test_key
+        self.y_test_key: str = self.config.y_test_key
+
+        self._classes = self.get_classes
+        data_frame = self.data.get(self.data_key)
+        if self.feature_names is None and isinstance(data_frame, pd.DataFrame):
+            self.feature_names = list(data_frame.columns)
+
         if self.use_proba:
             self.validate_predict_proba()
-        self.x_test_key = x_test_key
-        self.y_test_key = y_test_key
 
         # Initialize these as None, they'll be computed on demand
         self._explainer: Explainer | None = None
@@ -201,57 +216,70 @@ class XAI:
         max_display: int = DEFAULT_MAX_DISPLAY,
         class_index: int = -1,
         index: int = 0,
-        save_path: str | None = None,
-        save_name: str | None = None,
-        save_format: str = "png",
-        save_dpi: int = 300,
-        plot_title: str | None = None,
+        save_config: dict | None = None,
     ):
-        """Generic method to get either bar or beeswarm plot."""
+        """Generate plot with given configuration."""
         try:
-            # Initialize values with default
-            values = self.shap_values
-
-            # Override values if class-specific case
-            if self.shap_values.values.ndim > EXPECTED_SHAP_VALUES_DIM:  # noqa: PD011
-                values = self.shap_values_each_class[str(class_index)]
-
-            plt.figure()  # Create a new figure for the plot
-            plt.title(plot_title)  # Add the title to the empty plot
-
-            if plot_type != "waterfall":
-                plot_func = {
-                    "bar": shap.plots.bar,
-                    "beeswarm": shap.plots.beeswarm,
-                    "heatmap": shap.plots.heatmap,
-                    "violin": shap.plots.violin,
-                }[plot_type]
-
-                plot_func(values, max_display=max_display, show=False)
-                img_buf = io.BytesIO()
-                plt.savefig(img_buf, format="png")
-                img_buf.seek(0)
-                img_base64 = base64.b64encode(img_buf.getvalue()).decode("utf-8")
-                base64_code = f"data:image/png;base64,{img_base64}"
-                if save_path and save_name:
-                    # save the plot
-                    plt.savefig(Path(save_path) / save_name, format=save_format, dpi=save_dpi, bbox_inches='tight')
-                plt.close()
-                return base64_code
-            plot_func = shap.plots.waterfall
-            plot_func(values[index], show=False)
-            img_buf = io.BytesIO()
-            plt.savefig(img_buf, format="png")
-            img_buf.seek(0)
-            img_base64 = base64.b64encode(img_buf.getvalue()).decode("utf-8")
-            base64_code = f"data:image/png;base64,{img_base64}"
-            if save_path and save_name:
-                # save the plot
-                plt.savefig(Path(save_path) / save_name, format=save_format, dpi=save_dpi, bbox_inches='tight')
-            return base64_code
+            values = self._get_plot_values(class_index)
+            return self._generate_plot(plot_type, values, max_display, index, save_config)
         except (ValueError, TypeError, KeyError, RuntimeError) as e:
-            return values
             self._handle_plot_error(plot_type, e)
+
+    def _generate_plot(
+        self, plot_type: PlotType, values, max_display: int, index: int, save_config: dict | None
+    ) -> str:
+        plt.figure()
+        if plot_type != "waterfall":
+            plot_func = self._get_plot_function(plot_type)
+            plot_func(values, max_display=max_display, show=False)
+        else:
+            shap.plots.waterfall(values[index], show=False)
+
+        base64_code = self._save_plot_to_base64()
+
+        if save_config is not None:  # Check if save_config exists
+            self._save_plot_to_file(save_config)
+
+        plt.close()
+        return base64_code
+
+    def _get_plot_values(self, class_index: int) -> shap.Explanation:
+        if class_index == -1:
+            return self.shap_values
+        if self.shap_values.values.ndim > EXPECTED_SHAP_VALUES_DIM:  # noqa: PD011
+            if self.shap_values_each_class is None:
+                msg = "No class-specific SHAP values available"
+                raise ValueError(msg)
+            return self.shap_values_each_class[str(class_index)]
+        return self.shap_values
+
+    def _get_plot_function(self, plot_type: PlotType):
+        return {
+            "bar": shap.plots.bar,
+            "beeswarm": shap.plots.beeswarm,
+            "heatmap": shap.plots.heatmap,
+            "violin": shap.plots.violin,
+        }[plot_type]
+
+    def _save_plot_to_base64(self) -> str:
+        img_buf = io.BytesIO()
+        plt.savefig(img_buf, format="png")
+        img_buf.seek(0)
+        img_base64 = base64.b64encode(img_buf.getvalue()).decode("utf-8")
+        return f"data:image/png;base64,{img_base64}"
+
+    def _save_plot_to_file(self, save_config: dict) -> None:
+        save_path = save_config.get("save_path")
+        save_name = save_config.get("save_name")
+        if not save_path or not save_name:
+            return
+
+        plt.savefig(
+            Path(save_path) / save_name,
+            format=save_config.get("save_format", "png"),
+            dpi=save_config.get("save_dpi", 300),
+            bbox_inches="tight",
+        )
 
     def get_bar_plot(self, max_display: int = DEFAULT_MAX_DISPLAY, class_index: int = -1):
         return self.get_plot("bar", max_display, class_index=class_index)
@@ -311,10 +339,6 @@ class XAI:
         """Get the f1 score of the model."""
         return f1_score(self.y_test, self.predictions)
 
-    def get_average_precision_score(self):
-        """Get the average precision score of the model."""
-        return average_precision_score(self.y_test, self.predictions_proba)
-
     def get_mcc(self):
         """Get the mcc of the model."""
         return matthews_corrcoef(self.y_test, self.predictions)
@@ -335,10 +359,6 @@ class XAI:
         """Get the recall of the model."""
         return recall_score(self.y_test, self.predictions)
 
-    def get_classification_report(self):
-        """Get the classification report of the model."""
-        return classification_report(self.y_test, self.predictions)
-
     def get_report(self):
         """Get the report of the model."""
         report = {}
@@ -357,48 +377,39 @@ class XAI:
             "recall": self.get_recall,
         }
 
-        for key, func in metrics.items():
-            try:
+        try:
+            for key, func in metrics.items():
                 report[key] = func()
-            except Exception as e:
-                report[key] = f"Error retrieving {key.replace('_', ' ')}: {e!s}"
+        except (ValueError, TypeError) as e:
+            report[key] = str(e)
         return report
 
-    def plot_confusion_matrix(
-        self,
-        include_values=True,
-        cmap="viridis",
-        xticks_rotation="horizontal",
-        values_format=None,
-        ax=None,
-        colorbar=True,
-        im_kw=None,
-        text_kw=None,
-        save_path: str | None = None,
-        save_name: str | None = None,
-        save_format: str = "png",
-        save_dpi: int = 300,
-        plot_title: str = "Confusion Matrix",
-    ):
-        """Plot the confusion matrix of the model."""
+    def plot_confusion_matrix(self, plot_config: dict | None = None):
+        """Plot confusion matrix with given configuration."""
         from sklearn.metrics import ConfusionMatrixDisplay
 
-        cm = self.get_confusion_matrix()
-        ConfusionMatrixDisplay(cm).plot(
-            include_values=include_values,
-            cmap=cmap,
-            xticks_rotation=xticks_rotation,
-            values_format=values_format,
-            ax=ax,
-            colorbar=colorbar,
-            im_kw=im_kw,
-            text_kw=text_kw,
-        )
+        config = {
+            "include_values": True,
+            "cmap": "viridis",
+            "xticks_rotation": "horizontal",
+            "values_format": None,
+            "ax": None,
+            "colorbar": True,
+            "im_kw": None,
+            "text_kw": None,
+            **(plot_config or {}),
+        }
 
-        plt.title(plot_title)
-    
-        if save_path:
-            plt.savefig(Path(save_path) / save_name, format=save_format, dpi=save_dpi, bbox_inches='tight')
+        cm = self.get_confusion_matrix()
+        ConfusionMatrixDisplay(cm).plot(**config)
+
+        if plot_config and plot_config.get("save_path"):
+            plt.savefig(
+                Path(plot_config["save_path"]) / plot_config["save_name"],
+                format=plot_config.get("save_format", "png"),
+                dpi=plot_config.get("save_dpi", 300),
+                bbox_inches="tight",
+            )
 
         return plt.gcf()
 
@@ -412,43 +423,41 @@ class XAI:
         provider: str = "google",
         num_waterfall_plots: int = 5,
     ):
-        """Generates a comprehensive report using LangChain and a multimodal LLM."""
-
-        if provider == "google":
-            chat = ChatGoogleGenerativeAI(google_api_key=api_key, model=model_name)
-        elif provider == "openai":
-            chat = ChatOpenAI(openai_api_key=api_key, model_name=model_name)
-        else:
-            raise ValueError(f"Invalid provider: {provider}")
+        """Generate comprehensive report using LangChain and multimodal LLM."""
+        chat = self._initialize_chat(api_key, model_name, provider)
 
         report = self.get_report()
-        report_string = str(report)
+        images = self._generate_report_images(num_waterfall_plots)
 
-        images = {}
+        prompt2 = Path("prompt.txt").read_text()
+        return self._generate_final_report(chat, report, images, prompt2)
 
-        # --- Other Plots (Bar, Beeswarm, etc.) ---
-        for plot_type in ["bar", "beeswarm", "violin", "heatmap"]:  # Exclude waterfall here
-            try:
-                images[plot_type] = self.get_plot(plot_type)
-            except Exception as e:
-                msg = f"Error generating or encoding {plot_type} plot: {e}"
-                raise ValueError(msg) from e
+    def _initialize_chat(self, api_key: str, model_name: str, provider: str):
+        if provider == "google":
+            return ChatGoogleGenerativeAI(google_api_key=api_key, model=model_name)
+        if provider == "openai":
+            return ChatOpenAI(openai_api_key=api_key, model_name=model_name)
+        msg = "Invalid provider"
+        raise ValueError(msg)
 
-        # --- Waterfall Plots (Selected Randomly) ---
+    def _generate_report_images(self, num_waterfall_plots: int):
+        images: dict[str, str] = {}  # Change type hint to allow string keys
+        plot_types: list[PlotType] = ["bar", "beeswarm", "violin", "heatmap"]
+
         try:
+            for plot_type in plot_types:
+                images[plot_type] = self.get_plot(plot_type)
+
             if self.onsubset:
                 num_waterfall_plots = min(num_waterfall_plots, self.subset_size)
             else:
                 num_waterfall_plots = min(num_waterfall_plots, len(self.x_test))
+
             indices = sorted(random.sample(range(num_waterfall_plots), num_waterfall_plots))
             for i in indices:
-                images[f"waterfall_{i}"] = self.get_plot("waterfall", index=i)
-        except Exception as e:
-            msg = f"Error generating or encoding waterfall plots: {e}"
-            raise ValueError(msg) from e
+                waterfall_plot_type: PlotType = "waterfall"
+                images[f"{waterfall_plot_type}_{i}"] = self.get_plot(waterfall_plot_type, index=i)
 
-        # --- Confusion Matrix ---
-        try:
             fig = self.plot_confusion_matrix()
             img_buf = io.BytesIO()
             fig.savefig(img_buf, format="png")
@@ -456,56 +465,14 @@ class XAI:
             img_base64 = base64.b64encode(img_buf.getvalue()).decode("utf-8")
             images["confusion_matrix"] = f"data:image/png;base64,{img_base64}"
             plt.close(fig)
+
         except Exception as e:
-            msg = f"Error generating or encoding confusion matrix: {e}"
+            msg = f"Error generating plots: {e}"
             raise ValueError(msg) from e
 
-        # --- LangChain Prompt and LLM Call ---
-        prompt1 = """
-            You are an AI assistant that analyzes model evaluation reports and generates insightful summaries. 
-            You are provided with evaluation metrics and explanations of feature importance from SHAP values, along with visualizations. 
-            Use all of the available information to generate a comprehensive report. 
-            Be sure to explain what the metrics mean in context, and how they relate to the model's performance. 
-            For the SHAP values, explain which features are most important, and how they influence the model's predictions. 
-            For the confusion matrix, explain what the different quadrants represent, and what the overall accuracy is. 
-            If there are any potential problems with the model, be sure to point them out.   
-            """
-        prompt2 = """
-            System Role:
-            You are an AI assistant specializing in analyzing model evaluation reports to generate comprehensive, governance-oriented summaries. Your goal is to provide detailed, data-driven insights into the model’s performance, feature importance, and potential risks, aligning with AI governance principles such as transparency, fairness, and accountability.
+        return images
 
-            Key Instructions for Model Evaluation Report:
-                1.	Evaluation Metrics Analysis:
-                •	Clearly explain each metric (e.g., True Positives (TP), False Negatives (FN), Precision, Recall, F1-score, Accuracy).
-                •	Interpret what these metrics indicate about the model’s performance, strengths, weaknesses, and potential biases.
-                •	Provide precise calculations where applicable, referencing actual values (e.g., confusion matrix counts, accuracy percentages).
-                2.	Detailed SHAP Value and Feature Importance Analysis:
-            Analyze SHAP visualizations and bar plots to identify key features:
-                •	For Each SHAP Plot (Bar Plot, Beeswarm Plot, Violin Plot, Heatmap, Waterfall Plot):
-                •	Describe the plot—what is shown visually.
-                •	Interpret the data accurately based on provided plots without adding extra assumptions.
-                •	Numerically quantify feature importance where applicable (e.g., “Feature X has a SHAP value of 0.45, indicating strong positive influence on predictions”).
-                •	In the Bar Plot, identify which features are most relevant to the model’s predictions and quantify how much they contribute (e.g., “Feature A contributes 30% of the total SHAP value importance”).
-                3.	Risk and Fairness Assessment:
-                •	Identify potential risks such as overfitting, bias, or data drift based on observed metrics and feature contributions.
-                •	Highlight any indications of unfair bias in feature importance, especially if certain features dominate the model’s decisions disproportionately.
-                •	Recommend further fairness audits where necessary.
-                4.	Governance and Compliance Recommendations:
-                •	Provide actionable recommendations for improving model robustness, fairness, and explainability.
-                •	Suggest best practices for validation, monitoring, and accountability, aligned with regulatory standards.
-                •	If perfect or near-perfect accuracy is observed, recommend robustness testing and cross-validation to rule out overfitting.
-                5.	Model Lifecycle Context:
-                •	Frame the report within the AI model lifecycle, including development, deployment, and monitoring phases.
-                •	Emphasize continuous model evaluation, with recommendations for regular performance audits.
-
-            Tone and Structure:
-                •	Maintain a formal, precise, and governance-compliant writing style.
-                •	Use clear section headers, bullet points, and actionable recommendations.
-                •	Only include insights based on provided data—do not infer or assume beyond what the evaluation metrics and plots reveal.
-
-            Primary Objective:
-            Deliver a report that promotes trust, transparency, and accountability in AI systems. Your analysis should support technical teams, compliance officers, and governance stakeholders in making informed, data-driven decisions based on the provided evaluation metrics and visualizations.
-            """
+    def _generate_final_report(self, chat, report, images, prompt2):
         prompt_template = ChatPromptTemplate(
             messages=[
                 SystemMessage(content=prompt2),
@@ -524,7 +491,7 @@ class XAI:
                 )
             )
 
-        final_prompt = prompt_template.format_messages(report=report_string, images=image_messages)
+        final_prompt = prompt_template.format_messages(report=str(report), images=image_messages)
 
         response = chat(final_prompt)
         return response.content
