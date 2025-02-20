@@ -121,9 +121,9 @@ class DataPreparation:
 
     def save_state(self, file_path: str):
 """Saves the state of the class and its variables in a JSON file."""
-state_dict = {k: v for k, v in self.__dict__.items() if isinstance(v, (str, int, float, bool, list, dict))}
+state_dict = {k: v for k, v in self.__dict__.items()}
 with Path(file_path).open("w") as f:
-    json.dump(state_dict, f, indent=4)
+    json.dump(state_dict, f, default=lambda o: o.__dict__ if hasattr(o, '__dict__') else str(o), indent=4)
 
     @classmethod
     def load_state(cls, file_path: str):
