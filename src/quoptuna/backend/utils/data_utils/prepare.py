@@ -120,10 +120,10 @@ class DataPreparation:
     # Ensure pickle is imported for serialization
 
     def save_state(self, file_path: str):
-        """Saves the state of the class and its variables in a JSON file."""
-        state_dict = self.__dict__
-        with Path(file_path).open("w") as f:
-            json.dump(state_dict, f, indent=4)
+"""Saves the state of the class and its variables in a JSON file."""
+state_dict = {k: v for k, v in self.__dict__.items() if isinstance(v, (str, int, float, bool, list, dict))}
+with Path(file_path).open("w") as f:
+    json.dump(state_dict, f, indent=4)
 
     @classmethod
     def load_state(cls, file_path: str):
