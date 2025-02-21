@@ -66,15 +66,19 @@ def initialize_session_state():
 
 def update_plot():
     """Update the plot with the latest optimization results."""
-    optimizer, study_name, db_name = handle_input()
+    optimizer, study_name, db_name = handle_input(context="main")
     st.toast("Updating Plot")
     st.toast(f"Study Name: {study_name}, DB Name: {db_name}")
     if st.session_state["optimizer"] and st.session_state["study_name"]:
         display_study_control_panel(study_name, optimizer)
 
 
-def handle_input():
-    """Handles input for optimizer, study name, and database name."""
+def handle_input(context="main"):
+    """Handles input for optimizer, study name, and database name.
+    
+    Args:
+        context (str): Context identifier for generating unique widget keys ('main' or 'plots')
+    """
     optimizer = st.session_state["optimizer"]
     study_name = st.session_state.get("study_name", "")  # Get study_name from session state
     db_name = st.session_state.get("DB_NAME", "")  # Get DB_NAME from session state
@@ -84,13 +88,19 @@ def handle_input():
             "Enter database name",
             value=db_name,  # Set the default value to the existing DB name
             help="Name of the database to load optimizer from",
+            key=f"db_name_input_{context}"
         )
         study_name = st.text_input(
             "Enter study name",
             value=study_name,  # Set the default value to the existing study name
             help="Name of the study to load optimizer from",
+            key=f"study_name_input_{context}"
         )
-        uploaded_db = st.file_uploader("Upload DB file", type=["db"])
+        uploaded_db = st.file_uploader(
+            "Upload DB file",
+            type=["db"],
+            key=f"db_file_uploader_{context}"
+        )
 
         if uploaded_db:
             db_path = f"./db/{uploaded_db.name}"
@@ -99,7 +109,7 @@ def handle_input():
             with open(db_path, "wb") as f:  # noqa: PTH123
                 f.write(uploaded_db.getvalue())
             st.session_state["file_location"] = db_path
-        if st.button("Load Optimizer") and study_name:
+        if st.button("Load Optimizer", key=f"load_optimizer_button_{context}") and study_name:
             from quoptuna import Optimizer  # Import Optimizer here to avoid lint error
 
             optimizer = Optimizer(db_name=db_name, study_name=study_name)
@@ -114,21 +124,26 @@ def display_study_control_panel(study_name, optimizer):
     """Displays the study control panel and handles visualization."""
     st.toast("Study Control Panel")
     st.markdown("### Study Control Panel")
-    st.text_input("Study name", value=st.session_state["study_name"], disabled=True)
+    st.text_input(
+        "Study name",
+        value=st.session_state["study_name"],
+        disabled=True,
+        key="study_name_display"  # Add unique key
+    )
     col1, col2 = st.columns([1, 1])
     with col1:
         st.button(
             "Start Visualization",
             on_click=lambda: st.session_state.update({"start_visualization": True}),
             help="Start the visualization with the latest data.",
-            key="start_visualization_button",  # Add a unique key
+            key="start_visualization_button",
         )
     with col2:
         st.button(
             "Stop Visualization",
             on_click=lambda: st.session_state.update({"start_visualization": False}),
             help="Stop the visualization updates.",
-            key="stop_visualization_button",  # Add a unique key
+            key="stop_visualization_button",
         )
 
     plot_visualization(optimizer, study_name)

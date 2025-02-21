@@ -1,7 +1,7 @@
 import streamlit as st
 
 from quoptuna import Optimizer
-from quoptuna.backend.data import preprocess_data
+from quoptuna.backend.utils.data_utils.data import preprocess_data
 from quoptuna.frontend.support import (
     run_optimization_in_background,
     select_columns,
@@ -42,7 +42,7 @@ def run_optimization(session_state, data_dict):
 
 def handle_sidebar():
     """Handle the sidebar interactions."""
-    st.title("QuOptuna: Optimizing Quantum Models with Optuna")
+    st.title("Upload Data")
     st.write("Please upload your data file below.")
     data = upload_and_display_data()
     if data is not None:
