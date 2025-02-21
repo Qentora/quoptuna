@@ -56,11 +56,11 @@ def test_data_preparation_with_csv(mock_csv_data):
 def test_update_column_names():
     """Test column name updating functionality."""
     data = {"1": [1, 2, 3], "feature2": [4, 5, 6], "target": [0, 1, 0]}
-    df = pd.DataFrame(data)
+    data_frame = pd.DataFrame(data)
 
     data_prep = DataPreparation(
         file_path=None,
-        dataset={"x": df[["1", "feature2"]], "y": df["target"]},
+        dataset={"x": data_frame[["1", "feature2"]], "y": data_frame["target"]},
         x_cols=["1", "feature2"],
         y_col="target",
     )

@@ -116,3 +116,4 @@ class DataPreparation:
         return None
 
     # Additional methods for SHAP preparation can be added here
+    # Ensure pickle is imported for serialization

@@ -1,9 +1,9 @@
-import matplotlib.pyplot as plt
 import pytest
 import shap
 
 from quoptuna import XAI
 from quoptuna.backend.models import MLPClassifier
+from quoptuna.backend.xai.xai import XAIConfig
 
 
 @pytest.fixture
@@ -30,7 +30,8 @@ def test_load_data(load_data):
 
 def test_xai_initialization(trained_model, load_data):
     # Test the initialization of the XAI class
-    xai = XAI(model=trained_model, data=load_data)
+    config = XAIConfig(use_proba=True, onsubset=True)
+    xai = XAI(model=trained_model, data=load_data, config=config)
     assert isinstance(xai, XAI)
     assert xai.use_proba is True  # Check the default value of use_proba
     assert xai.onsubset is True  # Check the default value of onsubset
@@ -66,7 +67,8 @@ def trained_model_sample(load_data):
 
 def test_get_shap_values(trained_model_sample, load_data):
     # Test getting SHAP values
-    xai = XAI(model=trained_model_sample, data=load_data, onsubset=True, subset_size=5)
+    config = XAIConfig(onsubset=True, subset_size=5)
+    xai = XAI(model=trained_model_sample, data=load_data, config=config)
     shap_values = xai._get_shap_values()
     assert shap_values is not None
     assert hasattr(shap_values, "values")
@@ -97,34 +99,44 @@ def test_get_classes(trained_model_sample, load_data):
 # Tests for plotting methods
 def test_get_bar_plot(trained_model_sample, load_data):
     # Test the get_bar_plot method
-    xai = XAI(model=trained_model_sample, data=load_data, onsubset=True, subset_size=5)
+    config = XAIConfig(onsubset=True, subset_size=5)
+    xai = XAI(model=trained_model_sample, data=load_data, config=config)
     bar_plot = xai.get_bar_plot(class_index=0)
-    assert isinstance(bar_plot, plt.Figure)  # Check if a figure is returned
+    assert isinstance(bar_plot, str)  # Check if a base64 string is returned
+    assert bar_plot.startswith("data:image/png;base64,")  # Check if it's a base64 image
 
 
 def test_get_beeswarm_plot(trained_model_sample, load_data):
     # Test the get_beeswarm_plot method
-    xai = XAI(model=trained_model_sample, data=load_data, onsubset=True, subset_size=5)
+    config = XAIConfig(onsubset=True, subset_size=5)
+    xai = XAI(model=trained_model_sample, data=load_data, config=config)
     beeswarm_plot = xai.get_beeswarm_plot(class_index=0)
-    assert isinstance(beeswarm_plot, plt.Figure)  # Check if a figure is returned
+    assert isinstance(beeswarm_plot, str)
+    assert beeswarm_plot.startswith("data:image/png;base64,")
 
 
 def test_get_waterfall_plot(trained_model_sample, load_data):
     # Test the get_waterfall_plot method
-    xai = XAI(model=trained_model_sample, data=load_data, onsubset=True, subset_size=5)
+    config = XAIConfig(onsubset=True, subset_size=5)
+    xai = XAI(model=trained_model_sample, data=load_data, config=config)
     waterfall_plot = xai.get_waterfall_plot(index=0, class_index=0)
-    assert isinstance(waterfall_plot, plt.Figure)  # Check if a figure is returned
+    assert isinstance(waterfall_plot, str)
+    assert waterfall_plot.startswith("data:image/png;base64,")
 
 
 def test_get_violin_plot(trained_model_sample, load_data):
     # Test the get_violin_plot method
-    xai = XAI(model=trained_model_sample, data=load_data, onsubset=True, subset_size=5)
+    config = XAIConfig(onsubset=True, subset_size=5)
+    xai = XAI(model=trained_model_sample, data=load_data, config=config)
     violin_plot = xai.get_violin_plot(class_index=0)
-    assert isinstance(violin_plot, plt.Figure)  # Check if a figure is returned
+    assert isinstance(violin_plot, str)
+    assert violin_plot.startswith("data:image/png;base64,")
 
 
 def test_get_heatmap_plot(trained_model_sample, load_data):
     # Test the get_heatmap_plot method
-    xai = XAI(model=trained_model_sample, data=load_data, onsubset=True, subset_size=5)
+    config = XAIConfig(onsubset=True, subset_size=5)
+    xai = XAI(model=trained_model_sample, data=load_data, config=config)
     heatmap_plot = xai.get_heatmap_plot(class_index=0)
-    assert isinstance(heatmap_plot, plt.Figure)  # Check if a figure is returned
+    assert isinstance(heatmap_plot, str)
+    assert heatmap_plot.startswith("data:image/png;base64,")
