@@ -11,7 +11,7 @@ dependencies = [
     "pennylane==0.38.1",
     "scikit-learn==1.5.2",
     "matplotlib==3.9.2",
-    "jax==0.4.31",
+    "jax==0.5.3",
     "jaxlib==0.4.31",
     "flax==0.9.0",
     "optax==0.2.3",
