@@ -1,7 +1,7 @@
 import streamlit as st
 
 from quoptuna import Optimizer
-from quoptuna.backend.data import preprocess_data
+from quoptuna.backend.utils.data_utils.data import preprocess_data
 from quoptuna.frontend.support import (
     run_optimization_in_background,
     select_columns,
