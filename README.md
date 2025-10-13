@@ -1,190 +1,222 @@
 # QuOptuna
 
 <div align="center">
-  <img src="assets/logo.png" alt="logo" width="200" height="auto" />
+  <img src="assets/logo.png" alt="QuOptuna Logo" width="200" height="auto" />
   <h1>QuOptuna</h1>
   <p>
-    Integrating quantum computing with Optuna for enhanced hyperparameter optimization.
+    Bridging quantum computing and hyperparameter optimization for next-generation machine learning
   </p>
-  <!-- <p>
-    <a href="https://img.shields.io/pypi/v/quoptuna?style=flat-round">
-      <img src="https://img.shields.io/pypi/v/quoptuna?style=flat-round" alt="PyPI Version" />
-    </a>
-    <a href="https://img.shields.io/pypi/pyversions/quoptuna?style=flat-round">
-      <img src="https://img.shields.io/pypi/pyversions/quoptuna?style=flat-round" alt="Python Versions" />
-    </a>
-    <a href="https://img.shields.io/pypi/l/quoptuna?style=flat-round">
-      <img src="https://img.shields.io/pypi/l/quoptuna?style=flat-round" alt="License" />
-    </a>
-    <a href="https://readthedocs.org/projects/quoptuna/badge/?version=latest">
-      <img src="https://readthedocs.org/projects/quoptuna/badge/?version=latest" alt="Documentation Status" />
-    </a>
-    <a href="https://codecov.io/gh/Qentora/quoptuna">
-      <img src="https://codecov.io/gh/Qentora/quoptuna/graph/badge.svg?token=6QE861D1CB" alt="codecov" />
-    </a>
-    <a href="https://github.com/Qentora/quoptuna/graphs/contributors">
-      <img src="https://img.shields.io/github/contributors/Qentora/quoptuna" alt="contributors" />
-    </a>
-    <a href="https://github.com/Qentora/quoptuna/network/members">
-      <img src="https://img.shields.io/github/forks/Qentora/quoptuna" alt="forks" />
-    </a>
-    <a href="https://github.com/Qentora/quoptuna/stargazers">
-      <img src="https://img.shields.io/github/stars/Qentora/quoptuna" alt="stars" />
-    </a>
-    <a href="https://github.com/Qentora/quoptuna/issues/">
-      <img src="https://img.shields.io/github/issues/Qentora/quoptuna" alt="open issues" />
-    </a>
-    <a href="https://github.com/Qentora/quoptuna/blob/master/LICENSE">
-      <img src="https://img.shields.io/github/license/Qentora/quoptuna.svg" alt="license" />
-    </a>
-  </p>
-</div> -->
 
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/Qentora/quoptuna?utm_source=oss&utm_medium=github&utm_campaign=Qentora%2Fquoptuna&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+[![License](https://img.shields.io/github/license/Qentora/quoptuna.svg)](https://github.com/Qentora/quoptuna/blob/master/LICENSE)
+[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+
+</div>
 
 ---
 
-## :notebook_with_decorative_cover: Table of Contents
+## 📚 Table of Contents
 
-- [About the Project](#star2-about-the-project)
-- [Features](#dart-features)
-- [Installation](#gear-installation)
-- [Quick Start](#eyes-quick-start)
-- [Documentation](#book-documentation)
-- [Development](#toolbox-development)
-- [Contributing](#wave-contributing)
-- [License](#warning-license)
-- [Acknowledgments](#gem-acknowledgments)
+- [About](#-about)
+- [Key Features](#-key-features)
+- [Installation](#-installation)
+- [Quick Start](#-quick-start)
+- [Documentation](#-documentation)
+- [Development](#-development)
+- [Contributing](#-contributing)
+- [License](#-license)
+- [Acknowledgments](#-acknowledgments)
 
 ---
 
-## :star2: About the Project
+## 🌟 About
 
-QuOptuna combines quantum computing with advanced hyperparameter optimization to push the boundaries of machine learning and computational tasks.
+QuOptuna seamlessly integrates quantum computing capabilities with the powerful Optuna hyperparameter optimization framework. By leveraging quantum algorithms, QuOptuna enables researchers and practitioners to explore optimization landscapes more efficiently, pushing the boundaries of what's possible in machine learning and computational research.
 
-### :dart: Features
+Whether you're working with quantum machine learning models or classical algorithms, QuOptuna provides the tools you need to find optimal hyperparameters faster and more effectively.
 
-- **Quantum-ML Optimization**: Specialized hyperparameter tuning for Quantum algorithms
-- **Multiple Model Support**: Compatible with both classical and quantum models, including:
-  - Quantum Models: Circuit-Centric Classifier, Data Reuploading Classifier, Quantum Kitchen Sinks, and more
-  - Classical Models: SVC, MLP Classifier, Perceptron
-- **Interactive Dashboard**: Visualize optimization progress in real-time
-- **Explainable AI**: Built-in tools for model interpretability
-- **Extensible Framework**: Easy integration with custom models and algorithms
+## ✨ Key Features
 
-## :gear: Installation
+- **🔬 Quantum-Enhanced Optimization**: Specialized hyperparameter tuning algorithms designed specifically for quantum machine learning workflows
+- **🎯 Hybrid Model Support**: Seamlessly optimize both quantum and classical models
+  - **Quantum Models**: Circuit-Centric Classifier, Data Reuploading Classifier, Quantum Kitchen Sinks, and more
+  - **Classical Models**: SVC, MLP Classifier, Perceptron, and other scikit-learn compatible models
+- **📊 Interactive Dashboard**: Real-time visualization of optimization progress through an intuitive Streamlit interface
+- **🔍 Explainable AI**: Built-in interpretability tools to understand model decisions and optimization trajectories
+- **🔌 Extensible Architecture**: Plugin-friendly design for easy integration with custom models and optimization strategies
 
-Install QuOptuna using UV (recommended) or pip:
+## 📦 Installation
 
-```sh
-# Using UV (recommended)
+QuOptuna requires Python 3.8 or higher. Install using your preferred package manager:
+
+### Using UV (Recommended)
+
+```bash
 uv pip install quoptuna
+```
 
-# Using pip
+### Using pip
+
+```bash
 pip install quoptuna
 ```
 
-## :eyes: Quick Start
+### Development Installation
 
-Here's how you can get started:
+For contributors and developers:
+
+```bash
+git clone https://github.com/Qentora/quoptuna.git
+cd quoptuna
+uv pip install -e ".[dev]"
+```
+
+## 🚀 Quick Start
+
+Get up and running in minutes with this simple example:
 
 ```python
 import quoptuna as qo
 
+# Define your objective function
 def objective(trial):
-    # Define your optimization logic here
-    return trial.suggest_float('x', -10, 10) ** 2
+    """
+    Example: Minimize a simple quadratic function
+    """
+    x = trial.suggest_float('x', -10, 10)
+    return x ** 2
 
-study = qo.create_study()
+# Create and run optimization study
+study = qo.create_study(direction='minimize')
 study.optimize(objective, n_trials=100)
 
-print("Best trial:", study.best_trial)
+# Display results
+print(f"Best value: {study.best_value}")
+print(f"Best parameters: {study.best_params}")
 ```
 
-### Interactive Dashboard
+### 📈 Launch Interactive Dashboard
 
-QuOptuna includes a Streamlit-based dashboard for real-time optimization monitoring:
+Monitor your optimization progress in real-time:
 
-```sh
+```bash
 quoptuna --start
 ```
 
-## :book: Documentation
+This launches a Streamlit dashboard where you can visualize optimization history, parameter importance, and convergence patterns.
 
-Comprehensive documentation is available at [https://Qentora.github.io/quoptuna](https://Qentora.github.io/quoptuna).
+## 📖 Documentation
 
-## :toolbox: Development
+Comprehensive documentation, tutorials, and API references are available at:
 
-To contribute to QuOptuna, follow these steps:
+**[https://Qentora.github.io/quoptuna](https://Qentora.github.io/quoptuna)**
 
-### Clone the Repository
+Topics covered include:
+- Detailed installation guides
+- Quantum algorithm integration
+- Advanced optimization techniques
+- Custom sampler implementation
+- API reference
 
-```sh
+## 🛠️ Development
+
+We welcome contributions from the community! Here's how to set up your development environment:
+
+### Prerequisites
+
+- Python 3.8 or higher
+- UV package manager (recommended) or pip
+- Git
+
+### Setup Development Environment
+
+```bash
+# Clone the repository
 git clone https://github.com/Qentora/quoptuna.git
 cd quoptuna
-```
 
-### Install Requirements
-
-1. Ensure UV and Python 3.8+ are installed.
-2. Install development dependencies:
-
-```sh
+# Install development dependencies
 uv pip install -e ".[dev]"
 ```
 
-### Testing
+### Running Tests
 
-Run tests with:
-
-```sh
+```bash
+# Run all tests
 uv run pytest
-```
 
-To check code coverage:
-
-```sh
+# Run with coverage report
 uv run pytest --cov=quoptuna
+
+# Generate HTML coverage report
+uv run pytest --cov=quoptuna --cov-report=html
 ```
 
 ### Code Quality
 
-Run linting and type checks:
+Maintain code quality with our linting and type-checking tools:
 
-```sh
+```bash
+# Run linter
 uv run ruff check .
+
+# Auto-fix linting issues
+uv run ruff check . --fix
+
+# Type checking
 uv run mypy .
 ```
 
-## :wave: Contributing
+## 🤝 Contributing
 
-We welcome contributions! To get started:
-1. Fork the repository.
-2. Create a new branch (`git checkout -b feature-branch`).
-3. Make your changes and commit them (`git commit -m 'Add new feature'`).
-4. Push to the branch (`git push origin feature-branch`).
-5. Open a pull request.
+We're excited to have you contribute to QuOptuna! Here's how you can help:
 
-Refer to the Contributing Guidelines for more details.
+1. **Fork the repository** on GitHub
+2. **Create a feature branch**: `git checkout -b feature/amazing-feature`
+3. **Make your changes** and write tests
+4. **Commit your changes**: `git commit -m 'Add amazing feature'`
+5. **Push to the branch**: `git push origin feature/amazing-feature`
+6. **Open a Pull Request**
 
-## :warning: License
+Please ensure your code:
+- Passes all tests (`pytest`)
+- Follows our style guide (`ruff check`)
+- Includes appropriate documentation
+- Has type hints where applicable
 
-This project is licensed under the Apache 2.0 License. See the LICENSE file for details [here](https://github.com/Qentora/quoptuna?tab=Apache-2.0-1-ov-file).
+For detailed guidelines, see our [Contributing Guidelines](CONTRIBUTING.md).
 
-## :gem: Acknowledgments
+## 📄 License
 
-This project was generated using the [wolt-python-package-cookiecutter](https://github.com/woltapp/wolt-python-package-cookiecutter) template.
+This project is licensed under the Apache 2.0 License. See the [LICENSE](https://github.com/Qentora/quoptuna/blob/master/LICENSE) file for full details.
 
-This project includes code from the [qml-benchmarks project by XanaduAI](https://github.com/XanaduAI/qml-benchmarks). Licensed under the Apache License, Version 2.0.
+## 🙏 Acknowledgments
+
+This project builds on the excellent work of:
+
+- **[Wolt Python Package Cookiecutter](https://github.com/woltapp/wolt-python-package-cookiecutter)** - Project template and structure
+- **[XanaduAI's qml-benchmarks](https://github.com/XanaduAI/qml-benchmarks)** - Quantum machine learning benchmarking tools (Apache License 2.0)
+- **[Optuna](https://optuna.org/)** - The hyperparameter optimization framework that powers QuOptuna
+
+Special thanks to all our [contributors](https://github.com/Qentora/quoptuna/graphs/contributors) who help make QuOptuna better!
 
 ---
 
-## [![Repography logo](https://images.repography.com/logo.svg)](https://repography.com) / Recent activity [![Time period](https://images.repography.com/61358072/Qentora/quoptuna/recent-activity/NFJ5verQB-dv9RS0RuDOgSE84SRTHP39DKgPw9dAbEI/BGB39P4WjaaHESiizHx0odYYf_6ZBBoXmK4Gh8qIAD4_badge.svg)](https://repography.com)
+## 📊 Project Activity
+
+[![Repography logo](https://images.repography.com/logo.svg)](https://repography.com) / Recent activity
+
 [![Timeline graph](https://images.repography.com/61358072/Qentora/quoptuna/recent-activity/NFJ5verQB-dv9RS0RuDOgSE84SRTHP39DKgPw9dAbEI/BGB39P4WjaaHESiizHx0odYYf_6ZBBoXmK4Gh8qIAD4_timeline.svg)](https://github.com/Qentora/quoptuna/commits)
 [![Issue status graph](https://images.repography.com/61358072/Qentora/quoptuna/recent-activity/NFJ5verQB-dv9RS0RuDOgSE84SRTHP39DKgPw9dAbEI/BGB39P4WjaaHESiizHx0odYYf_6ZBBoXmK4Gh8qIAD4_issues.svg)](https://github.com/Qentora/quoptuna/issues)
 [![Pull request status graph](https://images.repography.com/61358072/Qentora/quoptuna/recent-activity/NFJ5verQB-dv9RS0RuDOgSE84SRTHP39DKgPw9dAbEI/BGB39P4WjaaHESiizHx0odYYf_6ZBBoXmK4Gh8qIAD4_prs.svg)](https://github.com/Qentora/quoptuna/pulls)
-[![Trending topics](https://images.repography.com/61358072/Qentora/quoptuna/recent-activity/NFJ5verQB-dv9RS0RuDOgSE84SRTHP39DKgPw9dAbEI/BGB39P4WjaaHESiizHx0odYYf_6ZBBoXmK4Gh8qIAD4_words.svg)](https://github.com/Qentora/quoptuna/commits)
 [![Top contributors](https://images.repography.com/61358072/Qentora/quoptuna/recent-activity/NFJ5verQB-dv9RS0RuDOgSE84SRTHP39DKgPw9dAbEI/BGB39P4WjaaHESiizHx0odYYf_6ZBBoXmK4Gh8qIAD4_users.svg)](https://github.com/Qentora/quoptuna/graphs/contributors)
-[![Activity map](https://images.repography.com/61358072/Qentora/quoptuna/recent-activity/NFJ5verQB-dv9RS0RuDOgSE84SRTHP39DKgPw9dAbEI/BGB39P4WjaaHESiizHx0odYYf_6ZBBoXmK4Gh8qIAD4_map.svg)](https://github.com/Qentora/quoptuna/commits)
 
+---
 
+<div align="center">
+
+**[Documentation](https://Qentora.github.io/quoptuna)** • **[Report Bug](https://github.com/Qentora/quoptuna/issues)** • **[Request Feature](https://github.com/Qentora/quoptuna/issues)**
+
+Made with ❤️ by the Qentora team
+
+</div>
