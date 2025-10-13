@@ -40,6 +40,8 @@
   </p>
 </div>
 
+![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/Qentora/quoptuna?utm_source=oss&utm_medium=github&utm_campaign=Qentora%2Fquoptuna&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
+
 ---
 
 ## :notebook_with_decorative_cover: Table of Contents
