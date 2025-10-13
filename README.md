@@ -6,7 +6,7 @@
   <p>
     Integrating quantum computing with Optuna for enhanced hyperparameter optimization.
   </p>
-  <p>
+  <!-- <p>
     <a href="https://img.shields.io/pypi/v/quoptuna?style=flat-round">
       <img src="https://img.shields.io/pypi/v/quoptuna?style=flat-round" alt="PyPI Version" />
     </a>
@@ -38,7 +38,7 @@
       <img src="https://img.shields.io/github/license/Qentora/quoptuna.svg" alt="license" />
     </a>
   </p>
-</div>
+</div> -->
 
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/Qentora/quoptuna?utm_source=oss&utm_medium=github&utm_campaign=Qentora%2Fquoptuna&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 
