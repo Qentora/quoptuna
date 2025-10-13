@@ -176,3 +176,13 @@ This project was generated using the [wolt-python-package-cookiecutter](https://
 This project includes code from the [qml-benchmarks project by XanaduAI](https://github.com/XanaduAI/qml-benchmarks). Licensed under the Apache License, Version 2.0.
 
 ---
+
+## [![Repography logo](https://images.repography.com/logo.svg)](https://repography.com) / Recent activity [![Time period](https://images.repography.com/61358072/Qentora/quoptuna/recent-activity/NFJ5verQB-dv9RS0RuDOgSE84SRTHP39DKgPw9dAbEI/BGB39P4WjaaHESiizHx0odYYf_6ZBBoXmK4Gh8qIAD4_badge.svg)](https://repography.com)
+[![Timeline graph](https://images.repography.com/61358072/Qentora/quoptuna/recent-activity/NFJ5verQB-dv9RS0RuDOgSE84SRTHP39DKgPw9dAbEI/BGB39P4WjaaHESiizHx0odYYf_6ZBBoXmK4Gh8qIAD4_timeline.svg)](https://github.com/Qentora/quoptuna/commits)
+[![Issue status graph](https://images.repography.com/61358072/Qentora/quoptuna/recent-activity/NFJ5verQB-dv9RS0RuDOgSE84SRTHP39DKgPw9dAbEI/BGB39P4WjaaHESiizHx0odYYf_6ZBBoXmK4Gh8qIAD4_issues.svg)](https://github.com/Qentora/quoptuna/issues)
+[![Pull request status graph](https://images.repography.com/61358072/Qentora/quoptuna/recent-activity/NFJ5verQB-dv9RS0RuDOgSE84SRTHP39DKgPw9dAbEI/BGB39P4WjaaHESiizHx0odYYf_6ZBBoXmK4Gh8qIAD4_prs.svg)](https://github.com/Qentora/quoptuna/pulls)
+[![Trending topics](https://images.repography.com/61358072/Qentora/quoptuna/recent-activity/NFJ5verQB-dv9RS0RuDOgSE84SRTHP39DKgPw9dAbEI/BGB39P4WjaaHESiizHx0odYYf_6ZBBoXmK4Gh8qIAD4_words.svg)](https://github.com/Qentora/quoptuna/commits)
+[![Top contributors](https://images.repography.com/61358072/Qentora/quoptuna/recent-activity/NFJ5verQB-dv9RS0RuDOgSE84SRTHP39DKgPw9dAbEI/BGB39P4WjaaHESiizHx0odYYf_6ZBBoXmK4Gh8qIAD4_users.svg)](https://github.com/Qentora/quoptuna/graphs/contributors)
+[![Activity map](https://images.repography.com/61358072/Qentora/quoptuna/recent-activity/NFJ5verQB-dv9RS0RuDOgSE84SRTHP39DKgPw9dAbEI/BGB39P4WjaaHESiizHx0odYYf_6ZBBoXmK4Gh8qIAD4_map.svg)](https://github.com/Qentora/quoptuna/commits)
+
+
