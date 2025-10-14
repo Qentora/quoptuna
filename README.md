@@ -11,6 +11,8 @@
 [![License](https://img.shields.io/github/license/Qentora/quoptuna.svg)](https://github.com/Qentora/quoptuna/blob/master/LICENSE)
 [![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
 
+[![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Qentora/quoptuna)
+
 </div>
 
 ---
