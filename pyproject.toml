@@ -10,7 +10,7 @@ requires-python = "<4.0,>=3.11"
 dependencies = [
     "pennylane==0.38.1",
     "scikit-learn==1.5.2",
-    "matplotlib==3.9.2",
+    "matplotlib==3.10.7",
     "jax==0.4.31",
     "jaxlib==0.4.31",
     "flax==0.9.0",
