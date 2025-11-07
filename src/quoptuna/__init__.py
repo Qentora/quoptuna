@@ -1,6 +1,6 @@
 from .backend.models import create_model
 from .backend.tuners.optimizer import Optimizer
 from .backend.utils.data_utils.prepare import DataPreparation
-from .backend.xai.xai import XAI
+from .backend.xai.xai import XAI, XAIConfig
 
-__all__ = ["XAI", "DataPreparation", "Optimizer", "create_model"]
+__all__ = ["XAI", "DataPreparation", "Optimizer", "XAIConfig", "create_model"]
