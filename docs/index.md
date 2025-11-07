@@ -1,23 +1,21 @@
 # QuOptuna Documentation
 
-Welcome to QuOptuna, a quantum-enhanced hyperparameter optimization framework that combines quantum computing with Optuna for advanced model tuning.
+Welcome to QuOptuna, a quantum-enhanced hyperparameter optimization framework that combines quantum computing with Optuna for advanced model tuning and explainable AI.
 
-## Table of Contents
+## Overview
 
-1. [Introduction](#introduction)
-2. [Installation](#installation)
-3. [Features](#features)
-4. [Usage](#usage)
-5. [API Documentation](#api-documentation)
-6. [Contributing](#contributing)
+QuOptuna provides a comprehensive platform for:
+- 🎯 **Automated hyperparameter optimization** for quantum and classical ML models
+- 🔍 **SHAP-based explainable AI** with rich visualizations
+- 📊 **UCI ML Repository integration** for easy dataset access
+- 📝 **AI-powered report generation** for model analysis
+- 🖥️ **Interactive Streamlit interface** for the complete workflow
 
-## Introduction
+## Quick Start
 
-QuOptuna integrates quantum computing capabilities with Optuna's hyperparameter optimization framework to enhance the model tuning process. It supports both classical and quantum models, providing a unified interface for optimization tasks.
+### Installation
 
-## Installation
-
-QuOptuna can be installed using UV (recommended) or pip:
+Install QuOptuna using UV (recommended) or pip:
 
 ```bash
 # Using UV (recommended)
@@ -27,70 +25,164 @@ uv pip install quoptuna
 pip install quoptuna
 ```
 
-For development setup:
+### Launch the Application
 
-```bash
-# Clone the repository
-git clone https://github.com/Qentora/quoptuna.git
-cd quoptuna
-
-# Install dependencies using UV
-uv pip install -e .
-```
-
-## Features
-
-- **Quantum-ML Optimization**:  hyperparameter tuning for Quantum algorithms
-- **Multiple Model Support**: Compatible with both classical and quantum models
-- **Interactive Dashboard**: Visualize optimization progress in real-time
-- **Explainable AI**: Built-in tools for model interpretability
-- **Extensible Framework**: Easy integration with custom models and algorithms
-
-## Usage
-
-### Basic Example
-
-```python
-import quoptuna as qo
-
-Add Example Here
-```
-
-### Interactive Dashboard
-
-QuOptuna provides a Streamlit-based dashboard for real-time optimization monitoring:
+Start the interactive Streamlit interface:
 
 ```bash
 quoptuna --start
 ```
 
-### Model Types
-
-QuOptuna supports various quantum and classical models:
-
-- Quantum Models:
-  - Circuit-Centric Classifier
-  - Data Reuploading Classifier
-  - Quantum Kitchen Sinks
-  - Quantum Metric Learner
-  - Dressed Quantum Circuit Classifier
-
-- Classical Models:
-  - SVC (Support Vector Classification)
-  - MLP Classifier
-  - Perceptron
-
-## API Documentation
-
-For detailed API documentation, please refer to our [API Documentation](api_docs.md).
-
-## Contributing
-
-We welcome contributions! Please see our [Contributing Guide](CONTRIBUTING.md) for details.
-
-### Development Setup
+Or run directly with Python:
 
 ```bash
+python -m quoptuna.frontend.app run
+```
+
+### Basic Python Usage
+
+```python
+from quoptuna import DataPreparation, Optimizer
+from quoptuna.backend.utils.data_utils.data import mock_csv_data
+import pandas as pd
+
+# Load and prepare data
+df = pd.read_csv("your_data.csv")
+df["target"] = df["target"].replace({0: -1, 1: 1})
+
+# Save data
+file_path = mock_csv_data(df, tmp_path="data", file_name="my_data")
+
+# Prepare for training
+data_prep = DataPreparation(
+    file_path=file_path,
+    x_cols=[col for col in df.columns if col != "target"],
+    y_col="target"
+)
+data_dict = data_prep.get_data(output_type="2")
+
+# Run optimization
+optimizer = Optimizer(db_name="experiment", study_name="trial_1", data=data_dict)
+study, best_trials = optimizer.optimize(n_trials=100)
+
+print(f"Best F1 Score: {best_trials[0].value:.4f}")
+print(f"Best Model: {best_trials[0].params['model_type']}")
+```
+
+## Key Features
+
+### 🎯 Hyperparameter Optimization
+
+Automated optimization using Optuna with support for:
+- Multiple quantum models (Data Reuploading, Circuit-Centric, Quantum Kitchen Sinks, etc.)
+- Classical baselines (SVC, MLP, Perceptron)
+- Multi-objective optimization
+- Parallel trial execution
+- Persistent storage with SQLite
+
+### 🔍 Explainable AI
+
+Comprehensive SHAP analysis with multiple visualization types:
+- **Bar Plot**: Feature importance ranking
+- **Beeswarm Plot**: Feature value impact distribution
+- **Violin Plot**: SHAP value distributions
+- **Heatmap**: Instance-level feature contributions
+- **Waterfall Plot**: Individual prediction explanations
+- **Confusion Matrix**: Model performance visualization
+
+### 📊 Dataset Management
+
+- **UCI ML Repository**: Direct access to 100+ datasets
+- **Custom Upload**: Support for CSV files
+- **Automatic Preprocessing**: Handle missing values, feature scaling
+- **Target Transformation**: Binary classification support (-1/+1 encoding)
+
+### 📝 AI-Powered Reports
+
+Generate comprehensive analysis reports using:
+- Google Gemini
+- OpenAI GPT
+- Anthropic Claude
+
+Reports include performance metrics, SHAP interpretations, and governance recommendations.
+
+## Supported Models
+
+### Quantum Models
+
+- **Data Reuploading Classifier**: Quantum circuit with data re-uploading
+- **Circuit-Centric Classifier**: Parameterized quantum circuits
+- **Quantum Kitchen Sinks**: Quantum feature maps
+- **Quantum Metric Learner**: Metric learning with quantum circuits
+- **Dressed Quantum Circuit Classifier**: Hybrid quantum-classical
+
+### Classical Models
+
+- **Support Vector Classifier (SVC)**: With multiple kernels
+- **Multi-Layer Perceptron (MLP)**: Neural network classifier
+- **Perceptron**: Simple linear classifier
+
+## Documentation
+
+- **[User Guide](user_guide.md)** - Complete walkthrough of the Streamlit interface
+- **[API Reference](api_reference.md)** - Detailed API documentation for Python usage
+- **[Examples](examples.md)** - Code examples for common use cases
+- **[Changelog](changelog.md)** - Version history and updates
+
+## Workflow
+
+QuOptuna provides a structured workflow:
+
+1. **Dataset Selection**
+   - Load from UCI ML Repository or upload CSV
+   - Configure features and target
+   - Apply preprocessing
+
+2. **Optimization**
+   - Prepare train/test splits
+   - Run hyperparameter optimization
+   - Review best performing models
+
+3. **Model Training**
+   - Select best trial
+   - Train model with optimized parameters
+   - Evaluate performance
+
+4. **SHAP Analysis**
+   - Calculate SHAP values
+   - Generate multiple visualization types
+   - Understand feature importance
+
+5. **Report Generation**
+   - Create AI-powered analysis
+   - Export results
+   - Share insights
+
+## System Requirements
+
+- Python 3.8+
+- 4GB+ RAM (8GB recommended for quantum models)
+- Internet connection (for UCI datasets and LLM reports)
+
+### Dependencies
+
+Core dependencies:
+- `optuna` - Hyperparameter optimization
+- `streamlit` - Web interface
+- `shap` - Explainable AI
+- `pennylane` - Quantum computing
+- `scikit-learn` - Classical ML models
+- `pandas`, `numpy` - Data processing
+
+## Development
+
+### Setup
+
+```bash
+# Clone repository
+git clone https://github.com/Qentora/quoptuna.git
+cd quoptuna
+
 # Install development dependencies
 uv pip install -e ".[dev]"
 
@@ -102,40 +194,69 @@ uv run ruff check .
 uv run mypy .
 ```
 
-For more information about the development process, refer to our [Development Guide](CONTRIBUTING.md).
+### Project Structure
 
-
-
-## Backend Optimizer Implementation
-
-```python
-class Optimizer:
-    def __init__(self, db_name: str, dataset_name: str = "", data: Optional[dict] = None, study_name: str = ""):
-        self.db_name = db_name
-        self.dataset_name = dataset_name
-        self.data = data or {}
-        self.data_path = f"db/{self.db_name}.db"
-        self.study_name = study_name
+```
+quoptuna/
+├── src/quoptuna/
+│   ├── backend/         # Core optimization and model code
+│   │   ├── models/      # Model implementations
+│   │   ├── tuners/      # Optuna integration
+│   │   ├── xai/         # SHAP analysis
+│   │   └── utils/       # Utilities
+│   └── frontend/        # Streamlit interface
+│       ├── pages/       # Multi-page app
+│       ├── app.py       # Main application
+│       └── support.py   # Helper functions
+├── docs/                # Documentation
+├── experiments/         # Example notebooks
+└── tests/              # Unit tests
 ```
 
-## Frontend Application
+## Contributing
 
-```python
-def main():
-    if "run" in sys.argv:
-        sys.argv = ["streamlit", "run", "src/quoptuna/frontend/app.py"]
-        stcli.main()
-    if "--start" in sys.argv:
-        sys.argv = ["streamlit", "run", "src/quoptuna/frontend/app.py"]
-        stcli.main()
-    else:
-        initialize_session_state()
-        main_page()
-        with st.sidebar:
-            handle_sidebar()
-        update_plot()
-...
-if __name__ == "__main__":
-    main()
+We welcome contributions! Please see our [Contributing Guidelines](https://github.com/Qentora/quoptuna/blob/main/CONTRIBUTING.md).
+
+### Ways to Contribute
+
+- 🐛 Report bugs and issues
+- 💡 Suggest new features
+- 📝 Improve documentation
+- 🔧 Submit pull requests
+- ⭐ Star the repository
+
+## Support & Community
+
+- **GitHub Issues**: [Report bugs or request features](https://github.com/Qentora/quoptuna/issues)
+- **Discussions**: [Join the community](https://github.com/Qentora/quoptuna/discussions)
+- **Documentation**: [Full docs](https://qentora.github.io/quoptuna)
+
+## License
+
+QuOptuna is released under the MIT License. See [LICENSE](https://github.com/Qentora/quoptuna/blob/main/LICENSE) for details.
+
+## Citation
+
+If you use QuOptuna in your research, please cite:
+
+```bibtex
+@software{quoptuna,
+  title = {QuOptuna: Quantum-Enhanced Machine Learning Optimization},
+  author = {QuOptuna Team},
+  year = {2024},
+  url = {https://github.com/Qentora/quoptuna}
+}
 ```
+
+## Acknowledgments
+
+Built with:
+- [Optuna](https://optuna.org/) - Hyperparameter optimization framework
+- [PennyLane](https://pennylane.ai/) - Quantum machine learning
+- [SHAP](https://shap.readthedocs.io/) - Explainable AI
+- [Streamlit](https://streamlit.io/) - Web framework
+
+---
+
+**Ready to get started?** Check out the [User Guide](user_guide.md) or launch the app with `quoptuna --start`!
 
