@@ -102,11 +102,11 @@ plugins:
           options:
             # show_signature_annotations: true
             show_source: true
-            show_submodules: true
+            show_submodules: false
             docstring_options:
               ignore_init_summary: false
             docstring_section_style: spacy
-            filters: ["!^_"]
+            filters: ["!^_", "!^pennylane_models"]
             inherited_members: true
             merge_init_into_class: true
             parameter_headings: true
@@ -115,7 +115,7 @@ plugins:
             scoped_crossrefs: true
             separate_signature: true
             show_bases: true
-            show_inheritance_diagram: true
+            show_inheritance_diagram: false
             show_root_heading: true
             show_root_full_path: false
             show_signature_annotations: true
@@ -124,7 +124,7 @@ plugins:
             signature_crossrefs: true
             summary: true
             unwrap_annotated: true
-  - social
+  # - social  # Disabled to avoid font loading issues in CI
   - tags
   - offline
   - glightbox:

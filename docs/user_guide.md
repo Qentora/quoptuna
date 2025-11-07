@@ -273,7 +273,7 @@ Advanced users can integrate custom models by:
 
 - Explore the [API Documentation](api_reference.md) for programmatic usage
 - Check out [Examples](examples.md) for common use cases
-- Review [Development Guide](development.md) for contributing
+- Contribute on [GitHub](https://github.com/Qentora/quoptuna)
 
 ## Support
 
