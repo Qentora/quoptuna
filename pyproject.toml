@@ -6,7 +6,7 @@ authors = [
     {name = "Edwin Jose", email = "edwinjose900@gmail.com"},
 ]
 license = {text = "Apache-2.0"}
-requires-python = "<4.0,>=3.11"
+requires-python = "<3.13,>=3.11"
 dependencies = [
     "pennylane==0.38.1",
     "scikit-learn==1.5.2",
@@ -38,10 +38,13 @@ dependencies = [
     "mkdocstrings-python>=1.12.2",
     "cairosvg>=2.7.1",
     "mkdocs-glightbox>=0.4.0",
+    "mike>=2.1.3",
+    "mkdocs-autorefs>=1.2.0",
     "pmlb>=1.0.1.post3",
     "langchain>=0.3.17",
     "langchain-openai>=0.3.3",
     "langchain-google-genai>=2.0.9",
+    "ucimlrepo>=0.0.7",
 ]
 readme = "README.md"
 classifiers = [
