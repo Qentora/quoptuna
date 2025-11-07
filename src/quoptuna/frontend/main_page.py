@@ -3,7 +3,10 @@ import streamlit as st
 
 def main_page():
     """This is the main page of the app."""
-    st.markdown('<div class="main-title">QuOptuna: Quantum-Enhanced ML Optimization</div>', unsafe_allow_html=True)
+    st.markdown(
+        '<div class="main-title">QuOptuna: Quantum-Enhanced ML Optimization</div>',
+        unsafe_allow_html=True,
+    )
 
     st.markdown(
         """
