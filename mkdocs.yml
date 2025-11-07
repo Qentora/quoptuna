@@ -1,4 +1,5 @@
 site_name: "QuOptuna"
+site_url: https://Qentora.github.io/quoptuna
 repo_url: https://github.com/Qentora/quoptuna
 
 # theme:
@@ -97,6 +98,7 @@ plugins:
       default_handler: python
       handlers:
         python:
+          paths: [src]
           options:
             # show_signature_annotations: true
             show_source: true
