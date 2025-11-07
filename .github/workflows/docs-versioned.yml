@@ -61,11 +61,11 @@ jobs:
           if [[ "${{ github.ref }}" == "refs/heads/main" || "${{ github.ref }}" == "refs/heads/master" ]]; then
             echo "version=latest" >> $GITHUB_OUTPUT
             echo "title=Latest (Stable)" >> $GITHUB_OUTPUT
-            echo "alias=latest" >> $GITHUB_OUTPUT
+            echo "alias=" >> $GITHUB_OUTPUT
           elif [[ "${{ github.ref }}" == "refs/heads/development" ]]; then
             echo "version=dev" >> $GITHUB_OUTPUT
             echo "title=Development" >> $GITHUB_OUTPUT
-            echo "alias=dev" >> $GITHUB_OUTPUT
+            echo "alias=" >> $GITHUB_OUTPUT
           else
             echo "version=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
             echo "title=${GITHUB_REF##*/}" >> $GITHUB_OUTPUT
@@ -74,9 +74,14 @@ jobs:
 
       - name: Deploy documentation with mike
         run: |
-          mike deploy --push --update-aliases \
-            ${{ steps.version.outputs.version }} \
-            ${{ steps.version.outputs.alias }}
+          if [ -n "${{ steps.version.outputs.alias }}" ]; then
+            mike deploy --push --update-aliases \
+              ${{ steps.version.outputs.version }} \
+              ${{ steps.version.outputs.alias }}
+          else
+            mike deploy --push \
+              ${{ steps.version.outputs.version }}
+          fi
 
       - name: Set default version (main/master only)
         if: github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master'
