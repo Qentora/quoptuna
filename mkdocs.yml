@@ -135,7 +135,10 @@ plugins:
       draggable: true
 
 
-# extra:
+extra:
+  version:
+    provider: mike
+    default: latest
 #   social:
 #     - icon: simple/youtube
 #       link: https://youtube.com/
