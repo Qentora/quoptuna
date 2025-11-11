@@ -437,6 +437,6 @@ except Exception as e:
 
 ## See Also
 
-- [User Guide](user_guide.md) - Step-by-step usage instructions
-- [Examples](examples.md) - Common use cases and tutorials
+- [User Guide](../user_guide.md) - Step-by-step usage instructions
+- [Examples](../examples.md) - Common use cases and tutorials
 - [GitHub Repository](https://github.com/Qentora/quoptuna) - Source code and issues

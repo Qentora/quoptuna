@@ -125,7 +125,7 @@ Reports include performance metrics, SHAP interpretations, and governance recomm
 ## Documentation
 
 - **[User Guide](user_guide.md)** - Complete walkthrough of the Streamlit interface
-- **[API Reference](api_reference.md)** - Detailed API documentation for Python usage
+- **[API Reference](api.md)** - Auto-generated API documentation for Python usage
 - **[Examples](examples.md)** - Code examples for common use cases
 - **[Changelog](changelog.md)** - Version history and updates
 
