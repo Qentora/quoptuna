@@ -1,11 +1,12 @@
-import { useCallback, useRef } from 'react';
+import { useCallback, useRef, useState } from 'react';
 import ReactFlow, { Background, Controls, MiniMap, ReactFlowProvider } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { NodePalette } from '../components/workflow/NodePalette';
 import { CustomNode } from '../components/workflow/CustomNode';
 import { useWorkflowStore } from '../stores/workflow';
 import type { NodeType, WorkflowNode } from '../types/workflow';
-import { Play, Save, Trash2 } from 'lucide-react';
+import { Play, Save, Trash2, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { executeWorkflow, pollExecutionStatus } from '../lib/api';
 
 const nodeTypes = {
   custom: CustomNode,
@@ -13,6 +14,10 @@ const nodeTypes = {
 
 function WorkflowBuilderContent() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
+  const [isExecuting, setIsExecuting] = useState(false);
+  const [executionStatus, setExecutionStatus] = useState<string | null>(null);
+  const [executionError, setExecutionError] = useState<string | null>(null);
+
   const {
     nodes,
     edges,
@@ -22,6 +27,7 @@ function WorkflowBuilderContent() {
     addNode,
     clearWorkflow,
     saveWorkflow,
+    updateNode,
   } = useWorkflowStore();
 
   const onDragOver = useCallback((event: React.DragEvent) => {
@@ -86,9 +92,86 @@ function WorkflowBuilderContent() {
     }
   };
 
-  const handleRun = () => {
-    // TODO: Implement workflow execution
-    alert('Workflow execution will be implemented in the backend integration phase!');
+  const handleRun = async () => {
+    if (nodes.length === 0) {
+      alert('Please add at least one node to the workflow');
+      return;
+    }
+
+    try {
+      setIsExecuting(true);
+      setExecutionStatus('Starting workflow execution...');
+      setExecutionError(null);
+
+      // Set all nodes to idle status
+      nodes.forEach((node) => {
+        updateNode(node.id, { status: 'idle' });
+      });
+
+      // Execute workflow
+      const response = await executeWorkflow({
+        name: 'Temporary Workflow',
+        nodes: nodes,
+        edges: edges,
+      });
+
+      setExecutionStatus(`Execution started (ID: ${response.execution_id})`);
+
+      // Poll for completion
+      const result = await pollExecutionStatus(
+        response.execution_id,
+        (status) => {
+          setExecutionStatus(
+            `Status: ${status.status} - ${
+              status.status === 'running' ? 'Processing...' : status.message || ''
+            }`
+          );
+
+          // Update node statuses based on execution
+          if (status.status === 'running') {
+            nodes.forEach((node) => {
+              updateNode(node.id, { status: 'running' });
+            });
+          }
+        }
+      );
+
+      if (result.status === 'completed') {
+        // Mark all nodes as complete
+        nodes.forEach((node) => {
+          updateNode(node.id, { status: 'complete' });
+        });
+
+        setExecutionStatus('Workflow completed successfully!');
+        alert(
+          `Workflow completed!\n\nExecution ID: ${result.id}\nResults: ${
+            result.result?.node_results
+              ? Object.keys(result.result.node_results).length + ' nodes executed'
+              : 'See console for details'
+          }`
+        );
+        console.log('Execution result:', result);
+      } else {
+        // Mark nodes as error
+        nodes.forEach((node) => {
+          updateNode(node.id, { status: 'error' });
+        });
+
+        setExecutionError(result.error || 'Workflow execution failed');
+        alert(`Workflow failed: ${result.error}`);
+      }
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      setExecutionError(errorMessage);
+      alert(`Failed to execute workflow: ${errorMessage}`);
+
+      // Mark all nodes as error
+      nodes.forEach((node) => {
+        updateNode(node.id, { status: 'error' });
+      });
+    } finally {
+      setIsExecuting(false);
+    }
   };
 
   return (
@@ -97,32 +180,63 @@ function WorkflowBuilderContent() {
 
       <div className="flex-1 flex flex-col">
         {/* Toolbar */}
-        <div className="bg-card border-b border-border p-4 flex items-center justify-between">
-          <h1 className="text-xl font-bold">Workflow Builder</h1>
+        <div className="bg-card border-b border-border p-4">
+          <div className="flex items-center justify-between mb-2">
+            <h1 className="text-xl font-bold">Workflow Builder</h1>
 
-          <div className="flex gap-2">
-            <button
-              onClick={handleRun}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
-            >
-              <Play className="w-4 h-4" />
-              Run
-            </button>
-            <button
-              onClick={handleSave}
-              className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors"
-            >
-              <Save className="w-4 h-4" />
-              Save
-            </button>
-            <button
-              onClick={clearWorkflow}
-              className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors"
-            >
-              <Trash2 className="w-4 h-4" />
-              Clear
-            </button>
+            <div className="flex gap-2">
+              <button
+                onClick={handleRun}
+                disabled={isExecuting}
+                className="flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                {isExecuting ? (
+                  <Loader2 className="w-4 h-4 animate-spin" />
+                ) : (
+                  <Play className="w-4 h-4" />
+                )}
+                {isExecuting ? 'Running...' : 'Run'}
+              </button>
+              <button
+                onClick={handleSave}
+                disabled={isExecuting}
+                className="flex items-center gap-2 px-4 py-2 bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors disabled:opacity-50"
+              >
+                <Save className="w-4 h-4" />
+                Save
+              </button>
+              <button
+                onClick={clearWorkflow}
+                disabled={isExecuting}
+                className="flex items-center gap-2 px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors disabled:opacity-50"
+              >
+                <Trash2 className="w-4 h-4" />
+                Clear
+              </button>
+            </div>
           </div>
+
+          {/* Status display */}
+          {(executionStatus || executionError) && (
+            <div className="flex items-center gap-2 text-sm">
+              {executionError ? (
+                <>
+                  <XCircle className="w-4 h-4 text-red-500" />
+                  <span className="text-red-600">{executionError}</span>
+                </>
+              ) : executionStatus?.includes('completed') ? (
+                <>
+                  <CheckCircle2 className="w-4 h-4 text-green-500" />
+                  <span className="text-green-600">{executionStatus}</span>
+                </>
+              ) : (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin text-blue-500" />
+                  <span className="text-blue-600">{executionStatus}</span>
+                </>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Canvas */}
