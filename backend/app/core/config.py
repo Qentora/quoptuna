@@ -2,7 +2,8 @@
 Application configuration
 """
 
-from typing import List
+from typing import List, Union
+from pydantic import field_validator
 from pydantic_settings import BaseSettings
 
 
@@ -14,11 +15,19 @@ class Settings(BaseSettings):
     PROJECT_NAME: str = "QuOptuna Next"
 
     # CORS
-    CORS_ORIGINS: List[str] = [
+    CORS_ORIGINS: Union[List[str], str] = [
         "http://localhost:5173",  # Vite dev server
         "http://localhost:3000",  # Alternative frontend port
         "http://localhost:8000",  # Backend port
     ]
+
+    @field_validator("CORS_ORIGINS", mode="before")
+    @classmethod
+    def parse_cors_origins(cls, v):
+        """Parse CORS_ORIGINS from comma-separated string or list"""
+        if isinstance(v, str):
+            return [origin.strip() for origin in v.split(",")]
+        return v
 
     # Database
     DATABASE_URL: str = "sqlite:///./quoptuna.db"
