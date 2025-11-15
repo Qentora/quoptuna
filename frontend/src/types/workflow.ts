@@ -25,6 +25,7 @@ export interface NodeData {
   status?: 'idle' | 'running' | 'complete' | 'error';
   result?: any;
   onRunFromNode?: (nodeId: string) => void;
+  onViewResult?: (nodeId: string, result: any) => void;
 }
 
 export interface WorkflowNode extends Node {

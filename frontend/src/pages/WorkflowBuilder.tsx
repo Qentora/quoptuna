@@ -1,11 +1,12 @@
 import { useCallback, useRef, useState } from 'react';
 import ReactFlow, { Background, Controls, MiniMap, ReactFlowProvider } from 'reactflow';
 import 'reactflow/dist/style.css';
+import toast from 'react-hot-toast';
 import { NodePalette } from '../components/workflow/NodePalette';
 import { CustomNode } from '../components/workflow/CustomNode';
 import { NodeConfigPanel } from '../components/workflow/NodeConfigPanel';
 import { ErrorModal } from '../components/ui/ErrorModal';
-import { SuccessModal } from '../components/ui/SuccessModal';
+import { NodeResultModal } from '../components/ui/NodeResultModal';
 import { useWorkflowStore } from '../stores/workflow';
 import type { NodeType, WorkflowNode } from '../types/workflow';
 import { Play, Save, Trash2, Loader2, CheckCircle2, XCircle, StopCircle } from 'lucide-react';
@@ -26,10 +27,15 @@ function WorkflowBuilderContent() {
 
   // Modal states
   const [showErrorModal, setShowErrorModal] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [modalTitle, setModalTitle] = useState('');
-  const [modalMessage, setModalMessage] = useState('');
-  const [modalDetails, setModalDetails] = useState<any>(null);
+  const [errorModalTitle, setErrorModalTitle] = useState('');
+  const [errorModalMessage, setErrorModalMessage] = useState('');
+  const [errorModalDetails, setErrorModalDetails] = useState<any>(null);
+
+  // Node result modal state
+  const [showResultModal, setShowResultModal] = useState(false);
+  const [resultModalNodeId, setResultModalNodeId] = useState('');
+  const [resultModalNodeLabel, setResultModalNodeLabel] = useState('');
+  const [resultModalData, setResultModalData] = useState<any>(null);
 
   const {
     nodes,
@@ -101,10 +107,7 @@ function WorkflowBuilderContent() {
     const name = prompt('Enter workflow name:');
     if (name) {
       saveWorkflow(name);
-      setModalTitle('Workflow Saved');
-      setModalMessage(`Workflow "${name}" has been saved successfully!`);
-      setModalDetails(null);
-      setShowSuccessModal(true);
+      toast.success(`Workflow "${name}" has been saved successfully!`);
     }
   };
 
@@ -138,11 +141,21 @@ function WorkflowBuilderContent() {
     handleRun();
   }, [nodes, edges]);
 
+  const handleViewResult = useCallback((nodeId: string, result: any) => {
+    const node = nodes.find((n) => n.id === nodeId);
+    if (node) {
+      setResultModalNodeId(nodeId);
+      setResultModalNodeLabel(node.data.label);
+      setResultModalData(result);
+      setShowResultModal(true);
+    }
+  }, [nodes]);
+
   const handleRun = async () => {
     if (nodes.length === 0) {
-      setModalTitle('No Nodes');
-      setModalMessage('Please add at least one node to the workflow before running.');
-      setModalDetails(null);
+      setErrorModalTitle('No Nodes');
+      setErrorModalMessage('Please add at least one node to the workflow before running.');
+      setErrorModalDetails(null);
       setShowErrorModal(true);
       return;
     }
@@ -194,22 +207,18 @@ function WorkflowBuilderContent() {
       if (result.status === 'completed') {
         // Mark all nodes as complete
         nodes.forEach((node) => {
-          updateNode(node.id, { status: 'complete' });
+          updateNode(node.id, { status: 'complete', result: result.result?.node_results?.[node.id] });
         });
 
         setExecutionStatus('Workflow completed successfully!');
 
-        // Show success modal
-        setModalTitle('Workflow Completed');
-        setModalMessage(
-          `Workflow executed successfully!\n\nExecution ID: ${result.id}\nNodes executed: ${
-            result.result?.node_results
-              ? Object.keys(result.result.node_results).length
-              : 0
-          }`
-        );
-        setModalDetails(result.result);
-        setShowSuccessModal(true);
+        // Show success toast
+        const nodesExecuted = result.result?.node_results
+          ? Object.keys(result.result.node_results).length
+          : 0;
+        toast.success(`Workflow executed successfully! ${nodesExecuted} nodes completed.`, {
+          duration: 4000,
+        });
 
         console.log('Execution result:', result);
       } else {
@@ -221,9 +230,9 @@ function WorkflowBuilderContent() {
         setExecutionError(result.error || 'Workflow execution failed');
 
         // Show error modal
-        setModalTitle('Workflow Failed');
-        setModalMessage('The workflow execution encountered an error.');
-        setModalDetails(result.error);
+        setErrorModalTitle('Workflow Failed');
+        setErrorModalMessage('The workflow execution encountered an error.');
+        setErrorModalDetails(result.error);
         setShowErrorModal(true);
       }
     } catch (error) {
@@ -231,9 +240,9 @@ function WorkflowBuilderContent() {
       setExecutionError(errorMessage);
 
       // Show error modal
-      setModalTitle('Execution Error');
-      setModalMessage('Failed to execute workflow.');
-      setModalDetails(errorMessage);
+      setErrorModalTitle('Execution Error');
+      setErrorModalMessage('Failed to execute workflow.');
+      setErrorModalDetails(errorMessage);
       setShowErrorModal(true);
 
       // Mark all nodes as error
@@ -327,6 +336,7 @@ function WorkflowBuilderContent() {
               data: {
                 ...node.data,
                 onRunFromNode: handleRunFromNode,
+                onViewResult: handleViewResult,
               },
             }))}
             edges={edges}
@@ -358,18 +368,18 @@ function WorkflowBuilderContent() {
       <ErrorModal
         isOpen={showErrorModal}
         onClose={() => setShowErrorModal(false)}
-        title={modalTitle}
-        message={modalMessage}
-        details={modalDetails}
+        title={errorModalTitle}
+        message={errorModalMessage}
+        details={errorModalDetails}
       />
 
-      {/* Success Modal */}
-      <SuccessModal
-        isOpen={showSuccessModal}
-        onClose={() => setShowSuccessModal(false)}
-        title={modalTitle}
-        message={modalMessage}
-        details={modalDetails}
+      {/* Node Result Modal */}
+      <NodeResultModal
+        isOpen={showResultModal}
+        onClose={() => setShowResultModal(false)}
+        nodeId={resultModalNodeId}
+        nodeLabel={resultModalNodeLabel}
+        result={resultModalData}
       />
     </div>
   );

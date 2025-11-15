@@ -18,6 +18,7 @@
     "react-dom": "^19.2.0",
     "react-dropzone": "^14.3.8",
     "react-hook-form": "^7.66.0",
+    "react-hot-toast": "^2.6.0",
     "react-plotly.js": "^2.6.0",
     "react-router-dom": "^7.9.6",
     "reactflow": "^11.11.4",

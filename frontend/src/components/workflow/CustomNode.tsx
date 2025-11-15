@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Handle, Position } from 'reactflow';
 import type { NodeProps } from 'reactflow';
-import { Database, Upload, Settings, Brain, BarChart3, FileOutput, Gauge, CheckCircle2, Loader2, XCircle, Circle, Play } from 'lucide-react';
+import { Database, Upload, Settings, Brain, BarChart3, FileOutput, Gauge, CheckCircle2, Loader2, XCircle, Circle, Play, Eye } from 'lucide-react';
 import type { NodeData } from '../../types/workflow';
 
 const getNodeIcon = (type: string) => {
@@ -37,6 +37,13 @@ export const CustomNode = memo(({ data, selected, id }: NodeProps<NodeData>) => 
     }
   };
 
+  const handleViewResult = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (data.onViewResult) {
+      data.onViewResult(id, data.result);
+    }
+  };
+
   return (
     <div
       className={`px-4 py-3 shadow-md rounded-lg border-2 bg-white min-w-[200px] ${
@@ -58,6 +65,15 @@ export const CustomNode = memo(({ data, selected, id }: NodeProps<NodeData>) => 
               title="Run workflow from this node"
             >
               <Play className="w-4 h-4 text-blue-600" />
+            </button>
+          )}
+          {data.status === 'complete' && data.result && (
+            <button
+              onClick={handleViewResult}
+              className="p-1 hover:bg-green-50 rounded transition-colors"
+              title="View execution result"
+            >
+              <Eye className="w-4 h-4 text-green-600" />
             </button>
           )}
           {getStatusIcon(data.status)}
