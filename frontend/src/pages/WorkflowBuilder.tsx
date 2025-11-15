@@ -1,5 +1,5 @@
 import { useCallback, useRef, useState } from 'react';
-import ReactFlow, { Background, Controls, MiniMap, ReactFlowProvider, NodeMouseHandler } from 'reactflow';
+import ReactFlow, { Background, Controls, MiniMap, ReactFlowProvider, Node } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { NodePalette } from '../components/workflow/NodePalette';
 import { CustomNode } from '../components/workflow/CustomNode';
@@ -94,7 +94,7 @@ function WorkflowBuilderContent() {
     }
   };
 
-  const handleNodeClick: NodeMouseHandler = useCallback((event, node) => {
+  const handleNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     setSelectedNode(node as WorkflowNode);
   }, []);
 
