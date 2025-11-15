@@ -17,12 +17,13 @@ services:
 
   backend:
     build:
-      context: ./backend
-      dockerfile: Dockerfile
+      context: .
+      dockerfile: backend/Dockerfile
     ports:
       - "8000:8000"
     volumes:
       - ./backend:/app
+      - ./src:/quoptuna/src
       - ./uploads:/app/uploads
     environment:
       - DATABASE_URL=sqlite:///./quoptuna.db
