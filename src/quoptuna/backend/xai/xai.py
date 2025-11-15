@@ -11,8 +11,8 @@ from typing import TYPE_CHECKING, Literal
 import matplotlib.pyplot as plt
 import pandas as pd
 import shap
-from langchain.prompts import ChatPromptTemplate, MessagesPlaceholder
-from langchain.schema import HumanMessage, SystemMessage
+from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.messages import HumanMessage, SystemMessage
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from shap import Explainer
