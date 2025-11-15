@@ -28,9 +28,9 @@ build:
 
 install_backend:
 	@echo "Installing main quoptuna package..."
-	pip install -e .
+	$(UV) pip install -e .
 	@echo "Installing backend dependencies..."
-	cd backend && pip install -e .
+	cd backend && $(UV) pip install -e .
 	@echo "Backend dependencies installed!"
 
 install_frontend:
