@@ -589,6 +589,7 @@ print(f"Recall: {study.best_trial.user_attrs['recall']:.4f}")
 
 ## Next Steps
 
-- Review the [API Reference](api_reference.md) for detailed class documentation
+- Review the [API Reference](api.md) for auto-generated API documentation
+- Check the [Python API Guide](guides/python-api-guide.md) for detailed Python usage
 - Check the [User Guide](user_guide.md) for the Streamlit interface
 - Visit [GitHub](https://github.com/Qentora/quoptuna) for more examples

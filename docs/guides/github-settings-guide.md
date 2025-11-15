@@ -342,7 +342,7 @@ Before workflows can deploy docs, ensure:
 If you encounter issues not covered here:
 
 1. Check workflow logs in **Actions** tab
-2. Review [GITHUB_PAGES_SETUP.md](GITHUB_PAGES_SETUP.md) for detailed troubleshooting
+2. Review [GitHub Pages Setup](github-pages-setup.md) for detailed troubleshooting
 3. Consult [GitHub Pages documentation](https://docs.github.com/en/pages)
 4. Check [mike documentation](https://github.com/jimporter/mike)
 5. Open an issue in the repository

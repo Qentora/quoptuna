@@ -73,6 +73,11 @@ venv.bak/
 # mkdocs documentation
 /site
 
+# Node.js (should not be in docs)
+node_modules/
+yarn.lock
+package-lock.json
+
 # mypy
 .mypy_cache/
 

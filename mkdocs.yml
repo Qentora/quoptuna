@@ -61,8 +61,14 @@ theme:
 nav:
   - Home: 'index.md'
   - User Guide: 'user_guide.md'
-  - API Reference: 'api_reference.md'
+  - API Reference: 'api.md'
   - Examples: 'examples.md'
+  - Guides:
+      - Python API Guide: 'guides/python-api-guide.md'
+      - Streamlit Interface: 'guides/streamlit-guide.md'
+      - GitHub Pages Setup: 'guides/github-pages-setup.md'
+      - GitHub Settings: 'guides/github-settings-guide.md'
+      - About Documentation: 'about-docs.md'
   - Changelog: 'changelog.md'
 
 markdown_extensions:
