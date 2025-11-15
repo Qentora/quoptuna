@@ -154,12 +154,20 @@ class WorkflowExecutor:
         dataset = list(inputs.values())[0]
         df = dataset["dataframe"]
 
+        # Convert dtypes to strings for JSON serialization
+        dtypes_dict = {col: str(dtype) for col, dtype in df.dtypes.items()}
+
+        # Convert describe() output, handling NaN values
+        describe_dict = df.describe().fillna(0).to_dict()
+
         return {
             "type": "preview",
-            "shape": df.shape,
-            "dtypes": df.dtypes.to_dict(),
-            "describe": df.describe().to_dict(),
+            "shape": list(df.shape),  # Convert tuple to list
+            "dtypes": dtypes_dict,
+            "describe": describe_dict,
             "head": df.head().to_dict(),
+            "columns": list(df.columns),
+            "rows": len(df),
         }
 
     def _execute_feature_selection(self, config: Dict, inputs: Dict) -> Dict:
