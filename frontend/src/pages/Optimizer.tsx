@@ -1,5 +1,6 @@
-import { useState } from 'react';
-import { CheckCircle2, Circle } from 'lucide-react';
+import { useState, useRef } from 'react';
+import { CheckCircle2, Circle, X } from 'lucide-react';
+import { fetchUCIDataset, uploadDataset } from '../lib/api';
 
 type Step = {
   id: number;
@@ -120,6 +121,44 @@ export function Optimizer() {
 
 // Step Components
 function DatasetStep({ onNext }: { onNext: () => void }) {
+  const [showUCIModal, setShowUCIModal] = useState(false);
+  const [selectedDataset, setSelectedDataset] = useState<{ name: string; source: string } | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleFileUpload = async (event: React.ChangeEvent<HTMLInputElement>) => {
+    const file = event.target.files?.[0];
+    if (!file) return;
+
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await uploadDataset(file);
+      setSelectedDataset({ name: result.filename, source: 'upload' });
+      setIsLoading(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to upload dataset');
+      setIsLoading(false);
+    }
+  };
+
+  const handleUCISelect = async (datasetId: number) => {
+    setIsLoading(true);
+    setError(null);
+
+    try {
+      const result = await fetchUCIDataset(datasetId);
+      setSelectedDataset({ name: result.name, source: 'uci' });
+      setShowUCIModal(false);
+      setIsLoading(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to fetch UCI dataset');
+      setIsLoading(false);
+    }
+  };
+
   return (
     <div className="space-y-6">
       <div>
@@ -127,9 +166,24 @@ function DatasetStep({ onNext }: { onNext: () => void }) {
         <p className="text-gray-600 mt-2">Upload your own dataset or select from UCI ML Repository</p>
       </div>
 
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+          {error}
+        </div>
+      )}
+
+      {selectedDataset && (
+        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
+          Selected: {selectedDataset.name} (from {selectedDataset.source === 'upload' ? 'upload' : 'UCI repository'})
+        </div>
+      )}
+
       <div className="grid grid-cols-2 gap-6">
         {/* Upload Dataset */}
-        <div className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer">
+        <div
+          onClick={() => fileInputRef.current?.click()}
+          className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer"
+        >
           <div className="text-gray-400 mb-4">
             <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 16a4 4 0 01-.88-7.903A5 5 0 1115.9 6L16 6a5 5 0 011 9.9M15 13l-3-3m0 0l-3 3m3-3v12" />
@@ -137,10 +191,20 @@ function DatasetStep({ onNext }: { onNext: () => void }) {
           </div>
           <h3 className="text-lg font-semibold text-gray-900 mb-2">Upload Dataset</h3>
           <p className="text-sm text-gray-500">Click to browse or drag and drop CSV file</p>
+          <input
+            ref={fileInputRef}
+            type="file"
+            accept=".csv"
+            onChange={handleFileUpload}
+            className="hidden"
+          />
         </div>
 
         {/* UCI Repository */}
-        <div className="border-2 border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer">
+        <div
+          onClick={() => setShowUCIModal(true)}
+          className="border-2 border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors cursor-pointer"
+        >
           <div className="text-gray-400 mb-4">
             <svg className="mx-auto h-12 w-12" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4" />
@@ -154,11 +218,21 @@ function DatasetStep({ onNext }: { onNext: () => void }) {
       <div className="flex justify-end pt-4">
         <button
           onClick={onNext}
-          className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors"
+          disabled={!selectedDataset || isLoading}
+          className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
         >
-          Next Step
+          {isLoading ? 'Loading...' : 'Next Step'}
         </button>
       </div>
+
+      {/* UCI Modal */}
+      {showUCIModal && (
+        <UCIDatasetModal
+          onClose={() => setShowUCIModal(false)}
+          onSelect={handleUCISelect}
+          isLoading={isLoading}
+        />
+      )}
     </div>
   );
 }
@@ -350,6 +424,73 @@ function ReportStep({ onBack }: { onBack: () => void }) {
         >
           Complete
         </button>
+      </div>
+    </div>
+  );
+}
+
+// UCI Dataset Modal Component
+function UCIDatasetModal({
+  onClose,
+  onSelect,
+  isLoading,
+}: {
+  onClose: () => void;
+  onSelect: (datasetId: number) => void;
+  isLoading: boolean;
+}) {
+  const popularDatasets = [
+    { id: 53, name: 'Iris', description: '150 samples, 4 features - Classic classification dataset' },
+    { id: 109, name: 'Wine Quality', description: '1599 samples, 11 features - Red wine quality dataset' },
+    { id: 17, name: 'Breast Cancer Wisconsin', description: '569 samples, 30 features - Diagnostic dataset' },
+    { id: 186, name: 'Wine', description: '178 samples, 13 features - Wine recognition dataset' },
+    { id: 267, name: 'Banknote Authentication', description: '1372 samples, 4 features - Classification task' },
+  ];
+
+  return (
+    <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+      <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full mx-4 max-h-[80vh] overflow-hidden flex flex-col">
+        {/* Header */}
+        <div className="flex items-center justify-between p-6 border-b border-gray-200">
+          <h3 className="text-xl font-bold text-gray-900">Select UCI Dataset</h3>
+          <button
+            onClick={onClose}
+            className="text-gray-400 hover:text-gray-600 transition-colors"
+            disabled={isLoading}
+          >
+            <X className="w-6 h-6" />
+          </button>
+        </div>
+
+        {/* Content */}
+        <div className="flex-1 overflow-y-auto p-6">
+          <p className="text-gray-600 mb-4">Choose from popular UCI Machine Learning Repository datasets:</p>
+          <div className="space-y-3">
+            {popularDatasets.map((dataset) => (
+              <button
+                key={dataset.id}
+                onClick={() => onSelect(dataset.id)}
+                disabled={isLoading}
+                className="w-full text-left p-4 border border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+              >
+                <div className="flex items-start justify-between">
+                  <div>
+                    <h4 className="font-semibold text-gray-900">{dataset.name}</h4>
+                    <p className="text-sm text-gray-500 mt-1">{dataset.description}</p>
+                    <p className="text-xs text-gray-400 mt-1">Dataset ID: {dataset.id}</p>
+                  </div>
+                </div>
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {/* Footer */}
+        <div className="p-6 border-t border-gray-200 bg-gray-50">
+          <p className="text-sm text-gray-500">
+            Need a different dataset? You can manually enter the dataset ID in the workflow builder.
+          </p>
+        </div>
       </div>
     </div>
   );

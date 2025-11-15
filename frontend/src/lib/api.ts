@@ -126,3 +126,47 @@ export async function uploadDataset(file: File): Promise<DatasetUploadResponse> 
 
   return response.json();
 }
+
+export interface UCIDataset {
+  id: number;
+  name: string;
+  description?: string;
+  num_instances?: number;
+  num_features?: number;
+}
+
+/**
+ * List available UCI datasets
+ */
+export async function listUCIDatasets(): Promise<UCIDataset[]> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/data/uci`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to list UCI datasets');
+  }
+
+  return response.json();
+}
+
+export interface UCIDatasetResponse {
+  message: string;
+  dataset_id: string;
+  name: string;
+  rows: number;
+  columns: string[];
+}
+
+/**
+ * Fetch a specific UCI dataset
+ */
+export async function fetchUCIDataset(datasetId: number): Promise<UCIDatasetResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/data/uci/${datasetId}`);
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to fetch UCI dataset');
+  }
+
+  return response.json();
+}
