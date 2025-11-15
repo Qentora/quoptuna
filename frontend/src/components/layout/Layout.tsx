@@ -1,14 +1,19 @@
 import { Link, Outlet, useLocation } from 'react-router-dom';
-import { LayoutDashboard, Workflow, Database, BarChart3, Settings, Brain } from 'lucide-react';
+import { LayoutDashboard, Workflow, Database, BarChart3, Settings, Brain, Zap } from 'lucide-react';
+import { FEATURES } from '../../config/features';
 
-const navigation = [
-  { name: 'Dashboard', href: '/', icon: LayoutDashboard },
-  { name: 'Workflow Builder', href: '/workflow', icon: Workflow },
-  { name: 'Data Explorer', href: '/data', icon: Database },
-  { name: 'Models', href: '/models', icon: Brain },
-  { name: 'Analytics', href: '/analytics', icon: BarChart3 },
-  { name: 'Settings', href: '/settings', icon: Settings },
+const allNavigation = [
+  { name: 'Dashboard', href: '/', icon: LayoutDashboard, feature: null },
+  { name: 'Optimizer', href: '/optimizer', icon: Zap, feature: 'STEP_OPTIMIZER' as const },
+  { name: 'Workflow Builder', href: '/workflow', icon: Workflow, feature: 'WORKFLOW_BUILDER' as const },
+  { name: 'Data Explorer', href: '/data', icon: Database, feature: 'DATA_EXPLORER' as const },
+  { name: 'Models', href: '/models', icon: Brain, feature: 'MODELS' as const },
+  { name: 'Analytics', href: '/analytics', icon: BarChart3, feature: 'ANALYTICS' as const },
+  { name: 'Settings', href: '/settings', icon: Settings, feature: null },
 ];
+
+// Filter navigation based on feature flags
+const navigation = allNavigation.filter(item => !item.feature || FEATURES[item.feature]);
 
 export function Layout() {
   const location = useLocation();
