@@ -232,22 +232,32 @@ class WorkflowExecutor:
         if not model_name:
             raise WorkflowExecutionError("No model name provided")
 
-        return {
+        result = {
             "type": "model_config",
             "model_name": model_name,
             "model_type": "quantum" if node_type == "quantum-model" else "classical",
-            **list(inputs.values())[0] if inputs else {},
         }
+
+        # Merge input data if available
+        if inputs:
+            result.update(list(inputs.values())[0])
+
+        return result
 
     def _execute_optuna_config(self, config: Dict, inputs: Dict) -> Dict:
         """Configure Optuna optimization parameters"""
-        return {
+        result = {
             "type": "optuna_config",
             "study_name": config.get("study_name", "workflow_study"),
             "n_trials": config.get("n_trials", 100),
             "db_name": config.get("db_name", "workflow_optimization.db"),
-            **list(inputs.values())[0] if inputs else {},
         }
+
+        # Merge input data if available
+        if inputs:
+            result.update(list(inputs.values())[0])
+
+        return result
 
     def _execute_optimization(self, config: Dict, inputs: Dict) -> Dict:
         """Run Optuna optimization"""
