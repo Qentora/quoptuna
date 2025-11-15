@@ -97,3 +97,32 @@ export async function pollExecutionStatus(
     poll();
   });
 }
+
+export interface DatasetUploadResponse {
+  message: string;
+  filename: string;
+  id: string;
+  file_path: string;
+  rows: number;
+  columns: string[];
+}
+
+/**
+ * Upload a CSV dataset
+ */
+export async function uploadDataset(file: File): Promise<DatasetUploadResponse> {
+  const formData = new FormData();
+  formData.append('file', file);
+
+  const response = await fetch(`${API_BASE_URL}/api/v1/data/upload`, {
+    method: 'POST',
+    body: formData,
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to upload dataset');
+  }
+
+  return response.json();
+}

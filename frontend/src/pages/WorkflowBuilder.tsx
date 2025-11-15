@@ -1,8 +1,9 @@
 import { useCallback, useRef, useState } from 'react';
-import ReactFlow, { Background, Controls, MiniMap, ReactFlowProvider } from 'reactflow';
+import ReactFlow, { Background, Controls, MiniMap, ReactFlowProvider, NodeMouseHandler } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { NodePalette } from '../components/workflow/NodePalette';
 import { CustomNode } from '../components/workflow/CustomNode';
+import { NodeConfigPanel } from '../components/workflow/NodeConfigPanel';
 import { useWorkflowStore } from '../stores/workflow';
 import type { NodeType, WorkflowNode } from '../types/workflow';
 import { Play, Save, Trash2, Loader2, CheckCircle2, XCircle } from 'lucide-react';
@@ -17,6 +18,7 @@ function WorkflowBuilderContent() {
   const [isExecuting, setIsExecuting] = useState(false);
   const [executionStatus, setExecutionStatus] = useState<string | null>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
+  const [selectedNode, setSelectedNode] = useState<WorkflowNode | null>(null);
 
   const {
     nodes,
@@ -90,6 +92,14 @@ function WorkflowBuilderContent() {
       saveWorkflow(name);
       alert('Workflow saved successfully!');
     }
+  };
+
+  const handleNodeClick: NodeMouseHandler = useCallback((event, node) => {
+    setSelectedNode(node as WorkflowNode);
+  }, []);
+
+  const handleConfigSave = (nodeId: string, config: any) => {
+    updateNode(nodeId, { config });
   };
 
   const handleRun = async () => {
@@ -249,6 +259,7 @@ function WorkflowBuilderContent() {
             onConnect={onConnect}
             onDrop={onDrop}
             onDragOver={onDragOver}
+            onNodeClick={handleNodeClick}
             nodeTypes={nodeTypes}
             fitView
             className="bg-gray-50"
@@ -259,6 +270,13 @@ function WorkflowBuilderContent() {
           </ReactFlow>
         </div>
       </div>
+
+      {/* Configuration Panel */}
+      <NodeConfigPanel
+        node={selectedNode}
+        onClose={() => setSelectedNode(null)}
+        onSave={handleConfigSave}
+      />
     </div>
   );
 }

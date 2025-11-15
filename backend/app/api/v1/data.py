@@ -2,11 +2,21 @@
 Data management endpoints
 """
 
+import os
+import uuid
+from pathlib import Path
 from fastapi import APIRouter, UploadFile, File, HTTPException
 from fastapi.responses import JSONResponse
 from typing import List
+import pandas as pd
+
+from app.core.config import settings
 
 router = APIRouter()
+
+# Ensure upload directory exists
+UPLOAD_DIR = Path(settings.UPLOAD_DIR)
+UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 
 
 @router.post("/upload")
@@ -15,15 +25,37 @@ async def upload_dataset(file: UploadFile = File(...)):
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Only CSV files are allowed")
 
-    # TODO: Implement file upload logic
-    return JSONResponse(
-        status_code=201,
-        content={
-            "message": "Dataset uploaded successfully",
-            "filename": file.filename,
-            "id": "dataset-123",
-        },
-    )
+    # Generate unique file ID
+    file_id = str(uuid.uuid4())
+    file_extension = os.path.splitext(file.filename)[1]
+    saved_filename = f"{file_id}{file_extension}"
+    file_path = UPLOAD_DIR / saved_filename
+
+    # Save file
+    try:
+        contents = await file.read()
+        with open(file_path, "wb") as f:
+            f.write(contents)
+
+        # Validate CSV and get basic info
+        df = pd.read_csv(file_path)
+
+        return JSONResponse(
+            status_code=201,
+            content={
+                "message": "Dataset uploaded successfully",
+                "filename": file.filename,
+                "id": file_id,
+                "file_path": str(file_path),
+                "rows": len(df),
+                "columns": list(df.columns),
+            },
+        )
+    except Exception as e:
+        # Clean up file if it was created
+        if file_path.exists():
+            file_path.unlink()
+        raise HTTPException(status_code=400, detail=f"Failed to process CSV file: {str(e)}")
 
 
 @router.get("/uci")
