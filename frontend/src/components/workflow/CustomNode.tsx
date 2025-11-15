@@ -1,7 +1,7 @@
 import { memo } from 'react';
 import { Handle, Position } from 'reactflow';
 import type { NodeProps } from 'reactflow';
-import { Database, Upload, Settings, Brain, BarChart3, FileOutput, Gauge, CheckCircle2, Loader2, XCircle, Circle } from 'lucide-react';
+import { Database, Upload, Settings, Brain, BarChart3, FileOutput, Gauge, CheckCircle2, Loader2, XCircle, Circle, Play } from 'lucide-react';
 import type { NodeData } from '../../types/workflow';
 
 const getNodeIcon = (type: string) => {
@@ -27,8 +27,15 @@ const getStatusIcon = (status?: string) => {
   }
 };
 
-export const CustomNode = memo(({ data, selected }: NodeProps<NodeData>) => {
+export const CustomNode = memo(({ data, selected, id }: NodeProps<NodeData>) => {
   const Icon = getNodeIcon(data.type);
+
+  const handleRunFromNode = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (data.onRunFromNode) {
+      data.onRunFromNode(id);
+    }
+  };
 
   return (
     <div
@@ -43,7 +50,18 @@ export const CustomNode = memo(({ data, selected }: NodeProps<NodeData>) => {
           <Icon className="w-5 h-5 text-gray-600" />
           <div className="font-medium text-sm">{data.label}</div>
         </div>
-        {getStatusIcon(data.status)}
+        <div className="flex items-center gap-1">
+          {data.status !== 'running' && (
+            <button
+              onClick={handleRunFromNode}
+              className="p-1 hover:bg-blue-50 rounded transition-colors"
+              title="Run workflow from this node"
+            >
+              <Play className="w-4 h-4 text-blue-600" />
+            </button>
+          )}
+          {getStatusIcon(data.status)}
+        </div>
       </div>
 
       {data.config && Object.keys(data.config).length > 0 && (

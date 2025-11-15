@@ -24,6 +24,7 @@ export interface NodeData {
   config?: Record<string, any>;
   status?: 'idle' | 'running' | 'complete' | 'error';
   result?: any;
+  onRunFromNode?: (nodeId: string) => void;
 }
 
 export interface WorkflowNode extends Node {

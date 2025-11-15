@@ -6,7 +6,7 @@ import { CustomNode } from '../components/workflow/CustomNode';
 import { NodeConfigPanel } from '../components/workflow/NodeConfigPanel';
 import { useWorkflowStore } from '../stores/workflow';
 import type { NodeType, WorkflowNode } from '../types/workflow';
-import { Play, Save, Trash2, Loader2, CheckCircle2, XCircle } from 'lucide-react';
+import { Play, Save, Trash2, Loader2, CheckCircle2, XCircle, StopCircle } from 'lucide-react';
 import { executeWorkflow, pollExecutionStatus } from '../lib/api';
 
 const nodeTypes = {
@@ -16,9 +16,11 @@ const nodeTypes = {
 function WorkflowBuilderContent() {
   const reactFlowWrapper = useRef<HTMLDivElement>(null);
   const [isExecuting, setIsExecuting] = useState(false);
+  const [currentExecutionId, setCurrentExecutionId] = useState<string | null>(null);
   const [executionStatus, setExecutionStatus] = useState<string | null>(null);
   const [executionError, setExecutionError] = useState<string | null>(null);
   const [selectedNode, setSelectedNode] = useState<WorkflowNode | null>(null);
+  const [stopRequested, setStopRequested] = useState(false);
 
   const {
     nodes,
@@ -102,6 +104,28 @@ function WorkflowBuilderContent() {
     updateNode(nodeId, { config });
   };
 
+  const handleStop = () => {
+    setStopRequested(true);
+    setExecutionStatus('Stopping execution...');
+    // Reset after a short delay
+    setTimeout(() => {
+      setIsExecuting(false);
+      setCurrentExecutionId(null);
+      setStopRequested(false);
+      setExecutionStatus('Execution stopped by user');
+      nodes.forEach((node) => {
+        updateNode(node.id, { status: 'idle' });
+      });
+    }, 500);
+  };
+
+  const handleRunFromNode = useCallback((nodeId: string) => {
+    // For now, just run the entire workflow
+    // TODO: Implement running from specific node
+    console.log(`Running workflow from node: ${nodeId}`);
+    handleRun();
+  }, [nodes, edges]);
+
   const handleRun = async () => {
     if (nodes.length === 0) {
       alert('Please add at least one node to the workflow');
@@ -110,6 +134,7 @@ function WorkflowBuilderContent() {
 
     try {
       setIsExecuting(true);
+      setStopRequested(false);
       setExecutionStatus('Starting workflow execution...');
       setExecutionError(null);
 
@@ -125,12 +150,17 @@ function WorkflowBuilderContent() {
         edges: edges,
       });
 
+      setCurrentExecutionId(response.execution_id);
       setExecutionStatus(`Execution started (ID: ${response.execution_id})`);
 
       // Poll for completion
       const result = await pollExecutionStatus(
         response.execution_id,
         (status) => {
+          if (stopRequested) {
+            return; // Stop polling if stop was requested
+          }
+
           setExecutionStatus(
             `Status: ${status.status} - ${
               status.status === 'running' ? 'Processing...' : status.message || ''
@@ -207,6 +237,15 @@ function WorkflowBuilderContent() {
                 )}
                 {isExecuting ? 'Running...' : 'Run'}
               </button>
+              {isExecuting && (
+                <button
+                  onClick={handleStop}
+                  className="flex items-center gap-2 px-4 py-2 bg-orange-600 text-white rounded-md hover:bg-orange-700 transition-colors"
+                >
+                  <StopCircle className="w-4 h-4" />
+                  Stop
+                </button>
+              )}
               <button
                 onClick={handleSave}
                 disabled={isExecuting}
@@ -252,7 +291,13 @@ function WorkflowBuilderContent() {
         {/* Canvas */}
         <div ref={reactFlowWrapper} className="flex-1">
           <ReactFlow
-            nodes={nodes}
+            nodes={nodes.map(node => ({
+              ...node,
+              data: {
+                ...node.data,
+                onRunFromNode: handleRunFromNode,
+              },
+            }))}
             edges={edges}
             onNodesChange={onNodesChange}
             onEdgesChange={onEdgesChange}

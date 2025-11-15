@@ -56,7 +56,7 @@ run_cli:
 	@echo ""
 	@echo "Press Ctrl+C to stop both services"
 	@echo ""
-	@trap 'kill 0' EXIT; \
+	@trap 'make clean' EXIT; \
 	$(MAKE) run_backend & \
 	$(MAKE) run_frontend & \
 	wait
@@ -108,7 +108,15 @@ clean_python_cache:
 	find . -type d -name '__pycache__' -exec rm -rf {} +
 	find . -type f -name '*.pyc' -exec rm -f {} +
 
-clean_all: clean_python_cache
+clean:
+	@echo "Stopping all services and cleaning up ports..."
+	@-pkill -f "uvicorn app.main:app" 2>/dev/null || true
+	@-pkill -f "vite" 2>/dev/null || true
+	@-lsof -ti:8000 | xargs kill -9 2>/dev/null || true
+	@-lsof -ti:5173 | xargs kill -9 2>/dev/null || true
+	@echo "Ports 8000 and 5173 cleaned up"
+
+clean_all: clean_python_cache clean
 
 # Pre-commit hooks
 pre-commit:
