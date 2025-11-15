@@ -429,6 +429,14 @@ function FeaturesStep({ onNext, onBack, workflowData, setWorkflowData }: StepPro
         <p className="text-gray-600 mt-2">Select input features and target column for optimization</p>
       </div>
 
+      {/* No Dataset Warning */}
+      {!workflowData.dataset && (
+        <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md">
+          <p className="font-medium">No dataset selected</p>
+          <p className="text-sm mt-1">Please go back to Step 1 and select a dataset first.</p>
+        </div>
+      )}
+
       {/* Dataset Info */}
       {workflowData.dataset && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -475,7 +483,7 @@ function FeaturesStep({ onNext, onBack, workflowData, setWorkflowData }: StepPro
               </tr>
             </thead>
             <tbody className="divide-y divide-gray-200">
-              {workflowData.dataset?.columns.map((column) => (
+              {(workflowData.dataset?.columns || []).map((column) => (
                 <tr key={column} className="hover:bg-gray-50">
                   <td className="px-4 py-3 text-sm text-gray-900">{column}</td>
                   <td className="px-4 py-3 text-center">
