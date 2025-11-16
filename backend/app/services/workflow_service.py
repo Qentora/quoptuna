@@ -274,12 +274,18 @@ class WorkflowExecutor:
 
         opt_config = list(inputs.values())[0]
 
-        # Prepare data dictionary
+        # Store original DataFrames for later SHAP analysis
+        x_train_df = opt_config["x_train"]
+        x_test_df = opt_config["x_test"]
+        y_train_df = opt_config["y_train"]
+        y_test_df = opt_config["y_test"]
+
+        # Convert to numpy arrays for Optimizer (as shown in notebooks)
         data_dict = {
-            "train_x": opt_config["x_train"],
-            "train_y": opt_config["y_train"],
-            "test_x": opt_config["x_test"],
-            "test_y": opt_config["y_test"],
+            "train_x": x_train_df.values if hasattr(x_train_df, 'values') else x_train_df,
+            "train_y": y_train_df.values if hasattr(y_train_df, 'values') else y_train_df,
+            "test_x": x_test_df.values if hasattr(x_test_df, 'values') else x_test_df,
+            "test_y": y_test_df.values if hasattr(y_test_df, 'values') else y_test_df,
         }
 
         # Create optimizer
@@ -308,7 +314,13 @@ class WorkflowExecutor:
             "db_name": opt_config.get("db_name"),
             "n_trials": n_trials,
             "model_name": model_name,
-            **opt_config,
+            # Store DataFrames for SHAP analysis
+            "x_train": x_train_df,
+            "x_test": x_test_df,
+            "y_train": y_train_df,
+            "y_test": y_test_df,
+            "x_columns": opt_config.get("x_columns"),
+            "y_column": opt_config.get("y_column"),
         }
 
     def _execute_shap_analysis(self, config: Dict, inputs: Dict) -> Dict:
@@ -321,6 +333,7 @@ class WorkflowExecutor:
         # Load the best model from Optuna study
         from optuna import load_study
         from quoptuna.backend.models import create_model
+        import numpy as np
 
         db_name = opt_result.get("db_name")
         study_name = opt_result.get("study_name")
@@ -329,20 +342,32 @@ class WorkflowExecutor:
         study = load_study(storage=storage_location, study_name=study_name)
         best_trial = study.best_trial
 
-        # Recreate the best model
-        model = create_model(best_trial.params["model_type"], **best_trial.params)
-        model.fit(opt_result["x_train"], opt_result["y_train"])
+        # Get DataFrames from opt_result
+        x_train_df = opt_result["x_train"]
+        x_test_df = opt_result["x_test"]
+        y_train_df = opt_result["y_train"]
+        y_test_df = opt_result["y_test"]
 
-        # Prepare data dictionary for XAI
+        # Recreate and fit the best model (model.fit needs numpy arrays)
+        model = create_model(best_trial.params["model_type"], **best_trial.params)
+
+        # Convert to numpy for model fitting (as shown in notebooks)
+        x_train_np = x_train_df.values if hasattr(x_train_df, 'values') else x_train_df
+        y_train_np = y_train_df.values if hasattr(y_train_df, 'values') else y_train_df
+
+        model.fit(x_train_np, y_train_np)
+
+        # Prepare data dictionary for XAI (XAI expects DataFrames)
         data_dict = {
-            "x_train": opt_result["x_train"],
-            "x_test": opt_result["x_test"],
-            "y_train": opt_result["y_train"],
-            "y_test": opt_result["y_test"],
+            "x_train": x_train_df,
+            "x_test": x_test_df,
+            "y_train": y_train_df,
+            "y_test": y_test_df,
         }
 
-        # Create XAI instance with correct parameters
-        xai = XAI(model=model, data=data_dict)
+        # Create XAI instance with XAIConfig
+        xai_config = XAIConfig(use_proba=True, onsubset=True, subset_size=50)
+        xai = XAI(model=model, data=data_dict, config=xai_config)
 
         # Generate SHAP plots
         plot_types = config.get("plot_types", ["bar", "beeswarm", "waterfall"])
@@ -362,16 +387,18 @@ class WorkflowExecutor:
                     plots[plot_type] = xai.get_heatmap_plot()
             except Exception as e:
                 logger.error(f"Error generating {plot_type} plot: {e}")
+                logger.exception("Full traceback:")
 
         # Get feature importance from SHAP values
         shap_values = xai.shap_values
         feature_importance = []
 
         if hasattr(shap_values, 'values') and hasattr(shap_values, 'data'):
-            import numpy as np
             # Calculate mean absolute SHAP values for feature importance
             mean_abs_shap = np.abs(shap_values.values).mean(axis=0)
-            feature_names = list(opt_result["x_train"].columns)
+
+            # Get feature names from DataFrame columns
+            feature_names = list(x_train_df.columns) if hasattr(x_train_df, 'columns') else [f"feature_{i}" for i in range(x_train_df.shape[1])]
 
             for i, feature in enumerate(feature_names):
                 feature_importance.append({
@@ -386,8 +413,7 @@ class WorkflowExecutor:
             "type": "shap_analysis",
             "plots": plots,
             "feature_importance": feature_importance,
-            "feature_names": list(opt_result["x_train"].columns),
-            **opt_result,
+            "feature_names": feature_names if feature_importance else [],
         }
 
     def _execute_confusion_matrix(self, config: Dict, inputs: Dict) -> Dict:
