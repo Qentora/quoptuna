@@ -170,3 +170,135 @@ export async function fetchUCIDataset(datasetId: number): Promise<UCIDatasetResp
 
   return response.json();
 }
+
+// Optimization API
+
+export interface OptimizationRequest {
+  dataset_id: string;
+  dataset_source: 'uci' | 'upload';
+  selected_features: string[];
+  target_column: string;
+  study_name: string;
+  database_name: string;
+  num_trials: number;
+  model_name?: string;
+}
+
+export interface OptimizationStatus {
+  id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  current_trial: number;
+  total_trials: number;
+  best_value: number | null;
+  best_params: Record<string, any> | null;
+  trials: Array<{
+    trial: number;
+    value: number;
+    params: Record<string, any>;
+  }> | null;
+  started_at: string;
+  completed_at: string | null;
+  error: string | null;
+}
+
+/**
+ * Start an optimization study
+ */
+export async function startOptimization(
+  request: OptimizationRequest
+): Promise<{ id: string; status: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/optimize`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(request),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to start optimization');
+  }
+
+  return response.json();
+}
+
+/**
+ * Get optimization status
+ */
+export async function getOptimizationStatus(
+  optimizationId: string
+): Promise<OptimizationStatus> {
+  const response = await fetch(
+    `${API_BASE_URL}/api/v1/optimize/${optimizationId}`
+  );
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to get optimization status');
+  }
+
+  return response.json();
+}
+
+/**
+ * Poll optimization status until complete
+ */
+export async function pollOptimization(
+  optimizationId: string,
+  onUpdate: (status: OptimizationStatus) => void,
+  intervalMs: number = 2000
+): Promise<OptimizationStatus> {
+  return new Promise((resolve, reject) => {
+    const poll = async () => {
+      try {
+        const status = await getOptimizationStatus(optimizationId);
+        onUpdate(status);
+
+        if (status.status === 'completed' || status.status === 'failed') {
+          resolve(status);
+        } else {
+          setTimeout(poll, intervalMs);
+        }
+      } catch (error) {
+        reject(error);
+      }
+    };
+
+    poll();
+  });
+}
+
+// Analysis API
+
+export interface SHAPResponse {
+  optimization_id: string;
+  feature_importance: Array<{
+    feature: string;
+    importance: number;
+  }>;
+  plots: Record<string, any>;
+  status: string;
+}
+
+/**
+ * Generate SHAP analysis
+ */
+export async function generateSHAP(
+  optimizationId: string,
+  plotTypes: string[] = ['bar', 'beeswarm']
+): Promise<SHAPResponse> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/analysis/shap`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      optimization_id: optimizationId,
+      plot_types: plotTypes,
+    }),
+  });
+
+  if (!response.ok) {
+    const error = await response.json();
+    throw new Error(error.detail || 'Failed to generate SHAP analysis');
+  }
+
+  return response.json();
+}
