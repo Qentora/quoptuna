@@ -1,6 +1,12 @@
 import { useState, useRef } from 'react';
 import { CheckCircle2, Circle, X, Loader2, FileText, PlayCircle, BarChart3 } from 'lucide-react';
-import { fetchUCIDataset, uploadDataset } from '../lib/api';
+import {
+  fetchUCIDataset,
+  uploadDataset,
+  startOptimization,
+  pollOptimization,
+  generateSHAP,
+} from '../lib/api';
 
 type Step = {
   id: number;
@@ -647,49 +653,62 @@ function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: StepPro
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTrial, setCurrentTrial] = useState(0);
+  const [error, setError] = useState<string | null>(null);
 
-  const startOptimization = async () => {
+  const runOptimization = async () => {
+    if (!workflowData.dataset) {
+      setError('No dataset selected');
+      return;
+    }
+
     setIsRunning(true);
     setProgress(0);
     setCurrentTrial(0);
+    setError(null);
 
-    // Simulate optimization progress
-    const totalTrials = workflowData.configuration.numTrials;
-    for (let i = 1; i <= totalTrials; i++) {
-      await new Promise((resolve) => setTimeout(resolve, 50)); // Simulate trial execution
-      setCurrentTrial(i);
-      setProgress((i / totalTrials) * 100);
-    }
+    try {
+      // Start real optimization via API
+      const { id } = await startOptimization({
+        dataset_id: workflowData.dataset.id,
+        dataset_source: workflowData.dataset.source,
+        selected_features: workflowData.features.selectedFeatures,
+        target_column: workflowData.features.targetColumn!,
+        study_name: workflowData.configuration.studyName,
+        database_name: workflowData.configuration.databaseName,
+        num_trials: workflowData.configuration.numTrials,
+      });
 
-    // Simulate results
-    const mockResults = {
-      bestValue: 0.9234,
-      bestParams: {
-        n_estimators: 150,
-        max_depth: 8,
-        learning_rate: 0.05,
-        min_samples_split: 5,
-      },
-      trials: Array.from({ length: Math.min(10, totalTrials) }, (_, i) => ({
-        trial: i + 1,
-        value: 0.85 + Math.random() * 0.1,
-        params: {
-          n_estimators: Math.floor(50 + Math.random() * 200),
-          max_depth: Math.floor(3 + Math.random() * 10),
+      // Poll for status updates
+      const finalStatus = await pollOptimization(id, (status) => {
+        setCurrentTrial(status.current_trial);
+        setProgress((status.current_trial / status.total_trials) * 100);
+      });
+
+      if (finalStatus.status === 'failed') {
+        setError(finalStatus.error || 'Optimization failed');
+        setIsRunning(false);
+        return;
+      }
+
+      // Update workflow data with real results
+      setWorkflowData((prev) => ({
+        ...prev,
+        optimization: {
+          executionId: id,
+          status: 'completed',
+          results: {
+            bestValue: finalStatus.best_value!,
+            bestParams: finalStatus.best_params!,
+            trials: finalStatus.trials || [],
+          },
         },
-      })),
-    };
+      }));
 
-    setWorkflowData((prev) => ({
-      ...prev,
-      optimization: {
-        executionId: `exec_${Date.now()}`,
-        status: 'completed',
-        results: mockResults,
-      },
-    }));
-
-    setIsRunning(false);
+      setIsRunning(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Optimization failed');
+      setIsRunning(false);
+    }
   };
 
   const hasResults = workflowData.optimization.status === 'completed';
@@ -700,6 +719,13 @@ function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: StepPro
         <h2 className="text-2xl font-bold text-gray-900">Run Optimization</h2>
         <p className="text-gray-600 mt-2">Execute hyperparameter optimization and view results</p>
       </div>
+
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
+          {error}
+        </div>
+      )}
 
       {/* Configuration Summary */}
       <div className="bg-blue-50 border border-blue-200 rounded-lg p-4">
@@ -720,7 +746,7 @@ function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: StepPro
       {!hasResults && !isRunning && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
           <button
-            onClick={startOptimization}
+            onClick={runOptimization}
             className="px-8 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-semibold inline-flex items-center gap-2"
           >
             <PlayCircle className="w-5 h-5" />
@@ -728,6 +754,9 @@ function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: StepPro
           </button>
           <p className="text-sm text-blue-700 mt-3">
             This will run {workflowData.configuration.numTrials} trials to find the best hyperparameters
+          </p>
+          <p className="text-xs text-blue-600 mt-2">
+            Note: Real optimization may take several minutes depending on trial count
           </p>
         </div>
       )}
@@ -843,29 +872,39 @@ function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: StepPro
 function AnalyzeStep({ onNext, onBack, workflowData, setWorkflowData }: StepProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [selectedPlot, setSelectedPlot] = useState<string>('summary');
+  const [error, setError] = useState<string | null>(null);
 
-  const generateSHAP = async () => {
+  const generateSHAPAnalysis = async () => {
+    if (!workflowData.optimization.executionId) {
+      setError('No optimization results available');
+      return;
+    }
+
     setIsGenerating(true);
+    setError(null);
 
-    // Simulate SHAP generation
-    await new Promise((resolve) => setTimeout(resolve, 2000));
+    try {
+      // Call real SHAP API
+      const shapResult = await generateSHAP(
+        workflowData.optimization.executionId,
+        ['bar', 'beeswarm', 'waterfall']
+      );
 
-    const mockSHAPData = {
-      featureImportance: workflowData.features.selectedFeatures.map((feature) => ({
-        feature,
-        importance: Math.random() * 0.5 + 0.1,
-      })).sort((a, b) => b.importance - a.importance),
-      generated: true,
-    };
+      setWorkflowData((prev) => ({
+        ...prev,
+        analysis: {
+          shapData: {
+            featureImportance: shapResult.feature_importance,
+            generated: true,
+          },
+        },
+      }));
 
-    setWorkflowData((prev) => ({
-      ...prev,
-      analysis: {
-        shapData: mockSHAPData,
-      },
-    }));
-
-    setIsGenerating(false);
+      setIsGenerating(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'SHAP generation failed');
+      setIsGenerating(false);
+    }
   };
 
   const hasSHAP = workflowData.analysis.shapData?.generated;
@@ -901,11 +940,18 @@ function AnalyzeStep({ onNext, onBack, workflowData, setWorkflowData }: StepProp
         </div>
       )}
 
+      {/* Error Display */}
+      {error && (
+        <div className="bg-red-50 border border-red-200 rounded-lg p-4">
+          <p className="text-red-800 font-medium">Error: {error}</p>
+        </div>
+      )}
+
       {/* Generate SHAP Button */}
       {!hasSHAP && !isGenerating && (
         <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
           <button
-            onClick={generateSHAP}
+            onClick={generateSHAPAnalysis}
             className="px-8 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors font-semibold inline-flex items-center gap-2"
           >
             <BarChart3 className="w-5 h-5" />
