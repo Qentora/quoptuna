@@ -318,28 +318,74 @@ class WorkflowExecutor:
 
         opt_result = list(inputs.values())[0]
 
-        # Create XAI instance
-        xai = XAI(
-            x_train=opt_result["x_train"],
-            x_test=opt_result["x_test"],
-            y_train=opt_result["y_train"],
-            y_test=opt_result["y_test"],
-            model_name=opt_result.get("model_name", "DataReuploading"),
-            db_name=opt_result.get("db_name"),
-            study_name=opt_result.get("study_name"),
-        )
+        # Load the best model from Optuna study
+        from optuna import load_study
+        from quoptuna.backend.models import create_model
 
-        # Generate SHAP values
-        plot_types = config.get("plot_types", ["bar", "beeswarm", "violin"])
+        db_name = opt_result.get("db_name")
+        study_name = opt_result.get("study_name")
+
+        storage_location = f"sqlite:///db/{db_name}.db"
+        study = load_study(storage=storage_location, study_name=study_name)
+        best_trial = study.best_trial
+
+        # Recreate the best model
+        model = create_model(best_trial.params["model_type"], **best_trial.params)
+        model.fit(opt_result["x_train"], opt_result["y_train"])
+
+        # Prepare data dictionary for XAI
+        data_dict = {
+            "x_train": opt_result["x_train"],
+            "x_test": opt_result["x_test"],
+            "y_train": opt_result["y_train"],
+            "y_test": opt_result["y_test"],
+        }
+
+        # Create XAI instance with correct parameters
+        xai = XAI(model=model, data=data_dict)
+
+        # Generate SHAP plots
+        plot_types = config.get("plot_types", ["bar", "beeswarm", "waterfall"])
         plots = {}
 
         for plot_type in plot_types:
-            if hasattr(xai, f"plot_{plot_type}"):
-                plots[plot_type] = getattr(xai, f"plot_{plot_type}")()
+            try:
+                if plot_type == "bar":
+                    plots[plot_type] = xai.get_bar_plot()
+                elif plot_type == "beeswarm":
+                    plots[plot_type] = xai.get_beeswarm_plot()
+                elif plot_type == "waterfall":
+                    plots[plot_type] = xai.get_waterfall_plot(index=0)
+                elif plot_type == "violin":
+                    plots[plot_type] = xai.get_violin_plot()
+                elif plot_type == "heatmap":
+                    plots[plot_type] = xai.get_heatmap_plot()
+            except Exception as e:
+                logger.error(f"Error generating {plot_type} plot: {e}")
+
+        # Get feature importance from SHAP values
+        shap_values = xai.shap_values
+        feature_importance = []
+
+        if hasattr(shap_values, 'values') and hasattr(shap_values, 'data'):
+            import numpy as np
+            # Calculate mean absolute SHAP values for feature importance
+            mean_abs_shap = np.abs(shap_values.values).mean(axis=0)
+            feature_names = list(opt_result["x_train"].columns)
+
+            for i, feature in enumerate(feature_names):
+                feature_importance.append({
+                    "feature": feature,
+                    "importance": float(mean_abs_shap[i]) if len(mean_abs_shap.shape) == 1 else float(mean_abs_shap[i].mean())
+                })
+
+            # Sort by importance
+            feature_importance.sort(key=lambda x: x["importance"], reverse=True)
 
         return {
             "type": "shap_analysis",
             "plots": plots,
+            "feature_importance": feature_importance,
             "feature_names": list(opt_result["x_train"].columns),
             **opt_result,
         }
