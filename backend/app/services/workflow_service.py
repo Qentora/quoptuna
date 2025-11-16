@@ -293,7 +293,8 @@ class WorkflowExecutor:
         n_trials = opt_config.get("n_trials", 100)
         model_name = opt_config.get("model_name", "DataReuploading")
 
-        optimizer.optimize(model_name=model_name, n_trials=n_trials)
+        # Note: model_name is stored for reference, but Optuna will try different models automatically
+        optimizer.optimize(n_trials=n_trials)
 
         # Get best trial
         best_trial = optimizer.study.best_trial
