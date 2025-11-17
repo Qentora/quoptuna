@@ -374,10 +374,14 @@ class WorkflowExecutor:
 
     def _execute_shap_analysis(self, config: Dict, inputs: Dict) -> Dict:
         """Generate SHAP analysis"""
+        # Check for inputs from dependencies first, then check for manually injected "input"
         if not inputs:
-            raise WorkflowExecutionError("No input data for SHAP analysis")
-
-        opt_result = list(inputs.values())[0]
+            if "input" in self.results:
+                opt_result = self.results["input"]
+            else:
+                raise WorkflowExecutionError("No input data for SHAP analysis")
+        else:
+            opt_result = list(inputs.values())[0]
 
         # Load the best model from Optuna study
         import numpy as np
@@ -398,7 +402,9 @@ class WorkflowExecutor:
         y_test_df = opt_result["y_test"]
 
         # Recreate and fit the best model (model.fit needs numpy arrays)
-        model = create_model(best_trial.params["model_type"], **best_trial.params)
+        # Extract model_type and pass remaining params to avoid duplicate argument error
+        params = {k: v for k, v in best_trial.params.items() if k != "model_type"}
+        model = create_model(best_trial.params["model_type"], **params)
 
         # Convert to numpy for model fitting (as shown in notebooks)
         x_train_np = x_train_df.values if hasattr(x_train_df, "values") else x_train_df
