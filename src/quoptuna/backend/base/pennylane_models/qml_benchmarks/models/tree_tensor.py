@@ -109,13 +109,9 @@ class TreeTensorClassifier(BaseEstimator, ClassifierMixin):
                 for q in range(0, self.n_qubits, 2**layer):
                     qml.RY(params["weights"][count], wires=q)
                     count = count + 1
-                qml.broadcast(
-                    qml.CNOT,
-                    wires=range(self.n_qubits),
-                    pattern=[
-                        ((i + 2**layer), i) for i in range(0, self.n_qubits, 2 ** (layer + 1))
-                    ],
-                )
+                # Apply CNOT gates in pattern (replaced qml.broadcast for PennyLane 0.38.1 compatibility)
+                for i in range(0, self.n_qubits, 2 ** (layer + 1)):
+                    qml.CNOT(wires=[i + 2**layer, i])
             qml.RY(params["weights"][count], wires=0)
             return qml.expval(qml.PauliZ(wires=0))
 

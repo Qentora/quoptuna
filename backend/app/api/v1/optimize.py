@@ -196,18 +196,66 @@ async def get_optimization_status(optimization_id: str):
 
 @router.get("/{optimization_id}/trials")
 async def get_optimization_trials(optimization_id: str):
-    """Get trial history"""
+    """Get trial history from Optuna database in real-time"""
     if optimization_id not in optimization_jobs:
         raise HTTPException(status_code=404, detail="Optimization not found")
 
     job = optimization_jobs[optimization_id]
-    return {
-        "trials": job.get('trials', []),
-        "best_trial": {
-            "value": job.get('best_value'),
-            "params": job.get('best_params')
-        } if job.get('best_value') else None,
-    }
+
+    # Try to fetch live data from Optuna database
+    try:
+        from optuna import load_study
+
+        request_data = job.get('request', {})
+        db_name = request_data.get('database_name', 'workflow_optimization.db')
+        study_name = request_data.get('study_name', 'workflow_study')
+        storage_location = f"sqlite:///db/{db_name}.db"
+
+        # Load study and get all trials
+        study = load_study(storage=storage_location, study_name=study_name, sampler=None)
+
+        trials = []
+        best_value = None
+        best_params = None
+
+        for trial in study.trials:
+            trial_data = {
+                'trial': trial.number,
+                'value': trial.value if trial.value is not None else 0.0,
+                'params': trial.params,
+                'state': trial.state.name,
+                'user_attrs': trial.user_attrs
+            }
+            trials.append(trial_data)
+
+            # Track best
+            if trial.value is not None and (best_value is None or trial.value > best_value):
+                best_value = trial.value
+                best_params = trial.params
+
+        # Update job with latest data
+        job['trials'] = trials
+        job['current_trial'] = len(trials)
+        if best_value is not None:
+            job['best_value'] = best_value
+            job['best_params'] = best_params
+
+        return {
+            "trials": trials,
+            "best_trial": {
+                "value": best_value,
+                "params": best_params
+            } if best_value is not None else None,
+        }
+    except Exception as e:
+        # Fallback to stored trials
+        return {
+            "trials": job.get('trials', []),
+            "best_trial": {
+                "value": job.get('best_value'),
+                "params": job.get('best_params')
+            } if job.get('best_value') else None,
+        }
 
 
 @router.delete("/{optimization_id}")
