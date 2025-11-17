@@ -5,10 +5,10 @@ Data management endpoints
 import os
 import uuid
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from fastapi.responses import JSONResponse
-from typing import List
+
 import pandas as pd
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 
@@ -22,7 +22,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 @router.post("/upload")
 async def upload_dataset(file: UploadFile = File(...)):
     """Upload a CSV dataset"""
-    if not file.filename.endswith('.csv'):
+    if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are allowed")
 
     # Generate unique file ID
@@ -83,16 +83,34 @@ async def list_uci_datasets():
 
 
 @router.get("/uci/{dataset_id}")
-async def fetch_uci_dataset(dataset_id: str):
+async def fetch_uci_dataset(dataset_id: int):
     """Fetch a specific UCI dataset"""
-    # TODO: Implement UCI dataset fetching
-    return {
-        "id": dataset_id,
-        "name": "Iris Dataset",
-        "rows": 150,
-        "columns": 4,
-        "status": "ready",
-    }
+    try:
+        from ucimlrepo import fetch_ucirepo
+
+        # Fetch dataset from UCI repository
+        dataset = fetch_ucirepo(id=dataset_id)
+
+        # Combine features and targets into single dataframe
+        if dataset.data.targets is not None:
+            df = pd.concat([dataset.data.features, dataset.data.targets], axis=1)
+        else:
+            df = dataset.data.features
+
+        # Get dataset name from metadata
+        dataset_name = dataset.metadata.get("name", f"UCI Dataset {dataset_id}")
+
+        return {
+            "message": "Dataset fetched successfully",
+            "dataset_id": str(dataset_id),
+            "name": dataset_name,
+            "rows": len(df),
+            "columns": list(df.columns),
+        }
+    except Exception as e:
+        raise HTTPException(
+            status_code=400, detail=f"Failed to fetch UCI dataset {dataset_id}: {str(e)}"
+        )
 
 
 @router.get("/{dataset_id}")
