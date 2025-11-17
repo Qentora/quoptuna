@@ -240,18 +240,47 @@ export async function getOptimizationStatus(
 }
 
 /**
+ * Fetch optimization trials history
+ */
+export async function fetchOptimizationTrials(optimizationId: string): Promise<{
+  trials: Array<{
+    trial: number;
+    value: number;
+    params: Record<string, any>;
+    state: string;
+    user_attrs?: Record<string, any>;
+  }>;
+  best_trial: {
+    value: number;
+    params: Record<string, any>;
+  } | null;
+}> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/optimize/${optimizationId}/trials`);
+
+  if (!response.ok) {
+    throw new Error('Failed to fetch trials');
+  }
+
+  return response.json();
+}
+
+/**
  * Poll optimization status until complete
  */
 export async function pollOptimization(
   optimizationId: string,
-  onUpdate: (status: OptimizationStatus) => void,
+  onUpdate: (status: OptimizationStatus, trials?: any) => void,
   intervalMs: number = 2000
 ): Promise<OptimizationStatus> {
   return new Promise((resolve, reject) => {
     const poll = async () => {
       try {
-        const status = await getOptimizationStatus(optimizationId);
-        onUpdate(status);
+        const [status, trialsData] = await Promise.all([
+          getOptimizationStatus(optimizationId),
+          fetchOptimizationTrials(optimizationId).catch(() => null)
+        ]);
+
+        onUpdate(status, trialsData);
 
         if (status.status === 'completed' || status.status === 'failed') {
           resolve(status);

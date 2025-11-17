@@ -654,6 +654,8 @@ function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: StepPro
   const [progress, setProgress] = useState(0);
   const [currentTrial, setCurrentTrial] = useState(0);
   const [error, setError] = useState<string | null>(null);
+  const [trials, setTrials] = useState<any[]>([]);
+  const [bestValue, setBestValue] = useState<number | null>(null);
 
   const runOptimization = async () => {
     if (!workflowData.dataset) {
@@ -678,10 +680,18 @@ function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: StepPro
         num_trials: workflowData.configuration.numTrials,
       });
 
-      // Poll for status updates
-      const finalStatus = await pollOptimization(id, (status) => {
+      // Poll for status updates with real-time trial data
+      const finalStatus = await pollOptimization(id, (status, trialsData) => {
         setCurrentTrial(status.current_trial);
         setProgress((status.current_trial / status.total_trials) * 100);
+
+        // Update trials in real-time
+        if (trialsData && trialsData.trials) {
+          setTrials(trialsData.trials);
+          if (trialsData.best_trial) {
+            setBestValue(trialsData.best_trial.value);
+          }
+        }
       });
 
       if (finalStatus.status === 'failed') {
@@ -782,6 +792,58 @@ function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: StepPro
               style={{ width: `${progress}%` }}
             />
           </div>
+
+          {/* Real-time Trial Updates */}
+          {trials.length > 0 && (
+            <div className="mt-6 space-y-4">
+              {bestValue !== null && (
+                <div className="flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
+                  <span className="text-sm font-medium text-green-900">Current Best Value:</span>
+                  <span className="text-lg font-bold text-green-700">{bestValue.toFixed(4)}</span>
+                </div>
+              )}
+
+              <div className="border border-gray-200 rounded-md overflow-hidden">
+                <div className="bg-gray-50 px-4 py-2 border-b border-gray-200">
+                  <h4 className="text-sm font-semibold text-gray-700">Recent Trials</h4>
+                </div>
+                <div className="max-h-60 overflow-y-auto">
+                  <table className="w-full text-sm">
+                    <thead className="bg-gray-100 sticky top-0">
+                      <tr>
+                        <th className="px-4 py-2 text-left text-gray-700 font-medium">Trial</th>
+                        <th className="px-4 py-2 text-left text-gray-700 font-medium">Value</th>
+                        <th className="px-4 py-2 text-left text-gray-700 font-medium">Model</th>
+                        <th className="px-4 py-2 text-left text-gray-700 font-medium">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-gray-200">
+                      {trials.slice(-10).reverse().map((trial, idx) => (
+                        <tr key={idx} className="hover:bg-gray-50">
+                          <td className="px-4 py-2 text-gray-900">#{trial.trial}</td>
+                          <td className="px-4 py-2">
+                            <span className={trial.value > 0 ? "text-green-600 font-medium" : "text-gray-500"}>
+                              {trial.value.toFixed(4)}
+                            </span>
+                          </td>
+                          <td className="px-4 py-2 text-gray-700 text-xs">{trial.params.model_type || 'N/A'}</td>
+                          <td className="px-4 py-2">
+                            <span className={`px-2 py-1 rounded text-xs ${
+                              trial.state === 'COMPLETE' ? 'bg-green-100 text-green-800' :
+                              trial.state === 'RUNNING' ? 'bg-blue-100 text-blue-800' :
+                              'bg-gray-100 text-gray-800'
+                            }`}>
+                              {trial.state}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       )}
 
