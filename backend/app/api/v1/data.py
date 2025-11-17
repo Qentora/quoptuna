@@ -5,10 +5,10 @@ Data management endpoints
 import os
 import uuid
 from pathlib import Path
-from fastapi import APIRouter, UploadFile, File, HTTPException
-from fastapi.responses import JSONResponse
-from typing import List
+
 import pandas as pd
+from fastapi import APIRouter, File, HTTPException, UploadFile
+from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 
@@ -22,7 +22,7 @@ UPLOAD_DIR.mkdir(parents=True, exist_ok=True)
 @router.post("/upload")
 async def upload_dataset(file: UploadFile = File(...)):
     """Upload a CSV dataset"""
-    if not file.filename.endswith('.csv'):
+    if not file.filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are allowed")
 
     # Generate unique file ID
@@ -98,7 +98,7 @@ async def fetch_uci_dataset(dataset_id: int):
             df = dataset.data.features
 
         # Get dataset name from metadata
-        dataset_name = dataset.metadata.get('name', f'UCI Dataset {dataset_id}')
+        dataset_name = dataset.metadata.get("name", f"UCI Dataset {dataset_id}")
 
         return {
             "message": "Dataset fetched successfully",
@@ -109,8 +109,7 @@ async def fetch_uci_dataset(dataset_id: int):
         }
     except Exception as e:
         raise HTTPException(
-            status_code=400,
-            detail=f"Failed to fetch UCI dataset {dataset_id}: {str(e)}"
+            status_code=400, detail=f"Failed to fetch UCI dataset {dataset_id}: {str(e)}"
         )
 
 

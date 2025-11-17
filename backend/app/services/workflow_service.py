@@ -6,18 +6,19 @@ It integrates with the existing quoptuna services (Optimizer, DataPreparation, X
 """
 
 import logging
-from typing import Any, Dict, List, Optional
 from pathlib import Path
-import pandas as pd
-from ucimlrepo import fetch_ucirepo
+from typing import Any, Dict, List
 
-from quoptuna import Optimizer, DataPreparation, XAI, XAIConfig, create_model
+import pandas as pd
+from quoptuna import XAI, DataPreparation, Optimizer, XAIConfig
+from ucimlrepo import fetch_ucirepo
 
 logger = logging.getLogger(__name__)
 
 
 class WorkflowExecutionError(Exception):
     """Raised when workflow execution fails"""
+
     pass
 
 
@@ -205,7 +206,7 @@ class WorkflowExecutor:
         data_prep = DataPreparation(
             dataset={"x": x, "y": y},
             x_cols=list(x.columns),
-            y_col=data["y_column"] if isinstance(data["y_column"], str) else data["y_column"][0]
+            y_col=data["y_column"] if isinstance(data["y_column"], str) else data["y_column"][0],
         )
 
         return {
@@ -235,24 +236,31 @@ class WorkflowExecutor:
 
         # Get unique classes from training data
         import numpy as np
+
         y_train = result["y_train"]
         y_test = result["y_test"]
 
         # Get unique classes
-        unique_classes = np.unique(np.concatenate([
-            y_train.values.ravel() if hasattr(y_train, 'values') else y_train.ravel(),
-            y_test.values.ravel() if hasattr(y_test, 'values') else y_test.ravel()
-        ]))
+        unique_classes = np.unique(
+            np.concatenate(
+                [
+                    y_train.values.ravel() if hasattr(y_train, "values") else y_train.ravel(),
+                    y_test.values.ravel() if hasattr(y_test, "values") else y_test.ravel(),
+                ]
+            )
+        )
 
         # For binary classification, map to -1 and 1
         if len(unique_classes) == 2:
-            logger.info(f"Binary classification detected. Mapping classes {unique_classes} to [-1, 1]")
+            logger.info(
+                f"Binary classification detected. Mapping classes {unique_classes} to [-1, 1]"
+            )
 
             # Create mapping: first class -> -1, second class -> 1
             class_mapping = {unique_classes[0]: -1, unique_classes[1]: 1}
 
             # Apply mapping
-            if hasattr(y_train, 'replace'):
+            if hasattr(y_train, "replace"):
                 # pandas DataFrame/Series
                 result["y_train"] = y_train.replace(class_mapping)
                 result["y_test"] = y_test.replace(class_mapping)
@@ -260,10 +268,18 @@ class WorkflowExecutor:
                 # numpy array
                 y_train_mapped = np.where(y_train == unique_classes[0], -1, 1)
                 y_test_mapped = np.where(y_test == unique_classes[0], -1, 1)
-                result["y_train"] = pd.DataFrame(y_train_mapped, columns=y_train.columns if hasattr(y_train, 'columns') else ['target'])
-                result["y_test"] = pd.DataFrame(y_test_mapped, columns=y_test.columns if hasattr(y_test, 'columns') else ['target'])
+                result["y_train"] = pd.DataFrame(
+                    y_train_mapped,
+                    columns=y_train.columns if hasattr(y_train, "columns") else ["target"],
+                )
+                result["y_test"] = pd.DataFrame(
+                    y_test_mapped,
+                    columns=y_test.columns if hasattr(y_test, "columns") else ["target"],
+                )
         else:
-            logger.warning(f"Multi-class classification detected ({len(unique_classes)} classes). Models may not support this.")
+            logger.warning(
+                f"Multi-class classification detected ({len(unique_classes)} classes). Models may not support this."
+            )
 
         return result
 
@@ -315,10 +331,10 @@ class WorkflowExecutor:
 
         # Convert to numpy arrays for Optimizer (as shown in notebooks)
         data_dict = {
-            "train_x": x_train_df.values if hasattr(x_train_df, 'values') else x_train_df,
-            "train_y": y_train_df.values if hasattr(y_train_df, 'values') else y_train_df,
-            "test_x": x_test_df.values if hasattr(x_test_df, 'values') else x_test_df,
-            "test_y": y_test_df.values if hasattr(y_test_df, 'values') else y_test_df,
+            "train_x": x_train_df.values if hasattr(x_train_df, "values") else x_train_df,
+            "train_y": y_train_df.values if hasattr(y_train_df, "values") else y_train_df,
+            "test_x": x_test_df.values if hasattr(x_test_df, "values") else x_test_df,
+            "test_y": y_test_df.values if hasattr(y_test_df, "values") else y_test_df,
         }
 
         # Create optimizer
@@ -364,9 +380,9 @@ class WorkflowExecutor:
         opt_result = list(inputs.values())[0]
 
         # Load the best model from Optuna study
+        import numpy as np
         from optuna import load_study
         from quoptuna.backend.models import create_model
-        import numpy as np
 
         db_name = opt_result.get("db_name")
         study_name = opt_result.get("study_name")
@@ -385,8 +401,8 @@ class WorkflowExecutor:
         model = create_model(best_trial.params["model_type"], **best_trial.params)
 
         # Convert to numpy for model fitting (as shown in notebooks)
-        x_train_np = x_train_df.values if hasattr(x_train_df, 'values') else x_train_df
-        y_train_np = y_train_df.values if hasattr(y_train_df, 'values') else y_train_df
+        x_train_np = x_train_df.values if hasattr(x_train_df, "values") else x_train_df
+        y_train_np = y_train_df.values if hasattr(y_train_df, "values") else y_train_df
 
         model.fit(x_train_np, y_train_np)
 
@@ -426,18 +442,26 @@ class WorkflowExecutor:
         shap_values = xai.shap_values
         feature_importance = []
 
-        if hasattr(shap_values, 'values') and hasattr(shap_values, 'data'):
+        if hasattr(shap_values, "values") and hasattr(shap_values, "data"):
             # Calculate mean absolute SHAP values for feature importance
             mean_abs_shap = np.abs(shap_values.values).mean(axis=0)
 
             # Get feature names from DataFrame columns
-            feature_names = list(x_train_df.columns) if hasattr(x_train_df, 'columns') else [f"feature_{i}" for i in range(x_train_df.shape[1])]
+            feature_names = (
+                list(x_train_df.columns)
+                if hasattr(x_train_df, "columns")
+                else [f"feature_{i}" for i in range(x_train_df.shape[1])]
+            )
 
             for i, feature in enumerate(feature_names):
-                feature_importance.append({
-                    "feature": feature,
-                    "importance": float(mean_abs_shap[i]) if len(mean_abs_shap.shape) == 1 else float(mean_abs_shap[i].mean())
-                })
+                feature_importance.append(
+                    {
+                        "feature": feature,
+                        "importance": float(mean_abs_shap[i])
+                        if len(mean_abs_shap.shape) == 1
+                        else float(mean_abs_shap[i].mean()),
+                    }
+                )
 
             # Sort by importance
             feature_importance.sort(key=lambda x: x["importance"], reverse=True)

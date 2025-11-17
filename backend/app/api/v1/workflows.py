@@ -4,11 +4,12 @@ Workflow management endpoints
 
 import logging
 from datetime import datetime
-from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, HTTPException, BackgroundTasks
+from typing import Any, Dict, List, Optional
+
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
-from app.services.workflow_service import WorkflowExecutor, WorkflowExecutionError
+from app.services.workflow_service import WorkflowExecutor
 
 router = APIRouter()
 logger = logging.getLogger(__name__)
@@ -34,6 +35,7 @@ class WorkflowUpdate(BaseModel):
 
 class WorkflowExecute(BaseModel):
     """Request body for executing a workflow directly (without saving)"""
+
     name: str
     nodes: List[Dict[str, Any]]
     edges: List[Dict[str, Any]]
@@ -48,19 +50,23 @@ def execute_workflow_task(execution_id: str, workflow: Dict):
         executor = WorkflowExecutor(workflow)
         result = executor.execute()
 
-        executions_db[execution_id].update({
-            "status": "completed",
-            "completed_at": datetime.utcnow().isoformat(),
-            "result": result,
-        })
+        executions_db[execution_id].update(
+            {
+                "status": "completed",
+                "completed_at": datetime.utcnow().isoformat(),
+                "result": result,
+            }
+        )
 
     except Exception as e:
         logger.error(f"Workflow execution {execution_id} failed: {str(e)}")
-        executions_db[execution_id].update({
-            "status": "failed",
-            "completed_at": datetime.utcnow().isoformat(),
-            "error": str(e),
-        })
+        executions_db[execution_id].update(
+            {
+                "status": "failed",
+                "completed_at": datetime.utcnow().isoformat(),
+                "error": str(e),
+            }
+        )
 
 
 @router.post("")

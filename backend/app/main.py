@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.v1 import data, workflows, optimize, analysis, system
+from app.api.v1 import analysis, data, optimize, system, workflows
 from app.core.config import settings
 
 app = FastAPI(
