@@ -6,7 +6,7 @@ This document describes the current state of the optimizer workflow, known issue
 
 ## Recent Fixes
 
-### Data Format Handling (2025-11-16)
+### 1. Data Format Handling (2025-11-16)
 
 Fixed critical data format mismatches between optimization and SHAP analysis:
 
@@ -21,26 +21,27 @@ Fixed critical data format mismatches between optimization and SHAP analysis:
 - Converts to numpy arrays only for model.fit() in SHAP analysis
 - Passes DataFrames to XAI constructor
 
+### 2. PennyLane Quantum Device Deprecation (2025-11-16) ✅ FIXED
+
+**Previous Error**: `pennylane.exceptions.DeviceError: Device default.qubit.jax does not exist`
+
+**Fix**: Updated all 14 quantum model classes to use `default.qubit` instead of deprecated `default.qubit.jax`:
+- DataReuploadingClassifier & DataReuploadingClassifierSeparable
+- DressedQuantumCircuitClassifier & DressedQuantumCircuitClassifierSeparable
+- CircuitCentricClassifier
+- ProjectedQuantumKernel
+- QuantumKitchenSinks
+- QuantumMetricLearner
+- IQPVariationalClassifier & IQPKernelClassifier
+- TreeTensorClassifier
+- SeparableVariationalClassifier & SeparableKernelClassifier
+- QuanvolutionalNeuralNetwork, VanillaQNN, WEINet
+
+**Result**: All quantum models now work correctly during optimization! 🎉
+
 ## Known Issues
 
-### 1. PennyLane Quantum Device Deprecation
-
-**Error**: `pennylane.exceptions.DeviceError: Device default.qubit.jax does not exist`
-
-**Cause**: Quantum model classes (DataReuploadingClassifier, DressedQuantumCircuitClassifier, etc.) are configured to use `default.qubit.jax`, which is deprecated in newer PennyLane versions.
-
-**Impact**:
-- Quantum models fail during optimization
-- Classical models (SVC, MLPClassifier, Perceptron) still work
-- Optuna marks failed trials with value 0.0 and continues
-- Best trial is selected from successful classical models
-
-**Workaround**:
-- Use small number of trials (10-20) to reduce quantum model failures
-- Or modify quantum model classes to use `default.qubit` instead
-- The workflow will still complete successfully with classical models
-
-### 2. sklearn Parameter Validation
+### 1. sklearn Parameter Validation
 
 **Error**: `The 'learning_rate' parameter of MLPClassifier must be a str among {'constant', 'adaptive', 'invscaling'}`
 
@@ -62,15 +63,18 @@ Fixed critical data format mismatches between optimization and SHAP analysis:
 2. **Configure Optimization**:
    - Study name: `test_wine` or similar
    - Database name: `test_wine` or similar
-   - **Num trials: 10-20** (not 100) to reduce quantum errors
+   - **Num trials: 10-100** (quantum models now work!)
+   - Start with 10-20 trials for quick testing
+   - Use 50-100 trials for better results
 
 3. **Run Optimization**:
-   - Expect some trial failures (quantum models)
-   - Watch for successful classical models
-   - Should complete in 1-2 minutes for 10 trials
+   - Both quantum and classical models now work
+   - Some MLPClassifier trials may fail (parameter validation)
+   - Should complete successfully with mixed model trials
+   - Expect 1-5 minutes for 10-20 trials
 
 4. **Generate SHAP Analysis**:
-   - Should work with the best classical model
+   - Works with both quantum and classical models
    - Generates bar, beeswarm, and waterfall plots
    - Returns feature importance rankings
 
@@ -184,7 +188,7 @@ Backend:
 ## Success Criteria
 
 ✅ **Optimization completes** with best_value > 0
-✅ **At least one trial succeeds** (classical model)
+✅ **Multiple trials succeed** (both quantum and classical models)
 ✅ **SHAP analysis generates** without 500 error
 ✅ **Feature importance** is non-empty array
 ✅ **Plots** are base64-encoded images
@@ -195,9 +199,11 @@ Backend:
 - Check if data has NaN values
 - Verify target column has correct labels
 - Try different dataset
+- Check backend logs for specific model errors
 
 ### "SHAP 500 error"
-- Check backend logs for specific error
+- ✅ Should be fixed now (data format issue resolved)
+- If still occurring, check backend logs for specific error
 - Verify optimization completed successfully
 - Confirm database file exists in `backend/db/`
 
@@ -206,12 +212,26 @@ Backend:
 - Verify XAI config subset_size is reasonable
 - Check backend logs for plot generation errors
 
-## Next Steps
+### "Quantum models still failing"
+- ✅ Should be fixed now (PennyLane device updated)
+- If still occurring, verify PennyLane version is up to date
+- Check that backend has correct dependencies installed
 
-To fully resolve quantum model issues, would need to:
+## Summary
 
-1. Update quantum model classes to use `default.qubit`
-2. Or install `pennylane-qiskit` for Jax support
-3. Or restrict Optuna search space to only classical models
+The optimizer workflow is now **fully functional** with both quantum and classical models! 🎉
 
-For now, the workflow is **functional** with classical models and can demonstrate the complete optimization + SHAP analysis pipeline.
+**What works**:
+- ✅ UCI dataset selection and loading
+- ✅ Feature selection
+- ✅ Optuna hyperparameter optimization with 15+ model types
+- ✅ Both quantum models (DataReuploading, DressedQuantumCircuit, etc.)
+- ✅ Classical models (SVC, MLP, Perceptron)
+- ✅ SHAP explainability analysis
+- ✅ Feature importance visualization
+- ✅ Complete end-to-end workflow
+
+**Minor issues remaining**:
+- Some MLPClassifier trials may fail due to parameter validation (doesn't affect workflow)
+
+The workflow successfully demonstrates quantum machine learning optimization and explainable AI!
