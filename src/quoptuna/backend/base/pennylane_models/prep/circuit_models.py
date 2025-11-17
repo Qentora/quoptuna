@@ -21,7 +21,7 @@ class CircuitConfig:
     jit: bool = True
     scaling: float = 1.0
     random_state: int = 42
-    dev_type: str = "default.qubit.jax"
+    dev_type: str = "default.qubit"
     qnode_kwargs: dict = field(default_factory=lambda: {"interface": "jax-jit"})
 
 
