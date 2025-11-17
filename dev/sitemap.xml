@@ -2,26 +2,38 @@
 <urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
     <url>
          <loc>https://Qentora.github.io/quoptuna/dev/index.html</loc>
-         <lastmod>2025-11-07</lastmod>
+         <lastmod>2025-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://Qentora.github.io/quoptuna/dev/IMPLEMENTATION_ROADMAP.html</loc>
+         <lastmod>2025-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://Qentora.github.io/quoptuna/dev/OPTIMIZER_ARCHITECTURE.html</loc>
+         <lastmod>2025-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://Qentora.github.io/quoptuna/dev/WORKFLOW_TESTING.html</loc>
+         <lastmod>2025-11-17</lastmod>
     </url>
     <url>
          <loc>https://Qentora.github.io/quoptuna/dev/api_docs.html</loc>
-         <lastmod>2025-11-07</lastmod>
+         <lastmod>2025-11-17</lastmod>
     </url>
     <url>
          <loc>https://Qentora.github.io/quoptuna/dev/api_reference.html</loc>
-         <lastmod>2025-11-07</lastmod>
+         <lastmod>2025-11-17</lastmod>
     </url>
     <url>
          <loc>https://Qentora.github.io/quoptuna/dev/changelog.html</loc>
-         <lastmod>2025-11-07</lastmod>
+         <lastmod>2025-11-17</lastmod>
     </url>
     <url>
          <loc>https://Qentora.github.io/quoptuna/dev/examples.html</loc>
-         <lastmod>2025-11-07</lastmod>
+         <lastmod>2025-11-17</lastmod>
     </url>
     <url>
          <loc>https://Qentora.github.io/quoptuna/dev/user_guide.html</loc>
-         <lastmod>2025-11-07</lastmod>
+         <lastmod>2025-11-17</lastmod>
     </url>
 </urlset>
