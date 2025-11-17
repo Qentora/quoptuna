@@ -73,6 +73,10 @@ def run_optimization_background(job_id: str, request: OptimizationRequest):
                     "data": {"type": "train-test-split", "config": {}}
                 },
                 {
+                    "id": "label_encode",
+                    "data": {"type": "label-encoding", "config": {}}
+                },
+                {
                     "id": "model",
                     "data": {
                         "type": "quantum-model",
@@ -98,7 +102,8 @@ def run_optimization_background(job_id: str, request: OptimizationRequest):
             "edges": [
                 {"source": "data", "target": "features"},
                 {"source": "features", "target": "split"},
-                {"source": "split", "target": "model"},
+                {"source": "split", "target": "label_encode"},
+                {"source": "label_encode", "target": "model"},
                 {"source": "model", "target": "optuna"},
                 {"source": "optuna", "target": "optimize"}
             ]

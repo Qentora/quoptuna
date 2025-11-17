@@ -227,12 +227,45 @@ class WorkflowExecutor:
         return list(inputs.values())[0]
 
     def _execute_label_encoding(self, config: Dict, inputs: Dict) -> Dict:
-        """Labels are already encoded by DataPreparation, just pass through"""
+        """Encode labels to -1 and 1 for binary classification (as required by quantum models)"""
         if not inputs:
             raise WorkflowExecutionError("No input data for label encoding")
 
-        # DataPreparation already handles encoding, just pass through
-        return list(inputs.values())[0]
+        result = list(inputs.values())[0]
+
+        # Get unique classes from training data
+        import numpy as np
+        y_train = result["y_train"]
+        y_test = result["y_test"]
+
+        # Get unique classes
+        unique_classes = np.unique(np.concatenate([
+            y_train.values.ravel() if hasattr(y_train, 'values') else y_train.ravel(),
+            y_test.values.ravel() if hasattr(y_test, 'values') else y_test.ravel()
+        ]))
+
+        # For binary classification, map to -1 and 1
+        if len(unique_classes) == 2:
+            logger.info(f"Binary classification detected. Mapping classes {unique_classes} to [-1, 1]")
+
+            # Create mapping: first class -> -1, second class -> 1
+            class_mapping = {unique_classes[0]: -1, unique_classes[1]: 1}
+
+            # Apply mapping
+            if hasattr(y_train, 'replace'):
+                # pandas DataFrame/Series
+                result["y_train"] = y_train.replace(class_mapping)
+                result["y_test"] = y_test.replace(class_mapping)
+            else:
+                # numpy array
+                y_train_mapped = np.where(y_train == unique_classes[0], -1, 1)
+                y_test_mapped = np.where(y_test == unique_classes[0], -1, 1)
+                result["y_train"] = pd.DataFrame(y_train_mapped, columns=y_train.columns if hasattr(y_train, 'columns') else ['target'])
+                result["y_test"] = pd.DataFrame(y_test_mapped, columns=y_test.columns if hasattr(y_test, 'columns') else ['target'])
+        else:
+            logger.warning(f"Multi-class classification detected ({len(unique_classes)} classes). Models may not support this.")
+
+        return result
 
     def _execute_model_config(self, config: Dict, inputs: Dict, node_type: str) -> Dict:
         """Configure model selection"""
