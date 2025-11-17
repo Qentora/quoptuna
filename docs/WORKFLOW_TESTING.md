@@ -39,6 +39,22 @@ Fixed critical data format mismatches between optimization and SHAP analysis:
 
 **Result**: All quantum models now work correctly during optimization! 🎉
 
+### 3. Binary Label Encoding (2025-11-16) ✅ FIXED
+
+**Previous Error**: `IndexError: boolean index did not match indexed array`
+
+**Cause**: Quantum models expect binary classification labels as -1 and 1, but UCI datasets often have labels as 0/1 or other values (e.g., "g"/"b" for Ionosphere).
+
+**Fix**: Added automatic label encoding step in workflow:
+- Detects binary classification (2 unique classes)
+- Automatically maps first class → -1, second class → 1
+- Logs the mapping for transparency
+- Works with any binary dataset (0/1, g/b, yes/no, etc.)
+
+**Example**: Breast Cancer dataset with labels [0, 1] is now automatically mapped to [-1, 1]
+
+**Result**: All binary classification datasets now work with quantum models! 🎉
+
 ## Known Issues
 
 ### 1. sklearn Parameter Validation
