@@ -5,35 +5,83 @@
          <lastmod>2025-11-17</lastmod>
     </url>
     <url>
-         <loc>https://Qentora.github.io/quoptuna/latest/IMPLEMENTATION_ROADMAP.html</loc>
+         <loc>https://Qentora.github.io/quoptuna/latest/api/api-docs.html</loc>
          <lastmod>2025-11-17</lastmod>
     </url>
     <url>
-         <loc>https://Qentora.github.io/quoptuna/latest/OPTIMIZER_ARCHITECTURE.html</loc>
+         <loc>https://Qentora.github.io/quoptuna/latest/api/api-reference.html</loc>
          <lastmod>2025-11-17</lastmod>
     </url>
     <url>
-         <loc>https://Qentora.github.io/quoptuna/latest/WORKFLOW_TESTING.html</loc>
+         <loc>https://Qentora.github.io/quoptuna/latest/architecture/frontend-architecture-diagram.html</loc>
          <lastmod>2025-11-17</lastmod>
     </url>
     <url>
-         <loc>https://Qentora.github.io/quoptuna/latest/api_docs.html</loc>
+         <loc>https://Qentora.github.io/quoptuna/latest/architecture/frontend-architecture.html</loc>
          <lastmod>2025-11-17</lastmod>
     </url>
     <url>
-         <loc>https://Qentora.github.io/quoptuna/latest/api_reference.html</loc>
+         <loc>https://Qentora.github.io/quoptuna/latest/architecture/new-frontend-design.html</loc>
          <lastmod>2025-11-17</lastmod>
     </url>
     <url>
-         <loc>https://Qentora.github.io/quoptuna/latest/changelog.html</loc>
+         <loc>https://Qentora.github.io/quoptuna/latest/architecture/optimizer-architecture.html</loc>
          <lastmod>2025-11-17</lastmod>
     </url>
     <url>
-         <loc>https://Qentora.github.io/quoptuna/latest/examples.html</loc>
+         <loc>https://Qentora.github.io/quoptuna/latest/configuration/github-pages-setup.html</loc>
          <lastmod>2025-11-17</lastmod>
     </url>
     <url>
-         <loc>https://Qentora.github.io/quoptuna/latest/user_guide.html</loc>
+         <loc>https://Qentora.github.io/quoptuna/latest/configuration/github-settings-guide.html</loc>
+         <lastmod>2025-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://Qentora.github.io/quoptuna/latest/development/implementation-summary.html</loc>
+         <lastmod>2025-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://Qentora.github.io/quoptuna/latest/development/testing-checklist.html</loc>
+         <lastmod>2025-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://Qentora.github.io/quoptuna/latest/development/workflow-testing.html</loc>
+         <lastmod>2025-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://Qentora.github.io/quoptuna/latest/examples/examples.html</loc>
+         <lastmod>2025-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://Qentora.github.io/quoptuna/latest/getting-started/quickstart.html</loc>
+         <lastmod>2025-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://Qentora.github.io/quoptuna/latest/getting-started/quoptuna-next.html</loc>
+         <lastmod>2025-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://Qentora.github.io/quoptuna/latest/getting-started/run-without-docker.html</loc>
+         <lastmod>2025-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://Qentora.github.io/quoptuna/latest/guides/frontend-quick-reference.html</loc>
+         <lastmod>2025-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://Qentora.github.io/quoptuna/latest/guides/streamlit-guide.html</loc>
+         <lastmod>2025-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://Qentora.github.io/quoptuna/latest/guides/user-guide.html</loc>
+         <lastmod>2025-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://Qentora.github.io/quoptuna/latest/guides/workflow-builder-guide.html</loc>
+         <lastmod>2025-11-17</lastmod>
+    </url>
+    <url>
+         <loc>https://Qentora.github.io/quoptuna/latest/roadmap/implementation-roadmap.html</loc>
          <lastmod>2025-11-17</lastmod>
     </url>
 </urlset>

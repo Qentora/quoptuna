@@ -1,0 +1,1549 @@
+<!DOCTYPE html><html lang="en" class="no-js"><head>
+    
+      <meta charset="utf-8">
+      <meta name="viewport" content="width=device-width,initial-scale=1">
+      
+      
+      
+        <link rel="canonical" href="https://Qentora.github.io/quoptuna/latest/configuration/github-settings-guide.html">
+      
+      
+      
+      
+        
+      
+      
+      <link rel="icon" href="../assets/logo.png">
+      <meta name="generator" content="mkdocs-1.6.1, mkdocs-material-9.7.0">
+    
+    
+      
+        <title>GitHub Settings Configuration Guide - QuOptuna</title>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/stylesheets/main.618322db.min.css">
+      
+        
+        <link rel="stylesheet" href="../assets/stylesheets/palette.ab4e12ef.min.css">
+      
+      
+
+
+    
+    
+      
+        <script src="https://unpkg.com/iframe-worker/shim"></script>
+      
+    
+    
+      
+        
+        
+        <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+        <link rel="stylesheet" href="https://fonts.googleapis.com/css?family=Roboto:300,300i,400,400i,700,700i%7CRoboto+Mono:400,400i,700,700i&amp;display=fallback">
+        <style>:root{--md-text-font:"Roboto";--md-code-font:"Roboto Mono"}</style>
+      
+    
+    
+      <link rel="stylesheet" href="../assets/_mkdocstrings.css">
+    
+    <script>__md_scope=new URL("..",location),__md_hash=e=>[...e].reduce(((e,_)=>(e<<5)-e+_.charCodeAt(0)),0),__md_get=(e,_=localStorage,t=__md_scope)=>JSON.parse(_.getItem(t.pathname+"."+e)),__md_set=(e,_,t=localStorage,a=__md_scope)=>{try{t.setItem(a.pathname+"."+e,JSON.stringify(_))}catch(e){}}</script>
+    
+      
+
+    
+    
+  <link href="../assets/stylesheets/glightbox.min.css" rel="stylesheet"><script src="../assets/javascripts/glightbox.min.js"></script><style id="glightbox-style">
+            html.glightbox-open { overflow: initial; height: 100%; }
+            .gslide-title { margin-top: 0px; user-select: text; }
+            .gslide-desc { color: #666; user-select: text; }
+            .gslide-image img { background: white; }
+            .gscrollbar-fixer { padding-right: 15px; }
+            .gdesc-inner { font-size: 0.75rem; }
+            body[data-md-color-scheme="slate"] .gdesc-inner { background: var(--md-default-bg-color); }
+            body[data-md-color-scheme="slate"] .gslide-title { color: var(--md-default-fg-color); }
+            body[data-md-color-scheme="slate"] .gslide-desc { color: var(--md-default-fg-color); }
+        </style></head>
+  
+  
+    
+    
+      
+    
+    
+    
+    
+    <body dir="ltr" data-md-color-scheme="default" data-md-color-primary="purple" data-md-color-accent="deep-orange">
+  
+    
+    <input class="md-toggle" data-md-toggle="drawer" type="checkbox" id="__drawer" autocomplete="off">
+    <input class="md-toggle" data-md-toggle="search" type="checkbox" id="__search" autocomplete="off">
+    <label class="md-overlay" for="__drawer"></label>
+    <div data-md-component="skip">
+      
+        
+        <a href="#github-settings-configuration-guide" class="md-skip">
+          Skip to content
+        </a>
+      
+    </div>
+    <div data-md-component="announce">
+      
+    </div>
+    
+      <div data-md-color-scheme="default" data-md-component="outdated" hidden>
+        
+      </div>
+    
+    
+      
+
+<header class="md-header" data-md-component="header">
+  <nav class="md-header__inner md-grid" aria-label="Header">
+    <a href="../index.html" title="QuOptuna" class="md-header__button md-logo" aria-label="QuOptuna" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    <label class="md-header__button md-icon" for="__drawer">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M3 6h18v2H3zm0 5h18v2H3zm0 5h18v2H3z"></path></svg>
+    </label>
+    <div class="md-header__title" data-md-component="header-title">
+      <div class="md-header__ellipsis">
+        <div class="md-header__topic">
+          <span class="md-ellipsis">
+            QuOptuna
+          </span>
+        </div>
+        <div class="md-header__topic" data-md-component="header-topic">
+          <span class="md-ellipsis">
+            
+              GitHub Settings Configuration Guide
+            
+          </span>
+        </div>
+      </div>
+    </div>
+    
+      
+        <form class="md-header__option" data-md-component="palette">
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: light)" data-md-color-scheme="default" data-md-color-primary="purple" data-md-color-accent="deep-orange" aria-label="Switch to dark mode" type="radio" name="__palette" id="__palette_0">
+    
+      <label class="md-header__button md-icon" title="Switch to dark mode" for="__palette_1" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 8a4 4 0 0 0-4 4 4 4 0 0 0 4 4 4 4 0 0 0 4-4 4 4 0 0 0-4-4m0 10a6 6 0 0 1-6-6 6 6 0 0 1 6-6 6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+    
+    
+    
+    <input class="md-option" data-md-color-media="(prefers-color-scheme: dark)" data-md-color-scheme="slate" data-md-color-primary="purple" data-md-color-accent="deep-orange" aria-label="Switch to light mode" type="radio" name="__palette" id="__palette_1">
+    
+      <label class="md-header__button md-icon" title="Switch to light mode" for="__palette_0" hidden>
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M12 18c-.89 0-1.74-.2-2.5-.55C11.56 16.5 13 14.42 13 12s-1.44-4.5-3.5-5.45C10.26 6.2 11.11 6 12 6a6 6 0 0 1 6 6 6 6 0 0 1-6 6m8-9.31V4h-4.69L12 .69 8.69 4H4v4.69L.69 12 4 15.31V20h4.69L12 23.31 15.31 20H20v-4.69L23.31 12z"></path></svg>
+      </label>
+    
+  
+</form>
+      
+    
+    
+      <script>var palette=__md_get("__palette");if(palette&&palette.color){if("(prefers-color-scheme)"===palette.color.media){var media=matchMedia("(prefers-color-scheme: light)"),input=document.querySelector(media.matches?"[data-md-color-media='(prefers-color-scheme: light)']":"[data-md-color-media='(prefers-color-scheme: dark)']");palette.color.media=input.getAttribute("data-md-color-media"),palette.color.scheme=input.getAttribute("data-md-color-scheme"),palette.color.primary=input.getAttribute("data-md-color-primary"),palette.color.accent=input.getAttribute("data-md-color-accent")}for(var[key,value]of Object.entries(palette.color))document.body.setAttribute("data-md-color-"+key,value)}</script>
+    
+    
+    
+      
+      
+        <label class="md-header__button md-icon" for="__search">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        </label>
+        <div class="md-search" data-md-component="search" role="dialog">
+  <label class="md-search__overlay" for="__search"></label>
+  <div class="md-search__inner" role="search">
+    <form class="md-search__form" name="search">
+      <input type="text" class="md-search__input" name="query" aria-label="Search" placeholder="Search" autocapitalize="off" autocorrect="off" autocomplete="off" spellcheck="false" data-md-component="search-query" required>
+      <label class="md-search__icon md-icon" for="__search">
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M9.5 3A6.5 6.5 0 0 1 16 9.5c0 1.61-.59 3.09-1.56 4.23l.27.27h.79l5 5-1.5 1.5-5-5v-.79l-.27-.27A6.52 6.52 0 0 1 9.5 16 6.5 6.5 0 0 1 3 9.5 6.5 6.5 0 0 1 9.5 3m0 2C7 5 5 7 5 9.5S7 14 9.5 14 14 12 14 9.5 12 5 9.5 5"></path></svg>
+        
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M20 11v2H8l5.5 5.5-1.42 1.42L4.16 12l7.92-7.92L13.5 5.5 8 11z"></path></svg>
+      </label>
+      <nav class="md-search__options" aria-label="Search">
+        
+          <a href="javascript:void(0)" class="md-search__icon md-icon" title="Share" aria-label="Share" data-clipboard data-clipboard-text="" data-md-component="search-share" tabindex="-1">
+            
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81a3 3 0 0 0 3-3 3 3 0 0 0-3-3 3 3 0 0 0-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9a3 3 0 0 0-3 3 3 3 0 0 0 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.15c-.05.21-.08.43-.08.66 0 1.61 1.31 2.91 2.92 2.91s2.92-1.3 2.92-2.91A2.92 2.92 0 0 0 18 16.08"></path></svg>
+          </a>
+        
+        <button type="reset" class="md-search__icon md-icon" title="Clear" aria-label="Clear" tabindex="-1">
+          
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M19 6.41 17.59 5 12 10.59 6.41 5 5 6.41 10.59 12 5 17.59 6.41 19 12 13.41 17.59 19 19 17.59 13.41 12z"></path></svg>
+        </button>
+      </nav>
+      
+        <div class="md-search__suggest" data-md-component="search-suggest"></div>
+      
+    </form>
+    <div class="md-search__output">
+      <div class="md-search__scrollwrap" tabindex="0" data-md-scrollfix>
+        <div class="md-search-result" data-md-component="search-result">
+          <div class="md-search-result__meta">
+            Initializing search
+          </div>
+          <ol class="md-search-result__list" role="presentation"></ol>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+      
+    
+    
+      <div class="md-header__source">
+        <a href="https://github.com/Qentora/quoptuna" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+      </div>
+    
+  </nav>
+  
+</header>
+    
+    <div class="md-container" data-md-component="container">
+      
+      
+        
+          
+            
+<nav class="md-tabs" aria-label="Tabs" data-md-component="tabs">
+  <div class="md-grid">
+    <ul class="md-tabs__list">
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../index.html" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Home
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../user_guide.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  User Guide
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../api_reference.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  API Reference
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../examples.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Examples
+
+      </a>
+    </li>
+  
+
+      
+        
+  
+  
+  
+  
+    <li class="md-tabs__item">
+      <a href="../changelog.md" class="md-tabs__link">
+        
+  
+  
+    
+  
+  Changelog
+
+      </a>
+    </li>
+  
+
+      
+    </ul>
+  </div>
+</nav>
+          
+        
+      
+      <main class="md-main" data-md-component="main">
+        <div class="md-main__inner md-grid">
+          
+            
+              
+              <div class="md-sidebar md-sidebar--primary" data-md-component="sidebar" data-md-type="navigation">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+
+  
+
+
+<nav class="md-nav md-nav--primary md-nav--lifted" aria-label="Navigation" data-md-level="0">
+  <label class="md-nav__title" for="__drawer">
+    <a href="../index.html" title="QuOptuna" class="md-nav__button md-logo" aria-label="QuOptuna" data-md-component="logo">
+      
+  <img src="../assets/logo.png" alt="logo">
+
+    </a>
+    QuOptuna
+  </label>
+  
+    <div class="md-nav__source">
+      <a href="https://github.com/Qentora/quoptuna" title="Go to repository" class="md-source" data-md-component="source">
+  <div class="md-source__icon md-icon">
+    
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 448 512"><!--! Font Awesome Free 7.1.0 by @fontawesome - https://fontawesome.com License - https://fontawesome.com/license/free (Icons: CC BY 4.0, Fonts: SIL OFL 1.1, Code: MIT License) Copyright 2025 Fonticons, Inc.--><path d="M439.6 236.1 244 40.5c-5.4-5.5-12.8-8.5-20.4-8.5s-15 3-20.4 8.4L162.5 81l51.5 51.5c27.1-9.1 52.7 16.8 43.4 43.7l49.7 49.7c34.2-11.8 61.2 31 35.5 56.7-26.5 26.5-70.2-2.9-56-37.3L240.3 199v121.9c25.3 12.5 22.3 41.8 9.1 55-6.4 6.4-15.2 10.1-24.3 10.1s-17.8-3.6-24.3-10.1c-17.6-17.6-11.1-46.9 11.2-56v-123c-20.8-8.5-24.6-30.7-18.6-45L142.6 101 8.5 235.1C3 240.6 0 247.9 0 255.5s3 15 8.5 20.4l195.6 195.7c5.4 5.4 12.7 8.4 20.4 8.4s15-3 20.4-8.4l194.7-194.7c5.4-5.4 8.4-12.8 8.4-20.4s-3-15-8.4-20.4"></path></svg>
+  </div>
+  <div class="md-source__repository">
+    GitHub
+  </div>
+</a>
+    </div>
+  
+  <ul class="md-nav__list" data-md-scrollfix>
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../index.html" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Home
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../user_guide.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    User Guide
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../api_reference.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    API Reference
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../examples.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Examples
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+      
+      
+  
+  
+  
+  
+    <li class="md-nav__item">
+      <a href="../changelog.md" class="md-nav__link">
+        
+  
+  
+  <span class="md-ellipsis">
+    
+  
+    Changelog
+  
+
+    
+  </span>
+  
+  
+
+      </a>
+    </li>
+  
+
+    
+  </ul>
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+            
+              
+              <div class="md-sidebar md-sidebar--secondary" data-md-component="sidebar" data-md-type="toc">
+                <div class="md-sidebar__scrollwrap">
+                  <div class="md-sidebar__inner">
+                    
+
+<nav class="md-nav md-nav--secondary" aria-label="Table of contents">
+  
+  
+  
+    
+  
+  
+    <label class="md-nav__title" for="__toc">
+      <span class="md-nav__icon md-icon"></span>
+      Table of contents
+    </label>
+    <ul class="md-nav__list" data-md-component="toc" data-md-scrollfix>
+      
+        <li class="md-nav__item">
+  <a href="#prerequisites" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Prerequisites
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-1-enable-github-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 1: Enable GitHub Pages
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 1: Enable GitHub Pages">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#11-navigate-to-repository-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.1 Navigate to Repository Settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#12-access-pages-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.2 Access Pages Settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#13-configure-pages-source" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.3 Configure Pages Source
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#14-optional-custom-domain-skip-if-not-needed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        1.4 Optional: Custom Domain (Skip if not needed)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-2-configure-workflow-permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 2: Configure Workflow Permissions
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 2: Configure Workflow Permissions">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#21-navigate-to-actions-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.1 Navigate to Actions Settings
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#22-set-workflow-permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.2 Set Workflow Permissions
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#23-why-this-is-important" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        2.3 Why This Is Important
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-3-verify-branch-protection-optional-but-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 3: Verify Branch Protection (Optional but Recommended)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 3: Verify Branch Protection (Optional but Recommended)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#31-navigate-to-branches" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.1 Navigate to Branches
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#32-add-branch-protection-rule-for-development" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.2 Add Branch Protection Rule for Development
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#33-branch-protection-for-mainmaster-recommended" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        3.3 Branch Protection for Main/Master (Recommended)
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-4-enable-github-actions-if-disabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 4: Enable GitHub Actions (if disabled)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 4: Enable GitHub Actions (if disabled)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#41-check-if-actions-are-enabled" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        4.1 Check if Actions Are Enabled
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-5-configure-environments-automatic" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 5: Configure Environments (Automatic)
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 5: Configure Environments (Automatic)">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#optional-environment-configuration" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Optional Environment Configuration
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-6-trigger-your-first-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 6: Trigger Your First Deployment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 6: Trigger Your First Deployment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#option-a-push-to-development-branch" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option A: Push to Development Branch
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-b-merge-pull-request" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option B: Merge Pull Request
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#option-c-manual-trigger" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Option C: Manual Trigger
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-7-monitor-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 7: Monitor Deployment
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 7: Monitor Deployment">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#71-check-workflow-status" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.1 Check Workflow Status
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#72-check-for-errors" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.2 Check for Errors
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#73-verify-deployment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        7.3 Verify Deployment
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#step-8-access-your-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Step 8: Access Your Documentation
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Step 8: Access Your Documentation">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#development-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Development Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#stable-documentation" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Stable Documentation
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#version-selector" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Version Selector
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#troubleshooting" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Troubleshooting
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Troubleshooting">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#issue-1-workflow-not-permitted-to-deploy-to-environment" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue 1: "Workflow not permitted to deploy to environment"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#issue-2-pages-build-and-deployment-failed" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue 2: "Pages build and deployment failed"
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#issue-3-workflow-runs-but-docs-dont-update" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue 3: Workflow runs but docs don't update
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#issue-4-404-error-when-visiting-docs-url" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue 4: 404 error when visiting docs URL
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#issue-5-old-version-still-showing" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Issue 5: Old version still showing
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#quick-reference-checklist" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Quick Reference Checklist
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#summary-of-settings" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Summary of Settings
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#next-steps-after-setup" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Next Steps After Setup
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#getting-help" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Getting Help
+      
+    </span>
+  </a>
+  
+</li>
+      
+        <li class="md-nav__item">
+  <a href="#visual-guide" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Visual Guide
+      
+    </span>
+  </a>
+  
+    <nav class="md-nav" aria-label="Visual Guide">
+      <ul class="md-nav__list">
+        
+          <li class="md-nav__item">
+  <a href="#settings-pages" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings → Pages
+      
+    </span>
+  </a>
+  
+</li>
+        
+          <li class="md-nav__item">
+  <a href="#settings-actions-general-workflow-permissions" class="md-nav__link">
+    <span class="md-ellipsis">
+      
+        Settings → Actions → General → Workflow permissions
+      
+    </span>
+  </a>
+  
+</li>
+        
+      </ul>
+    </nav>
+  
+</li>
+      
+    </ul>
+  
+</nav>
+                  </div>
+                </div>
+              </div>
+            
+          
+          
+            <div class="md-content" data-md-component="content">
+              
+              <article class="md-content__inner md-typeset">
+                
+                  
+
+
+  
+    <a href="https://github.com/Qentora/quoptuna/edit/master/docs/configuration/github-settings-guide.md" title="Edit this page" class="md-content__button md-icon" rel="edit">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M10 20H6V4h7v5h5v3.1l2-2V8l-6-6H6c-1.1 0-2 .9-2 2v16c0 1.1.9 2 2 2h4zm10.2-7c.1 0 .3.1.4.2l1.3 1.3c.2.2.2.6 0 .8l-1 1-2.1-2.1 1-1c.1-.1.2-.2.4-.2m0 3.9L14.1 23H12v-2.1l6.1-6.1z"></path></svg>
+    </a>
+  
+  
+    
+      
+    
+    <a href="https://github.com/Qentora/quoptuna/raw/master/docs/configuration/github-settings-guide.md" title="View source of this page" class="md-content__button md-icon">
+      
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M17 18c.56 0 1 .44 1 1s-.44 1-1 1-1-.44-1-1 .44-1 1-1m0-3c-2.73 0-5.06 1.66-6 4 .94 2.34 3.27 4 6 4s5.06-1.66 6-4c-.94-2.34-3.27-4-6-4m0 6.5a2.5 2.5 0 0 1-2.5-2.5 2.5 2.5 0 0 1 2.5-2.5 2.5 2.5 0 0 1 2.5 2.5 2.5 2.5 0 0 1-2.5 2.5M9.27 20H6V4h7v5h5v4.07c.7.08 1.36.25 2 .49V8l-6-6H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h4.5a8.2 8.2 0 0 1-1.23-2"></path></svg>
+    </a>
+  
+
+
+<h1 id="github-settings-configuration-guide">GitHub Settings Configuration Guide</h1>
+<p>This guide walks you through the required GitHub repository settings to enable automatic documentation deployment.</p>
+<h2 id="prerequisites">Prerequisites</h2>
+<ul>
+<li>You must have <strong>admin access</strong> to the repository</li>
+<li>The workflows must be committed to the repository</li>
+<li>You need to be on GitHub.com (not local)</li>
+</ul>
+<hr>
+<h2 id="step-1-enable-github-pages">Step 1: Enable GitHub Pages</h2>
+<h3 id="11-navigate-to-repository-settings">1.1 Navigate to Repository Settings</h3>
+<ol>
+<li>Go to your repository on GitHub: <code>https://github.com/Qentora/quoptuna</code></li>
+<li>Click the <strong>⚙️ Settings</strong> tab (top right of the repository page)</li>
+<li>If you don't see this tab, you don't have admin access</li>
+</ol>
+<h3 id="12-access-pages-settings">1.2 Access Pages Settings</h3>
+<ol>
+<li>In the left sidebar, scroll down to the <strong>Code and automation</strong> section</li>
+<li>Click on <strong>Pages</strong></li>
+</ol>
+<h3 id="13-configure-pages-source">1.3 Configure Pages Source</h3>
+<ol>
+<li>Under <strong>Build and deployment</strong> section:</li>
+<li><strong>Source</strong>: Select <strong>GitHub Actions</strong> from the dropdown
+     <div class="highlight"><pre><span></span><code><a id="__codelineno-0-1" name="__codelineno-0-1" href="#__codelineno-0-1"></a>Before: Deploy from a branch
+<a id="__codelineno-0-2" name="__codelineno-0-2" href="#__codelineno-0-2"></a>After:  GitHub Actions ✓
+</code></pre></div></li>
+<li>
+<p>You should see: "Your site is ready to be published at https://qentora.github.io/quoptuna/"</p>
+</li>
+<li>
+<p><strong>Do NOT select a branch</strong> - GitHub Actions will handle deployment</p>
+</li>
+<li>
+<p>The page should now show:
+   </p><div class="highlight"><pre><span></span><code><a id="__codelineno-1-1" name="__codelineno-1-1" href="#__codelineno-1-1"></a>Source
+<a id="__codelineno-1-2" name="__codelineno-1-2" href="#__codelineno-1-2"></a>GitHub Actions
+<a id="__codelineno-1-3" name="__codelineno-1-3" href="#__codelineno-1-3"></a>
+<a id="__codelineno-1-4" name="__codelineno-1-4" href="#__codelineno-1-4"></a>Your GitHub Pages site is currently being built from the GitHub Actions workflow.
+</code></pre></div><p></p>
+</li>
+<li>
+<p>Click anywhere else to auto-save (no save button needed)</p>
+</li>
+</ol>
+<h3 id="14-optional-custom-domain-skip-if-not-needed">1.4 Optional: Custom Domain (Skip if not needed)</h3>
+<p>If you want to use a custom domain like <code>docs.quoptuna.com</code>:</p>
+<ol>
+<li>Under <strong>Custom domain</strong>, enter your domain</li>
+<li>Click <strong>Save</strong></li>
+<li>Wait for DNS check to complete</li>
+<li>Enable <strong>Enforce HTTPS</strong> after DNS verification</li>
+</ol>
+<hr>
+<h2 id="step-2-configure-workflow-permissions">Step 2: Configure Workflow Permissions</h2>
+<p>This is <strong>critical</strong> - without this, the workflows cannot deploy to GitHub Pages.</p>
+<h3 id="21-navigate-to-actions-settings">2.1 Navigate to Actions Settings</h3>
+<ol>
+<li>Still in <strong>⚙️ Settings</strong>, find <strong>Code and automation</strong> section in left sidebar</li>
+<li>Click on <strong>Actions</strong></li>
+<li>Click on <strong>General</strong> (under Actions)</li>
+</ol>
+<h3 id="22-set-workflow-permissions">2.2 Set Workflow Permissions</h3>
+<p>Scroll down to the <strong>Workflow permissions</strong> section:</p>
+<ol>
+<li>
+<p>Select: <strong>Read and write permissions</strong> (this is critical!)
+   </p><div class="highlight"><pre><span></span><code><a id="__codelineno-2-1" name="__codelineno-2-1" href="#__codelineno-2-1"></a>○ Read repository contents and packages permissions (default)
+<a id="__codelineno-2-2" name="__codelineno-2-2" href="#__codelineno-2-2"></a>● Read and write permissions ← SELECT THIS
+</code></pre></div><p></p>
+</li>
+<li>
+<p>Keep checked: ✅ <strong>Allow GitHub Actions to create and approve pull requests</strong></p>
+</li>
+<li>
+<p>Click <strong>Save</strong> button at the bottom</p>
+</li>
+</ol>
+<h3 id="23-why-this-is-important">2.3 Why This Is Important</h3>
+<p>The workflows need write permissions to:
+- Push to the <code>gh-pages</code> branch
+- Deploy documentation to GitHub Pages
+- Update version information with mike</p>
+<hr>
+<h2 id="step-3-verify-branch-protection-optional-but-recommended">Step 3: Verify Branch Protection (Optional but Recommended)</h2>
+<h3 id="31-navigate-to-branches">3.1 Navigate to Branches</h3>
+<ol>
+<li>In <strong>⚙️ Settings</strong>, click <strong>Branches</strong> (under Code and automation)</li>
+</ol>
+<h3 id="32-add-branch-protection-rule-for-development">3.2 Add Branch Protection Rule for Development</h3>
+<ol>
+<li>
+<p>Click <strong>Add branch protection rule</strong></p>
+</li>
+<li>
+<p>Configure:</p>
+</li>
+<li>
+<p><strong>Branch name pattern</strong>: <code>development</code></p>
+</li>
+<li>
+<p>Enable these settings:</p>
+</li>
+<li>
+<p>✅ <strong>Require a pull request before merging</strong></p>
+<ul>
+<li>✅ Require approvals: 1 (or more)</li>
+</ul>
+</li>
+<li>
+<p>✅ <strong>Require status checks to pass before merging</strong></p>
+<ul>
+<li>✅ Require branches to be up to date before merging</li>
+<li>Search and select: <code>build</code> (from docs workflows)</li>
+</ul>
+</li>
+<li>
+<p>✅ <strong>Require conversation resolution before merging</strong></p>
+</li>
+<li>
+<p>✅ <strong>Do not allow bypassing the above settings</strong></p>
+</li>
+<li>
+<p>Click <strong>Create</strong> or <strong>Save changes</strong></p>
+</li>
+</ol>
+<h3 id="33-branch-protection-for-mainmaster-recommended">3.3 Branch Protection for Main/Master (Recommended)</h3>
+<p>Repeat the same process for your main branch:
+- <strong>Branch name pattern</strong>: <code>main</code> (or <code>master</code>)
+- Same settings as development
+- This prevents accidental direct pushes to production</p>
+<hr>
+<h2 id="step-4-enable-github-actions-if-disabled">Step 4: Enable GitHub Actions (if disabled)</h2>
+<h3 id="41-check-if-actions-are-enabled">4.1 Check if Actions Are Enabled</h3>
+<ol>
+<li>In <strong>⚙️ Settings</strong> → <strong>Actions</strong> → <strong>General</strong></li>
+<li>Under <strong>Actions permissions</strong>, ensure one of these is selected:</li>
+<li>✅ <strong>Allow all actions and reusable workflows</strong> (recommended for public repos)</li>
+<li>
+<p>✅ <strong>Allow enterprise, and select non-enterprise, actions and reusable workflows</strong></p>
+</li>
+<li>
+<p>If actions were disabled, click <strong>Save</strong></p>
+</li>
+</ol>
+<hr>
+<h2 id="step-5-configure-environments-automatic">Step 5: Configure Environments (Automatic)</h2>
+<p>GitHub will automatically create these environments when workflows run:
+- <code>github-pages</code> (for stable docs from main)
+- <code>github-pages-dev</code> (for dev docs from development)</p>
+<p>You can view/configure them later at:
+- <strong>⚙️ Settings</strong> → <strong>Environments</strong></p>
+<h3 id="optional-environment-configuration">Optional Environment Configuration</h3>
+<p>After the first deployment, you can add protection rules:</p>
+<ol>
+<li>Go to <strong>Settings</strong> → <strong>Environments</strong></li>
+<li>Click on <code>github-pages</code> or <code>github-pages-dev</code></li>
+<li>Add <strong>Deployment protection rules</strong>:</li>
+<li>Required reviewers</li>
+<li>Wait timer</li>
+<li>Deployment branches (restrict to specific branches)</li>
+</ol>
+<hr>
+<h2 id="step-6-trigger-your-first-deployment">Step 6: Trigger Your First Deployment</h2>
+<h3 id="option-a-push-to-development-branch">Option A: Push to Development Branch</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-3-1" name="__codelineno-3-1" href="#__codelineno-3-1"></a><span class="c1"># If you're on the claude branch, merge to development</span>
+<a id="__codelineno-3-2" name="__codelineno-3-2" href="#__codelineno-3-2"></a>git<span class="w"> </span>checkout<span class="w"> </span>development
+<a id="__codelineno-3-3" name="__codelineno-3-3" href="#__codelineno-3-3"></a>git<span class="w"> </span>merge<span class="w"> </span>claude/jupyter-dataset-experiments-011CUsbYuf2cF6t4P6NWtFfg
+<a id="__codelineno-3-4" name="__codelineno-3-4" href="#__codelineno-3-4"></a>git<span class="w"> </span>push<span class="w"> </span>origin<span class="w"> </span>development
+</code></pre></div>
+<h3 id="option-b-merge-pull-request">Option B: Merge Pull Request</h3>
+<ol>
+<li>Create a PR from your claude branch to <code>development</code></li>
+<li>The workflow will build (but not deploy) the docs</li>
+<li>After PR is merged, the workflow will deploy to <code>/dev/</code></li>
+</ol>
+<h3 id="option-c-manual-trigger">Option C: Manual Trigger</h3>
+<ol>
+<li>Go to <strong>Actions</strong> tab in your repository</li>
+<li>Select <strong>Deploy Versioned Docs</strong> workflow</li>
+<li>Click <strong>Run workflow</strong> button</li>
+<li>Select branch: <code>development</code></li>
+<li>Click <strong>Run workflow</strong></li>
+</ol>
+<hr>
+<h2 id="step-7-monitor-deployment">Step 7: Monitor Deployment</h2>
+<h3 id="71-check-workflow-status">7.1 Check Workflow Status</h3>
+<ol>
+<li>Go to <strong>Actions</strong> tab</li>
+<li>You should see a workflow running: <strong>Deploy Versioned Docs</strong></li>
+<li>Click on it to see progress</li>
+<li>Wait for all jobs to complete (green checkmarks)</li>
+</ol>
+<h3 id="72-check-for-errors">7.2 Check for Errors</h3>
+<p>If the workflow fails:</p>
+<ol>
+<li>Click on the failed job</li>
+<li>Expand the step that failed (red X)</li>
+<li>Read the error message</li>
+<li>Common issues:</li>
+<li><strong>Permission denied</strong>: Go back to Step 2, ensure "Read and write permissions" is selected</li>
+<li><strong>Pages not enabled</strong>: Go back to Step 1</li>
+<li><strong>Build errors</strong>: Check the documentation locally with <code>mkdocs build --strict</code></li>
+</ol>
+<h3 id="73-verify-deployment">7.3 Verify Deployment</h3>
+<p>After workflow succeeds:</p>
+<ol>
+<li>Go back to <strong>Settings</strong> → <strong>Pages</strong></li>
+<li>You should see:
+   <div class="highlight"><pre><span></span><code><a id="__codelineno-4-1" name="__codelineno-4-1" href="#__codelineno-4-1"></a>Your site is live at https://qentora.github.io/quoptuna/
+</code></pre></div></li>
+<li>Click <strong>Visit site</strong> to view your documentation</li>
+</ol>
+<hr>
+<h2 id="step-8-access-your-documentation">Step 8: Access Your Documentation</h2>
+<h3 id="development-documentation">Development Documentation</h3>
+<p>After pushing to <code>development</code> branch:
+- <strong>URL</strong>: <code>https://qentora.github.io/quoptuna/dev/</code>
+- Updates automatically on every push to development</p>
+<h3 id="stable-documentation">Stable Documentation</h3>
+<p>After merging to <code>main</code> or <code>master</code>:
+- <strong>URL</strong>: <code>https://qentora.github.io/quoptuna/latest/</code>
+- Also available at: <code>https://qentora.github.io/quoptuna/</code></p>
+<h3 id="version-selector">Version Selector</h3>
+<p>Users can switch between versions using the selector in the documentation header.</p>
+<hr>
+<h2 id="troubleshooting">Troubleshooting</h2>
+<h3 id="issue-1-workflow-not-permitted-to-deploy-to-environment">Issue 1: "Workflow not permitted to deploy to environment"</h3>
+<p><strong>Solution:</strong>
+1. <strong>Settings</strong> → <strong>Actions</strong> → <strong>General</strong>
+2. Ensure "Read and write permissions" is selected
+3. Click <strong>Save</strong></p>
+<h3 id="issue-2-pages-build-and-deployment-failed">Issue 2: "Pages build and deployment failed"</h3>
+<p><strong>Solution:</strong>
+1. <strong>Settings</strong> → <strong>Pages</strong>
+2. Ensure source is set to <strong>GitHub Actions</strong> (not "Deploy from a branch")</p>
+<h3 id="issue-3-workflow-runs-but-docs-dont-update">Issue 3: Workflow runs but docs don't update</h3>
+<p><strong>Solution:</strong>
+1. Check if the <code>gh-pages</code> branch exists
+2. Go to repository → <strong>Branches</strong>
+3. If <code>gh-pages</code> doesn't exist, the first deployment creates it
+4. Wait a few minutes and check again</p>
+<h3 id="issue-4-404-error-when-visiting-docs-url">Issue 4: 404 error when visiting docs URL</h3>
+<p><strong>Possible causes:</strong>
+1. Workflow hasn't completed yet - wait and refresh
+2. GitHub Pages not enabled - go to Step 1
+3. Path is wrong - use <code>/dev/</code> or <code>/latest/</code> not just root</p>
+<p><strong>Solution:</strong>
+1. Verify workflow completed successfully (green checkmark)
+2. Wait 2-3 minutes for GitHub Pages to propagate
+3. Clear browser cache
+4. Try incognito/private browsing mode</p>
+<h3 id="issue-5-old-version-still-showing">Issue 5: Old version still showing</h3>
+<p><strong>Solution:</strong>
+</p><div class="highlight"><pre><span></span><code><a id="__codelineno-5-1" name="__codelineno-5-1" href="#__codelineno-5-1"></a><span class="c1"># Clear version cache with mike</span>
+<a id="__codelineno-5-2" name="__codelineno-5-2" href="#__codelineno-5-2"></a>pip<span class="w"> </span>install<span class="w"> </span>mike
+<a id="__codelineno-5-3" name="__codelineno-5-3" href="#__codelineno-5-3"></a>mike<span class="w"> </span>delete<span class="w"> </span>old-version<span class="w"> </span>--push
+<a id="__codelineno-5-4" name="__codelineno-5-4" href="#__codelineno-5-4"></a>mike<span class="w"> </span>deploy<span class="w"> </span>new-version<span class="w"> </span>latest<span class="w"> </span>--push<span class="w"> </span>--update-aliases
+</code></pre></div><p></p>
+<hr>
+<h2 id="quick-reference-checklist">Quick Reference Checklist</h2>
+<p>Before workflows can deploy docs, ensure:</p>
+<ul>
+<li>[ ] GitHub Pages enabled (Settings → Pages → Source: GitHub Actions)</li>
+<li>[ ] Workflow permissions set to "Read and write" (Settings → Actions → General)</li>
+<li>[ ] Workflows committed and pushed to repository</li>
+<li>[ ] Branch exists (<code>development</code> or <code>main</code>)</li>
+<li>[ ] Changes to <code>docs/</code> or <code>mkdocs.yml</code> pushed</li>
+</ul>
+<hr>
+<h2 id="summary-of-settings">Summary of Settings</h2>
+<table>
+<thead>
+<tr>
+<th>Setting</th>
+<th>Location</th>
+<th>Required Value</th>
+</tr>
+</thead>
+<tbody>
+<tr>
+<td>Pages Source</td>
+<td>Settings → Pages</td>
+<td>GitHub Actions</td>
+</tr>
+<tr>
+<td>Workflow Permissions</td>
+<td>Settings → Actions → General</td>
+<td>Read and write permissions</td>
+</tr>
+<tr>
+<td>Actions</td>
+<td>Settings → Actions → General</td>
+<td>Allow all actions</td>
+</tr>
+<tr>
+<td>Branch</td>
+<td>N/A</td>
+<td><code>development</code> or <code>main</code> exists</td>
+</tr>
+</tbody>
+</table>
+<hr>
+<h2 id="next-steps-after-setup">Next Steps After Setup</h2>
+<ol>
+<li><strong>Test the deployment:</strong></li>
+<li>Make a small change to any file in <code>docs/</code></li>
+<li>Commit and push to <code>development</code></li>
+<li>Check Actions tab for workflow run</li>
+<li>
+<p>Visit the dev docs URL</p>
+</li>
+<li>
+<p><strong>Set up branch protection</strong> (recommended)</p>
+</li>
+<li>Protect <code>development</code> and <code>main</code> branches</li>
+<li>Require PR reviews</li>
+<li>
+<p>Require status checks</p>
+</li>
+<li>
+<p><strong>Customize documentation:</strong></p>
+</li>
+<li>Update <code>docs/index.md</code></li>
+<li>Add more documentation pages</li>
+<li>
+<p>Customize <code>mkdocs.yml</code> theme</p>
+</li>
+<li>
+<p><strong>Monitor deployments:</strong></p>
+</li>
+<li>Subscribe to workflow notifications</li>
+<li>Check Actions tab regularly</li>
+<li>Set up deployment notifications</li>
+</ol>
+<hr>
+<h2 id="getting-help">Getting Help</h2>
+<p>If you encounter issues not covered here:</p>
+<ol>
+<li>Check workflow logs in <strong>Actions</strong> tab</li>
+<li>Review <a href="GITHUB_PAGES_SETUP.md">GITHUB_PAGES_SETUP.md</a> for detailed troubleshooting</li>
+<li>Consult <a href="https://docs.github.com/en/pages">GitHub Pages documentation</a></li>
+<li>Check <a href="https://github.com/jimporter/mike">mike documentation</a></li>
+<li>Open an issue in the repository</li>
+</ol>
+<hr>
+<h2 id="visual-guide">Visual Guide</h2>
+<h3 id="settings-pages">Settings → Pages</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-6-1" name="__codelineno-6-1" href="#__codelineno-6-1"></a>┌─────────────────────────────────────┐
+<a id="__codelineno-6-2" name="__codelineno-6-2" href="#__codelineno-6-2"></a>│ Build and deployment                │
+<a id="__codelineno-6-3" name="__codelineno-6-3" href="#__codelineno-6-3"></a>│                                     │
+<a id="__codelineno-6-4" name="__codelineno-6-4" href="#__codelineno-6-4"></a>│ Source                              │
+<a id="__codelineno-6-5" name="__codelineno-6-5" href="#__codelineno-6-5"></a>│ [GitHub Actions ▼]  ← SELECT THIS  │
+<a id="__codelineno-6-6" name="__codelineno-6-6" href="#__codelineno-6-6"></a>│                                     │
+<a id="__codelineno-6-7" name="__codelineno-6-7" href="#__codelineno-6-7"></a>│ Your site is live at:               │
+<a id="__codelineno-6-8" name="__codelineno-6-8" href="#__codelineno-6-8"></a>│ https://qentora.github.io/quoptuna/ │
+<a id="__codelineno-6-9" name="__codelineno-6-9" href="#__codelineno-6-9"></a>└─────────────────────────────────────┘
+</code></pre></div>
+<h3 id="settings-actions-general-workflow-permissions">Settings → Actions → General → Workflow permissions</h3>
+<div class="highlight"><pre><span></span><code><a id="__codelineno-7-1" name="__codelineno-7-1" href="#__codelineno-7-1"></a>┌─────────────────────────────────────┐
+<a id="__codelineno-7-2" name="__codelineno-7-2" href="#__codelineno-7-2"></a>│ Workflow permissions                │
+<a id="__codelineno-7-3" name="__codelineno-7-3" href="#__codelineno-7-3"></a>│                                     │
+<a id="__codelineno-7-4" name="__codelineno-7-4" href="#__codelineno-7-4"></a>│ ○ Read repository contents and     │
+<a id="__codelineno-7-5" name="__codelineno-7-5" href="#__codelineno-7-5"></a>│   packages permissions              │
+<a id="__codelineno-7-6" name="__codelineno-7-6" href="#__codelineno-7-6"></a>│                                     │
+<a id="__codelineno-7-7" name="__codelineno-7-7" href="#__codelineno-7-7"></a>│ ● Read and write permissions        │
+<a id="__codelineno-7-8" name="__codelineno-7-8" href="#__codelineno-7-8"></a>│   ← SELECT THIS                     │
+<a id="__codelineno-7-9" name="__codelineno-7-9" href="#__codelineno-7-9"></a>│                                     │
+<a id="__codelineno-7-10" name="__codelineno-7-10" href="#__codelineno-7-10"></a>│ ✓ Allow GitHub Actions to create   │
+<a id="__codelineno-7-11" name="__codelineno-7-11" href="#__codelineno-7-11"></a>│   and approve pull requests         │
+<a id="__codelineno-7-12" name="__codelineno-7-12" href="#__codelineno-7-12"></a>│                                     │
+<a id="__codelineno-7-13" name="__codelineno-7-13" href="#__codelineno-7-13"></a>│ [Save]                              │
+<a id="__codelineno-7-14" name="__codelineno-7-14" href="#__codelineno-7-14"></a>└─────────────────────────────────────┘
+</code></pre></div>
+<hr>
+<p><strong>Last Updated</strong>: November 2024
+<strong>Repository</strong>: https://github.com/Qentora/quoptuna</p>
+
+
+
+
+
+
+
+
+
+
+
+
+                
+              </article>
+            </div>
+          
+          
+<script>var target=document.getElementById(location.hash.slice(1));target&&target.name&&(target.checked=target.name.startsWith("__tabbed_"))</script>
+        </div>
+        
+          <button type="button" class="md-top md-icon" data-md-component="top" hidden>
+  
+  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24"><path d="M13 20h-2V8l-5.5 5.5-1.42-1.42L12 4.16l7.92 7.92-1.42 1.42L13 8z"></path></svg>
+  Back to top
+</button>
+        
+      </main>
+      
+        <footer class="md-footer">
+  
+    
+  
+  <div class="md-footer-meta md-typeset">
+    <div class="md-footer-meta__inner md-grid">
+      <div class="md-copyright">
+  
+    <div class="md-copyright__highlight">
+      Copyright © 2024 Edwin Jose Chittilappilly
+    </div>
+  
+  
+    Made with
+    <a href="https://squidfunk.github.io/mkdocs-material/" target="_blank" rel="noopener">
+      Material for MkDocs
+    </a>
+  
+</div>
+      
+    </div>
+  </div>
+</footer>
+      
+    </div>
+    <div class="md-dialog" data-md-component="dialog">
+      <div class="md-dialog__inner md-typeset"></div>
+    </div>
+    
+    
+    
+      
+      
+      <script id="__config" type="application/json">{"annotate": null, "base": "..", "features": ["navigation.footer", "content.action.edit", "content.action.view", "content.code.annotate", "content.code.copy", "content.tooltips", "navigation.tabs", "navigation.sections", "navigation.footer", "navigation.indexes", "navigation.top", "navigation.tracking", "search.highlight", "search.share", "search.suggest", "toc.follow"], "search": "../assets/javascripts/workers/search.7a47a382.min.js", "tags": null, "translations": {"clipboard.copied": "Copied to clipboard", "clipboard.copy": "Copy to clipboard", "search.result.more.one": "1 more on this page", "search.result.more.other": "# more on this page", "search.result.none": "No matching documents", "search.result.one": "1 matching document", "search.result.other": "# matching documents", "search.result.placeholder": "Type to start searching", "search.result.term.missing": "Missing", "select.version": "Select version"}, "version": {"default": "latest", "provider": "mike"}}</script>
+    
+    
+      <script src="../assets/javascripts/bundle.e71a0d61.min.js"></script>
+      
+    
+  
+<script id="init-glightbox">const lightbox = GLightbox({"touchNavigation": false, "loop": false, "zoomable": true, "draggable": true, "openEffect": "zoom", "closeEffect": "zoom", "slideEffect": "slide"});
+document$.subscribe(()=>{ lightbox.reload(); });
+</script></body></html>
