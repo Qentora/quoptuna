@@ -206,8 +206,8 @@ def display_results():
                 for k, v in important_params.items():
                     st.write(f"- {k}: {v}")
 
-            with st.expander("All Parameters"):
-                st.json(trial.params)
+            st.write("**All Parameters:**")
+            st.json(trial.params)
 
     st.info("👉 Proceed to the next page: **Model Training & Evaluation**")
 
