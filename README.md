@@ -1,7 +1,7 @@
 # QuOptuna
 
 <div align="center">
-  <img src="assets/logo.png" alt="QuOptuna Logo" width="200" height="auto" />
+  <img src="https://raw.githubusercontent.com/Qentora/quoptuna/refs/heads/main/assets/logo.png" alt="QuOptuna Logo" width="200" height="auto" />
   <h1>QuOptuna</h1>
   <p>
     Bridging quantum computing and hyperparameter optimization for next-generation machine learning
