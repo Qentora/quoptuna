@@ -350,8 +350,8 @@ def generate_report():
                 # Prepare dataset info
                 dataset_info = {
                     "Name": st.session_state.get("dataset_name", "Unknown"),
-                    "URL": dataset_url if dataset_url else "N/A",
-                    "Description": dataset_description if dataset_description else "N/A",
+                    "URL": dataset_url or "N/A",
+                    "Description": dataset_description or "N/A",
                     "Features": st.session_state.get("feature_columns", []),
                     "Target": st.session_state.get("target_column", "target"),
                 }
