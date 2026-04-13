@@ -2868,7 +2868,7 @@ wheels = [
 
 [[package]]
 name = "quoptuna"
-version = "0.0.4rc1"
+version = "0.0.4rc2"
 source = { editable = "." }
 dependencies = [
     { name = "cairosvg" },
