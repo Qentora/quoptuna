@@ -126,15 +126,16 @@ class QuantumKitchenSinks(BaseEstimator, ClassifierMixin):
             self.dev_type,
             wires=self.n_qubits_,
             shots=1,
-            prng_key=self.generate_key(),
         )
 
         @qml.qnode(dev, **self.qnode_kwargs)
         def circuit(Q):
             for i, q in enumerate(Q):
                 qml.RX(q, wires=i)
-            qml.broadcast(qml.CNOT, wires=range(self.n_qubits_), pattern="double")
-            qml.broadcast(qml.CNOT, wires=range(self.n_qubits_), pattern=pattern)
+            for _i in range(0, self.n_qubits_ - 1, 2):
+                qml.CNOT(wires=[_i, _i + 1])
+            for _wire_pair in pattern:
+                qml.CNOT(wires=_wire_pair)
 
             return qml.sample(wires=range(self.n_qubits_))
 

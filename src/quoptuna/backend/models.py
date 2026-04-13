@@ -120,7 +120,7 @@ def create_model(model_type, **kwargs):
         "SVClinear": (LinearSVC, ["C"]),
         "MLPClassifier": (
             MLPClassifier,
-            ["batch_size", "learning_rate", "hidden_layer_sizes", "alpha"],
+            ["batch_size", "hidden_layer_sizes", "alpha"],
         ),
         "Perceptron": (Perceptron, ["eta0"]),
     }
@@ -133,5 +133,6 @@ def create_model(model_type, **kwargs):
 
     if model_type == "MLPClassifier":
         params["hidden_layer_sizes"] = ast.literal_eval(params["hidden_layer_sizes"])
+        params["learning_rate_init"] = kwargs.get("learning_rate")
 
     return model_class(**params)

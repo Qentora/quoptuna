@@ -151,9 +151,11 @@ class DataReuploadingClassifier(BaseEstimator, ClassifierMixin):
 
                     x_idx += 3
                 if layer % 2 == 0:
-                    qml.broadcast(qml.CZ, range(self.n_qubits_), pattern="double")
+                    for _i in range(0, self.n_qubits_ - 1, 2):
+                        qml.CZ(wires=[_i, _i + 1])
                 else:
-                    qml.broadcast(qml.CZ, range(self.n_qubits_), pattern="double_odd")
+                    for _i in range(1, self.n_qubits_ - 1, 2):
+                        qml.CZ(wires=[_i, _i + 1])
 
             # final reupload without CZs
             x_idx = 0
@@ -349,9 +351,11 @@ class DataReuploadingClassifierNoScaling(DataReuploadingClassifier):
                     qml.Rot(*angles, wires=i)
                     x_idx += 3
                 if layer % 2 == 0:
-                    qml.broadcast(qml.CZ, range(self.n_qubits_), pattern="double")
+                    for _i in range(0, self.n_qubits_ - 1, 2):
+                        qml.CZ(wires=[_i, _i + 1])
                 else:
-                    qml.broadcast(qml.CZ, range(self.n_qubits_), pattern="double_odd")
+                    for _i in range(1, self.n_qubits_ - 1, 2):
+                        qml.CZ(wires=[_i, _i + 1])
 
             # final reupload without CZs
             x_idx = 0
@@ -424,9 +428,11 @@ class DataReuploadingClassifierNoTrainableEmbedding(DataReuploadingClassifier):
                     qml.Rot(*angles, wires=i)
                     x_idx += 3
                 if layer % 2 == 0:
-                    qml.broadcast(qml.CZ, range(self.n_qubits_), pattern="double")
+                    for _i in range(0, self.n_qubits_ - 1, 2):
+                        qml.CZ(wires=[_i, _i + 1])
                 else:
-                    qml.broadcast(qml.CZ, range(self.n_qubits_), pattern="double_odd")
+                    for _i in range(1, self.n_qubits_ - 1, 2):
+                        qml.CZ(wires=[_i, _i + 1])
 
                 # final reupload without CZs
             x_idx = 0
