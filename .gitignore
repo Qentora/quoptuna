@@ -111,6 +111,9 @@ node_modules/
 .next/
 out/
 
+# Frontend static bundle copied into the Python package at build time.
+src/quoptuna/web/
+
 # production
 # (build/ already ignored above)
 

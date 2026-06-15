@@ -9,8 +9,8 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
-from app.services import dataset_registry
-from app.services.workflow_service import WorkflowExecutor
+from quoptuna.server.services import dataset_registry
+from quoptuna.server.services.workflow_service import WorkflowExecutor
 
 router = APIRouter()
 

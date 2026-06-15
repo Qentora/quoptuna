@@ -27,6 +27,11 @@ jobs:
       - name: Install uv
         uses: astral-sh/setup-uv@v5
 
+      - name: Set up Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+
       - name: Extract version from pyproject.toml
         id: version
         run: |
@@ -42,6 +47,19 @@ jobs:
           else
             echo "exists=false" >> "$GITHUB_OUTPUT"
           fi
+
+      - name: Build frontend static export
+        if: steps.check.outputs.exists == 'false'
+        working-directory: frontend
+        run: |
+          npm ci
+          npm run build
+
+      - name: Bundle frontend into the package
+        if: steps.check.outputs.exists == 'false'
+        run: |
+          rm -rf src/quoptuna/web
+          cp -R frontend/out src/quoptuna/web
 
       - name: Build package
         if: steps.check.outputs.exists == 'false'

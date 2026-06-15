@@ -27,25 +27,36 @@ pip install quoptuna
 
 ### Launch the Application
 
-Start the full stack (FastAPI backend + Next.js frontend) in production mode with a single command. A gradient ASCII banner appears while the services boot:
+QuOptuna bundles a pre-built web UI inside the Python package, so one command boots the whole app from Python alone — no Node.js and no repository checkout required:
 
 ```bash
+# Straight from PyPI, no permanent install
+uvx quoptuna
+
+# ...or, in an environment that already has quoptuna installed
 uv run quoptuna run
 ```
 
-This builds the frontend, starts both services on the first free ports (defaults: `:8000` API, `:3000` UI), waits for readiness, prints the access links, and opens your browser. Running `uv run quoptuna` with no subcommand does the same thing.
+A single FastAPI/uvicorn process serves the JSON API and the bundled UI on one port (default `:8000`, auto-incrementing if busy). A gradient ASCII banner appears while it boots, then your browser opens automatically. Running `uv run quoptuna` (or `uvx quoptuna`) with no subcommand does the same thing.
+
+| URL | What |
+| --- | --- |
+| `http://localhost:8000` | Web UI |
+| `http://localhost:8000/api/v1/...` | JSON API |
+| `http://localhost:8000/api/docs` | Interactive API docs |
 
 Useful options:
 
 ```bash
-# Custom ports and no auto-opened browser
-uv run quoptuna run --backend-port 8001 --frontend-port 3001 --no-browser
+# Custom port and no auto-opened browser
+uv run quoptuna run --port 8001 --no-browser
 
 # Legacy Streamlit dashboard instead of the full stack
 uv run quoptuna run --streamlit
 ```
 
-Build and server logs are written to files under `${TMPDIR}/quoptuna/`; their paths are shown beneath the banner.
+!!! tip "Dev vs packaged mode"
+    The command above is the **packaged** mode: one process, one port, served from the wheel. For frontend development with hot reload, use the **dev** mode (two processes — Next.js on `:3000` and FastAPI on `:8000`) via `make run_cli`. See [Run without Docker](getting-started/run-without-docker.md).
 
 ### Basic Python Usage
 
@@ -203,7 +214,7 @@ QuOptuna provides a structured workflow:
 ## System Requirements
 
 - Python 3.11 or 3.12
-- Node.js 18+ (for the Next.js frontend)
+- Node.js 18+ — only for frontend development (the published package ships a pre-built UI)
 - 4GB+ RAM (8GB recommended for quantum models)
 - Internet connection (for UCI datasets and LLM reports)
 

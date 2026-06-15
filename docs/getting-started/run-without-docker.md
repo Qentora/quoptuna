@@ -1,14 +1,20 @@
 # Running QuOptuna Without Docker
 
-## Quickest: One Command
+## Quickest: One Command (packaged mode)
 
-If you just want to run the app, the `quoptuna` CLI builds and serves the full stack (FastAPI backend + Next.js frontend) in production mode from the repository root:
+If you just want to run the app, the published package bundles a pre-built web UI, so a single command serves everything from one FastAPI/uvicorn process — no Node.js and no repository checkout:
 
 ```bash
+# Straight from PyPI
+uvx quoptuna
+
+# ...or, in an environment that already has quoptuna installed
 uv run quoptuna run
 ```
 
-It auto-selects free ports (defaults `:8000` API, `:3000` UI), prints access links beneath a gradient ASCII banner, and opens your browser. Use `--backend-port` / `--frontend-port` to override ports, `--no-browser` to skip auto-opening, and `--streamlit` to launch the legacy Streamlit dashboard instead. The manual steps below are for development with hot-reload.
+It auto-selects a free port (default `:8000`), serves the UI, JSON API, and `/api/docs` from that one origin, prints access links beneath a gradient ASCII banner, and opens your browser. Use `--port` to override the port, `--no-browser` to skip auto-opening, and `--streamlit` to launch the legacy Streamlit dashboard instead.
+
+The manual steps below are the **dev mode** (two processes, hot reload). It's the same workflow as `make run_cli`, which runs the Next.js dev server on `:3000` against the FastAPI backend on `:8000`.
 
 ## Backend Setup
 
@@ -25,22 +31,17 @@ source venv/bin/activate  # On Windows: venv\Scripts\activate
 pip install -e .
 ```
 
-### 3. Install Backend Dependencies
-```bash
-cd backend
-pip install -e .
-```
+### 3. Run Backend Server
+The FastAPI app now lives inside the `quoptuna` package at `quoptuna.server.main`, so run it from the repository root:
 
-### 4. Run Backend Server
 ```bash
-# From the backend directory
-cd /home/user/quoptuna/backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+cd /home/user/quoptuna
+uvicorn quoptuna.server.main:app --host 0.0.0.0 --port 8000 --reload
 ```
 
 **Backend will be available at:**
 - API: http://localhost:8000
-- Docs: http://localhost:8000/docs
+- Docs: http://localhost:8000/api/docs
 
 ## Frontend Setup
 
@@ -69,8 +70,7 @@ Create a file `start-dev.sh`:
 echo "Starting backend..."
 cd /home/user/quoptuna
 source venv/bin/activate
-cd backend
-uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload &
+uvicorn quoptuna.server.main:app --host 0.0.0.0 --port 8000 --reload &
 BACKEND_PID=$!
 
 # Start frontend in background

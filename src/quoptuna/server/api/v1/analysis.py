@@ -12,8 +12,8 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 
 # Access optimization results stored by the optimize module.
-from app.api.v1.optimize import optimization_jobs
-from app.services.workflow_service import build_xai
+from quoptuna.server.api.v1.optimize import optimization_jobs
+from quoptuna.server.services.workflow_service import build_xai
 
 logger = logging.getLogger(__name__)
 
@@ -111,7 +111,7 @@ async def generate_shap_analysis(request: SHAPRequest):
                     plots[plot_type] = xai.get_plot(plot_type)
                 elif plot_type == "waterfall":
                     plots[plot_type] = xai.get_waterfall_plot(index=request.sample_index)
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.error("Failed to generate %s plot: %s", plot_type, exc)
 
         return {
@@ -122,8 +122,8 @@ async def generate_shap_analysis(request: SHAPRequest):
         }
     except HTTPException:
         raise
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=f"Failed to generate SHAP analysis: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate SHAP analysis: {e!s}")
 
 
 @router.post("/metrics")
@@ -148,7 +148,7 @@ async def generate_metrics(request: MetricsRequest):
             try:
                 value = func()
                 metrics[name] = float(value) if np.ndim(value) == 0 else value
-            except Exception as exc:  # noqa: BLE001
+            except Exception as exc:
                 logger.warning("Metric %s failed: %s", name, exc)
 
         _safe("f1_score", xai.get_f1_score)
@@ -164,17 +164,17 @@ async def generate_metrics(request: MetricsRequest):
             from sklearn.metrics import accuracy_score
 
             metrics["accuracy"] = float(accuracy_score(xai.y_test, xai.predictions))
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("accuracy failed: %s", exc)
 
         try:
             metrics["classification_report"] = xai.get_classification_report()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("classification_report failed: %s", exc)
 
         try:
             metrics["confusion_matrix"] = xai.get_confusion_matrix().tolist()
-        except Exception as exc:  # noqa: BLE001
+        except Exception as exc:
             logger.warning("confusion_matrix failed: %s", exc)
 
         return {
@@ -185,8 +185,8 @@ async def generate_metrics(request: MetricsRequest):
         }
     except HTTPException:
         raise
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=f"Failed to compute metrics: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compute metrics: {e!s}")
 
 
 @router.post("/report")
@@ -216,5 +216,5 @@ async def generate_ai_report(request: ReportRequest):
         }
     except HTTPException:
         raise
-    except Exception as e:  # noqa: BLE001
-        raise HTTPException(status_code=500, detail=f"Failed to generate report: {str(e)}")
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to generate report: {e!s}")
