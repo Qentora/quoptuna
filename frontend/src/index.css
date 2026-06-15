@@ -1,0 +1,41 @@
+@import "tailwindcss";
+
+@layer base {
+  body {
+    @apply bg-white text-gray-900;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* React Flow specific styles */
+.react-flow__node {
+  @apply rounded-lg border-2 border-gray-300 bg-white shadow-md transition-all;
+}
+
+.react-flow__node:hover {
+  @apply shadow-lg border-blue-500;
+}
+
+.react-flow__node.selected {
+  @apply border-blue-500 ring-2 ring-blue-200;
+}
+
+.react-flow__handle {
+  @apply w-3 h-3 rounded-full border-2 border-white;
+}
+
+.react-flow__handle-top {
+  @apply bg-blue-500;
+}
+
+.react-flow__handle-bottom {
+  @apply bg-green-500;
+}
+
+.react-flow__edge-path {
+  @apply stroke-2;
+}
+
+.react-flow__edge.selected .react-flow__edge-path {
+  @apply stroke-blue-500;
+}

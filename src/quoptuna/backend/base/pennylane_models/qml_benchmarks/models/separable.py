@@ -35,7 +35,7 @@ class SeparableVariationalClassifier(BaseEstimator, ClassifierMixin):
         random_state=42,
         scaling=1.0,
         convergence_interval=200,
-        dev_type="default.qubit.jax",
+        dev_type="default.qubit",
         qnode_kwargs={"interface": "jax"},
     ):
         r"""
@@ -247,7 +247,7 @@ class SeparableKernelClassifier(BaseEstimator, ClassifierMixin):
         jit=True,
         random_state=42,
         scaling=1.0,
-        dev_type="default.qubit.jax",
+        dev_type="default.qubit",
         qnode_kwargs={"interface": "jax", "diff_method": None},
     ):
         r"""

@@ -124,10 +124,44 @@ Reports include performance metrics, SHAP interpretations, and governance recomm
 
 ## Documentation
 
-- **[User Guide](user_guide.md)** - Complete walkthrough of the Streamlit interface
-- **[API Reference](api_reference.md)** - Detailed API documentation for Python usage
-- **[Examples](examples.md)** - Code examples for common use cases
-- **[Changelog](changelog.md)** - Version history and updates
+### 🚀 Getting Started
+- **[Quick Start Guide](getting-started/quickstart.md)** - Get up and running in 5 minutes
+- **[QuOptuna Next](getting-started/quoptuna-next.md)** - Modern drag-and-drop workflow interface
+- **[Running Without Docker](getting-started/run-without-docker.md)** - Local development setup
+
+### 📖 User Guides
+- **[User Guide](guides/user-guide.md)** - Complete walkthrough of the Streamlit interface
+- **[Streamlit Guide](guides/streamlit-guide.md)** - Streamlit-specific features and tips
+- **[Workflow Builder Guide](guides/workflow-builder-guide.md)** - Create and manage workflows
+- **[Frontend Quick Reference](guides/frontend-quick-reference.md)** - Quick reference for frontend features
+
+### 🏗️ Architecture & Design
+- **[Frontend Architecture](architecture/frontend-architecture.md)** - Frontend design and components
+- **[Frontend Architecture Diagram](architecture/frontend-architecture-diagram.md)** - Visual architecture overview
+- **[Optimizer Architecture](architecture/optimizer-architecture.md)** - Backend optimization system design
+- **[New Frontend Design](architecture/new-frontend-design.md)** - Latest frontend improvements
+
+### 🛠️ Development
+- **[Testing Checklist](development/testing-checklist.md)** - Testing best practices
+- **[Workflow Testing](development/workflow-testing.md)** - Test workflow components
+- **[Implementation Summary](development/implementation-summary.md)** - Recent implementation updates
+
+### ⚙️ Configuration
+- **[GitHub Settings Guide](configuration/github-settings-guide.md)** - Repository configuration
+- **[GitHub Pages Setup](configuration/github-pages-setup.md)** - Deploy documentation site
+
+### 📚 API Documentation
+- **[API Reference](api/api-reference.md)** - Detailed API documentation for Python usage
+- **[API Docs](api/api-docs.md)** - Additional API documentation
+
+### 💡 Examples
+- **[Examples](examples/examples.md)** - Code examples for common use cases
+
+### 🗺️ Roadmap
+- **[Implementation Roadmap](roadmap/implementation-roadmap.md)** - Future plans and features
+
+### 📋 Changelog
+- **[Changelog](../CHANGELOG.md)** - Version history and updates
 
 ## Workflow
 
@@ -258,5 +292,5 @@ Built with:
 
 ---
 
-**Ready to get started?** Check out the [User Guide](user_guide.md) or launch the app with `quoptuna --start`!
+**Ready to get started?** Check out the [Quick Start Guide](getting-started/quickstart.md) or [User Guide](guides/user-guide.md), then launch the app with `quoptuna --start`!
 
