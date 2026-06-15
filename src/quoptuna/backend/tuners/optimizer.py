@@ -13,14 +13,67 @@ from quoptuna.backend.utils.data_utils.data import load_data, preprocess_data
 logging.getLogger().setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
 
+# Default hyperparameter search space. ``objective`` samples one value per key
+# via ``trial.suggest_categorical``; insertion order is preserved so the
+# sampling sequence is identical to the previous inline definition. Callers
+# (e.g. tests) can pass a reduced ``search_space``/``model_types`` to the
+# ``Optimizer`` to shrink the search and speed up runs.
+DEFAULT_SEARCH_SPACE: dict = {
+    "max_vmap": [1],
+    "batch_size": [32],
+    "learning_rate": [0.001, 0.01, 0.1],
+    "n_input_copies": [1, 2, 3],
+    "n_layers": [1, 5, 10],
+    "observable_type": ["single", "half", "full"],
+    "repeats": [1, 5, 10],
+    "C": [0.1, 1, 10, 100],
+    "gamma_factor": [0.1, 1, 10],
+    "trotter_steps": [1, 3, 5],
+    "t": [0.01, 0.1, 1.0],
+    "n_qfeatures": ["full", "half"],
+    "n_episodes": [10, 100, 500, 2000],
+    "visible_qubits": ["single", "half", "full"],
+    "temperature": [1, 10, 100],
+    "encoding_layers": [1, 3, 5, 10],
+    "degree": [2, 3, 4],
+    "n_qchannels": [1, 5, 10],
+    "qkernel_shape": [2, 3],
+    "kernel_shape": [2, 3, 5],
+    "filter_name": ["edge_detect", "smooth", "sharpen"],
+    "gamma": [0.001, 0.01, 0.1, 1],
+    "alpha": [0.01, 0.001, 0.0001],
+    "hidden_layer_sizes": ["(100,)", "(10, 10, 10, 10)", "(50, 10, 5)"],
+    "eta0": [0.1, 1, 10],
+}
+
+DEFAULT_MODEL_TYPES: list = [
+    "CircuitCentricClassifier",
+    "DataReuploadingClassifier",
+    "DataReuploadingClassifierSeparable",
+    "DressedQuantumCircuitClassifier",
+    "DressedQuantumCircuitClassifierSeparable",
+    "ProjectedQuantumKernel",
+    "QuantumKitchenSinks",
+    "QuantumMetricLearner",
+    "TreeTensorClassifier",
+    "SeparableVariationalClassifier",
+    "SeparableKernelClassifier",
+    "SVC",
+    "SVClinear",
+    "MLPClassifier",
+    "Perceptron",
+]
+
 
 class Optimizer:
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         db_name: str,
         dataset_name: str = "",
         data: Optional[dict] = None,  # noqa: FA100
         study_name: str = "",
+        model_types: Optional[list] = None,  # noqa: FA100
+        search_space: Optional[dict] = None,  # noqa: FA100
     ):
         """Initialize the Optimizer class.
 
@@ -64,6 +117,8 @@ class Optimizer:
         self.storage_location = f"sqlite:///{self.data_path}"
         self.study_name = study_name
         self.study = None
+        self.model_types = model_types or DEFAULT_MODEL_TYPES
+        self.search_space = search_space or DEFAULT_SEARCH_SPACE
 
     def load_and_preprocess_data(self):
         self.X, self.y = load_data(self.data_path)
@@ -71,63 +126,14 @@ class Optimizer:
 
     def objective(self, trial: Trial):
         try:
-            # Define the hyperparameter search space
+            # Sample one value per hyperparameter from the (possibly reduced)
+            # search space. Insertion order is preserved for reproducibility.
             params = {
-                "max_vmap": trial.suggest_categorical("max_vmap", [1]),
-                "batch_size": trial.suggest_categorical("batch_size", [32]),
-                "learning_rate": trial.suggest_categorical("learning_rate", [0.001, 0.01, 0.1]),
-                "n_input_copies": trial.suggest_categorical("n_input_copies", [1, 2, 3]),
-                "n_layers": trial.suggest_categorical("n_layers", [1, 5, 10]),
-                "observable_type": trial.suggest_categorical(
-                    "observable_type", ["single", "half", "full"]
-                ),
-                "repeats": trial.suggest_categorical("repeats", [1, 5, 10]),
-                "C": trial.suggest_categorical("C", [0.1, 1, 10, 100]),
-                "gamma_factor": trial.suggest_categorical("gamma_factor", [0.1, 1, 10]),
-                "trotter_steps": trial.suggest_categorical("trotter_steps", [1, 3, 5]),
-                "t": trial.suggest_categorical("t", [0.01, 0.1, 1.0]),
-                "n_qfeatures": trial.suggest_categorical("n_qfeatures", ["full", "half"]),
-                "n_episodes": trial.suggest_categorical("n_episodes", [10, 100, 500, 2000]),
-                "visible_qubits": trial.suggest_categorical(
-                    "visible_qubits", ["single", "half", "full"]
-                ),
-                "temperature": trial.suggest_categorical("temperature", [1, 10, 100]),
-                "encoding_layers": trial.suggest_categorical("encoding_layers", [1, 3, 5, 10]),
-                "degree": trial.suggest_categorical("degree", [2, 3, 4]),
-                "n_qchannels": trial.suggest_categorical("n_qchannels", [1, 5, 10]),
-                "qkernel_shape": trial.suggest_categorical("qkernel_shape", [2, 3]),
-                "kernel_shape": trial.suggest_categorical("kernel_shape", [2, 3, 5]),
-                "filter_name": trial.suggest_categorical(
-                    "filter_name", ["edge_detect", "smooth", "sharpen"]
-                ),
-                "gamma": trial.suggest_categorical("gamma", [0.001, 0.01, 0.1, 1]),
-                "alpha": trial.suggest_categorical("alpha", [0.01, 0.001, 0.0001]),
-                "hidden_layer_sizes": trial.suggest_categorical(
-                    "hidden_layer_sizes", ["(100,)", "(10, 10, 10, 10)", "(50, 10, 5)"]
-                ),
-                "eta0": trial.suggest_categorical("eta0", [0.1, 1, 10]),
+                name: trial.suggest_categorical(name, choices)
+                for name, choices in self.search_space.items()
             }
 
-            model_type = trial.suggest_categorical(
-                "model_type",
-                [
-                    "CircuitCentricClassifier",
-                    "DataReuploadingClassifier",
-                    "DataReuploadingClassifierSeparable",
-                    "DressedQuantumCircuitClassifier",
-                    "DressedQuantumCircuitClassifierSeparable",
-                    "ProjectedQuantumKernel",
-                    "QuantumKitchenSinks",
-                    "QuantumMetricLearner",
-                    "TreeTensorClassifier",
-                    "SeparableVariationalClassifier",
-                    "SeparableKernelClassifier",
-                    "SVC",
-                    "SVClinear",
-                    "MLPClassifier",
-                    "Perceptron",
-                ],
-            )
+            model_type = trial.suggest_categorical("model_type", self.model_types)
 
             model = create_model(model_type, **params)
 

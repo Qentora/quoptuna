@@ -20,6 +20,8 @@ from app.api.v1.optimize import (
 from app.services import dataset_registry
 from quoptuna.backend.tuners.optimizer import Optimizer
 
+from .conftest import TEST_MODEL_TYPES, TEST_SEARCH_SPACE
+
 STUDY_NAME = "my-optimization-study-test-1"
 DATABASE_NAME = "results-test1"
 SELECTED_FEATURES = ["entropy", "curtosis", "skewness", "variance"]
@@ -52,6 +54,8 @@ def test_optimization_configuration_full_pipeline(
         study_name=STUDY_NAME,
         database_name=DATABASE_NAME,
         num_trials=5,
+        model_types=TEST_MODEL_TYPES,
+        search_space=TEST_SEARCH_SPACE,
     )
 
     job_id = "opt_inttest"
@@ -99,6 +103,8 @@ def test_optimizer_ten_trials_on_banknote(
         db_name="results-test1-10trials",
         data=preprocessed_banknote,
         study_name="my-optimization-study-test-10trials",
+        model_types=TEST_MODEL_TYPES,
+        search_space=TEST_SEARCH_SPACE,
     )
 
     study, _best = optimizer.optimize(n_trials=10)

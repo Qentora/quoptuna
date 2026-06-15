@@ -33,6 +33,9 @@ class OptimizationRequest(BaseModel):
     num_trials: int
     model_name: str = "DataReuploading"
     label_mapping: Optional[LabelMapping] = None
+    # Optional overrides to shrink Optuna's search (defaults use the full space).
+    model_types: Optional[List[str]] = None
+    search_space: Optional[Dict[str, List[Any]]] = None
 
 
 class OptimizationStatus(BaseModel):
@@ -112,6 +115,8 @@ def run_optimization_background(job_id: str, request: OptimizationRequest):
                             "study_name": request.study_name,
                             "n_trials": request.num_trials,
                             "db_name": request.database_name,
+                            "model_types": request.model_types,
+                            "search_space": request.search_space,
                         },
                     },
                 },

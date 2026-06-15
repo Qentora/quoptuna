@@ -373,6 +373,8 @@ class WorkflowExecutor:
             "study_name": config.get("study_name", "workflow_study"),
             "n_trials": config.get("n_trials", 100),
             "db_name": config.get("db_name", "workflow_optimization.db"),
+            "model_types": config.get("model_types"),
+            "search_space": config.get("search_space"),
         }
 
         # Merge input data if available
@@ -406,11 +408,13 @@ class WorkflowExecutor:
             else y_test_df.ravel(),
         }
 
-        # Create optimizer
+        # Create optimizer (optional reduced search space, e.g. for tests)
         optimizer = Optimizer(
             db_name=opt_config.get("db_name", "workflow_optimization.db"),
             data=data_dict,
             study_name=opt_config.get("study_name", "workflow_study"),
+            model_types=opt_config.get("model_types"),
+            search_space=opt_config.get("search_space"),
         )
 
         # Run optimization

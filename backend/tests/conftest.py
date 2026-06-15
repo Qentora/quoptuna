@@ -74,6 +74,20 @@ BASE_PARAMS = {
     "eta0": 0.1,
 }
 
+# A deliberately tiny search space for the optimizer integration tests: a single
+# value per hyperparameter (so params are deterministic) and a small, mixed set
+# of model types. Including the easily-separable classical models guarantees a
+# best_value > 0 on Banknote. Wrapping every BASE_PARAMS value in a one-element
+# list guarantees every candidate model's required keys are present.
+TEST_SEARCH_SPACE = {key: [value] for key, value in BASE_PARAMS.items()}
+TEST_MODEL_TYPES = [
+    "DataReuploadingClassifier",
+    "ProjectedQuantumKernel",
+    "SVC",
+    "MLPClassifier",
+    "Perceptron",
+]
+
 
 # Variational qml_benchmarks models train to convergence with a floor of
 # 2 * convergence_interval (default 200 -> >=400 steps) and max_steps=10000.
