@@ -22,6 +22,53 @@ class WorkflowExecutionError(Exception):
     pass
 
 
+def build_xai(
+    opt_result: Dict[str, Any],
+    trial_number: int | None = None,
+    use_proba: bool = True,
+    subset_size: int = 50,
+):
+    """Retrain a study trial and build an ``XAI`` instance for it.
+
+    Shared by the SHAP / metrics / report analysis endpoints. When
+    ``trial_number`` is ``None`` the study's best trial is used.
+    """
+    from optuna import load_study
+    from quoptuna import XAI, XAIConfig
+    from quoptuna.backend.models import create_model
+
+    db_name = opt_result.get("db_name")
+    study_name = opt_result.get("study_name")
+    storage_location = f"sqlite:///db/{db_name}.db"
+    study = load_study(storage=storage_location, study_name=study_name)
+
+    if trial_number is not None:
+        trial = next((t for t in study.trials if t.number == trial_number), None)
+        if trial is None:
+            raise WorkflowExecutionError(f"Trial {trial_number} not found in study")
+    else:
+        trial = study.best_trial
+
+    params = {k: v for k, v in trial.params.items() if k != "model_type"}
+    model = create_model(trial.params["model_type"], **params)
+
+    x_train_df = opt_result["x_train"]
+    y_train_df = opt_result["y_train"]
+    x_train_np = x_train_df.values if hasattr(x_train_df, "values") else x_train_df
+    y_train_np = y_train_df.values if hasattr(y_train_df, "values") else y_train_df
+    model.fit(x_train_np, y_train_np)
+
+    data_dict = {
+        "x_train": x_train_df,
+        "x_test": opt_result["x_test"],
+        "y_train": y_train_df,
+        "y_test": opt_result["y_test"],
+    }
+
+    xai_config = XAIConfig(use_proba=use_proba, onsubset=True, subset_size=subset_size)
+    return XAI(model=model, data=data_dict, config=xai_config)
+
+
 class WorkflowExecutor:
     """Executes visual workflows by running nodes in topological order"""
 
@@ -32,7 +79,7 @@ class WorkflowExecutor:
 
         self.nodes = {node["id"]: node for node in workflow.get("nodes", [])}
         self.edges = workflow.get("edges", [])
-        self.results = {}  # Store results from each node
+        self.results: Dict[str, Any] = {}  # Store results from each node
 
     def get_node_dependencies(self, node_id: str) -> List[str]:
         """Get list of node IDs that this node depends on"""
@@ -240,6 +287,24 @@ class WorkflowExecutor:
         y_train = result["y_train"]
         y_test = result["y_test"]
 
+        # Explicit user-provided mapping takes precedence (values map to -1/1).
+        label_mapping = config.get("label_mapping")
+        if label_mapping:
+            neg = str(label_mapping.get("neg"))
+            pos = str(label_mapping.get("pos"))
+            logger.info(f"Applying explicit label mapping: {neg} -> -1, {pos} -> 1")
+
+            def _map(series):
+                as_str = series.astype(str) if hasattr(series, "astype") else series
+                mapped = np.where(np.asarray(as_str) == pos, 1, -1)
+                if hasattr(series, "columns"):
+                    return pd.DataFrame(mapped, columns=series.columns, index=series.index)
+                return pd.DataFrame(mapped, columns=["target"])
+
+            result["y_train"] = _map(y_train)
+            result["y_test"] = _map(y_test)
+            return result
+
         # Get unique classes
         unique_classes = np.unique(
             np.concatenate(
@@ -308,6 +373,8 @@ class WorkflowExecutor:
             "study_name": config.get("study_name", "workflow_study"),
             "n_trials": config.get("n_trials", 100),
             "db_name": config.get("db_name", "workflow_optimization.db"),
+            "model_types": config.get("model_types"),
+            "search_space": config.get("search_space"),
         }
 
         # Merge input data if available
@@ -332,16 +399,22 @@ class WorkflowExecutor:
         # Convert to numpy arrays for Optimizer (as shown in notebooks)
         data_dict = {
             "train_x": x_train_df.values if hasattr(x_train_df, "values") else x_train_df,
-            "train_y": y_train_df.values if hasattr(y_train_df, "values") else y_train_df,
+            "train_y": y_train_df.values.ravel()
+            if hasattr(y_train_df, "values")
+            else y_train_df.ravel(),
             "test_x": x_test_df.values if hasattr(x_test_df, "values") else x_test_df,
-            "test_y": y_test_df.values if hasattr(y_test_df, "values") else y_test_df,
+            "test_y": y_test_df.values.ravel()
+            if hasattr(y_test_df, "values")
+            else y_test_df.ravel(),
         }
 
-        # Create optimizer
+        # Create optimizer (optional reduced search space, e.g. for tests)
         optimizer = Optimizer(
             db_name=opt_config.get("db_name", "workflow_optimization.db"),
             data=data_dict,
             study_name=opt_config.get("study_name", "workflow_study"),
+            model_types=opt_config.get("model_types"),
+            search_space=opt_config.get("search_space"),
         )
 
         # Run optimization
@@ -352,6 +425,8 @@ class WorkflowExecutor:
         optimizer.optimize(n_trials=n_trials)
 
         # Get best trial
+        if optimizer.study is None:
+            raise RuntimeError("Optimization did not produce a study with a best trial")
         best_trial = optimizer.study.best_trial
 
         return {

@@ -153,7 +153,9 @@ namespace_packages = true
 mypy_path = "quoptuna"
 ignore_missing_imports = true
 disallow_any_unimported = false
-exclude = ["src/quoptuna/backend/base/pennylane_models/.*","venv/"]
+# `backend/` is a separate uv project (own deps + its own mypy run in CI lint);
+# excluding it here avoids a duplicate "tests" module clash with root tests/.
+exclude = ["src/quoptuna/backend/base/pennylane_models/.*", "venv/", "backend/.*", "frontend/.*"]
 
 # If you need to ignore something for some specific module,
 # add overrides for them. Avoid changing the global config!

@@ -6,12 +6,13 @@ services:
       context: ./frontend
       dockerfile: Dockerfile
     ports:
-      - "5173:5173"
+      - "3000:3000"
     volumes:
       - ./frontend:/app
       - /app/node_modules
+      - /app/.next
     environment:
-      - VITE_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
     depends_on:
       - backend
 
@@ -27,7 +28,7 @@ services:
       - ./uploads:/app/uploads
     environment:
       - DATABASE_URL=sqlite:///./quoptuna.db
-      - CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+      - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
   # Redis for Celery (future use)

@@ -8,7 +8,7 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
-from app.api.v1 import analysis, data, optimize, system, workflows
+from app.api.v1 import analysis, data, optimize, system
 from app.core.config import settings
 
 app = FastAPI(
@@ -30,7 +30,6 @@ app.add_middleware(
 
 # Include routers
 app.include_router(data.router, prefix="/api/v1/data", tags=["data"])
-app.include_router(workflows.router, prefix="/api/v1/workflows", tags=["workflows"])
 app.include_router(optimize.router, prefix="/api/v1/optimize", tags=["optimization"])
 app.include_router(analysis.router, prefix="/api/v1/analysis", tags=["analysis"])
 app.include_router(system.router, prefix="/api/v1", tags=["system"])

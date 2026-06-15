@@ -41,17 +41,17 @@ install_frontend:
 run_backend:
 	@echo "Starting FastAPI backend on http://localhost:8000..."
 	@echo "API docs: http://localhost:8000/docs"
-	cd backend && $(UV) run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+	cd backend && $(UV) run --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 run_frontend:
-	@echo "Starting Vite frontend on http://localhost:5173..."
+	@echo "Starting Next.js frontend on http://localhost:3000..."
 	cd frontend && npm run dev
 
 run_cli:
 	@echo "Starting QuOptuna full-stack application..."
 	@echo ""
 	@echo "Backend: http://localhost:8000"
-	@echo "Frontend: http://localhost:5173"
+	@echo "Frontend: http://localhost:3000"
 	@echo "API Docs: http://localhost:8000/docs"
 	@echo ""
 	@echo "Press Ctrl+C to stop both services"
@@ -78,7 +78,7 @@ help:
 	@echo ""
 	@echo "Running:"
 	@echo "  run_backend       - Run FastAPI backend (port 8000)"
-	@echo "  run_frontend      - Run Vite frontend (port 5173)"
+	@echo "  run_frontend      - Run Next.js frontend (port 3000)"
 	@echo "  run_cli           - Run both backend and frontend"
 	@echo "  run_streamlit     - Run legacy Streamlit interface"
 	@echo ""
@@ -111,10 +111,10 @@ clean_python_cache:
 clean:
 	@echo "Stopping all services and cleaning up ports..."
 	@-pkill -f "uvicorn app.main:app" 2>/dev/null || true
-	@-pkill -f "vite" 2>/dev/null || true
+	@-pkill -f "next dev" 2>/dev/null || true
 	@-lsof -ti:8000 | xargs kill -9 2>/dev/null || true
-	@-lsof -ti:5173 | xargs kill -9 2>/dev/null || true
-	@echo "Ports 8000 and 5173 cleaned up"
+	@-lsof -ti:3000 | xargs kill -9 2>/dev/null || true
+	@echo "Ports 8000 and 3000 cleaned up"
 
 clean_all: clean_python_cache clean
 
