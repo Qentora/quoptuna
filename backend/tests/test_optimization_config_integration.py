@@ -11,6 +11,7 @@ import math
 import pytest
 from optuna import load_study
 from optuna.trial import TrialState
+from quoptuna.backend.tuners.optimizer import Optimizer
 
 from app.api.v1.optimize import (
     OptimizationRequest,
@@ -18,7 +19,6 @@ from app.api.v1.optimize import (
     run_optimization_background,
 )
 from app.services import dataset_registry
-from quoptuna.backend.tuners.optimizer import Optimizer
 
 from .conftest import TEST_MODEL_TYPES, TEST_SEARCH_SPACE
 

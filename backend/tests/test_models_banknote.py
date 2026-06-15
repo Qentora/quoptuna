@@ -8,10 +8,9 @@ every model the optimizer can sample, which directly exercises all three fixes
 import ast
 
 import pytest
+from quoptuna.backend.models import create_model
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.metrics import f1_score
-
-from quoptuna.backend.models import create_model
 
 from .conftest import OPTIMIZER_MODEL_TYPES, cap_training
 
