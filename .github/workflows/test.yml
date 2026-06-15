@@ -29,9 +29,38 @@ jobs:
   pre-commit:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v4
-      - uses: ./.github/actions/python-uv-env
-      - run: uv run pre-commit run --all-files
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # Full history so we can diff against the PR merge base / push parent.
+          fetch-depth: 0
+
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
+
+      - name: Set up Python
+        run: uv python install 3.12
+
+      - name: Install dependencies
+        run: uv sync
+
+      - name: Run pre-commit on changed files
+        run: |
+          if [ "${{ github.event_name }}" = "pull_request" ]; then
+            from=$(git merge-base "${{ github.event.pull_request.base.sha }}" "${{ github.event.pull_request.head.sha }}")
+            to="${{ github.event.pull_request.head.sha }}"
+          else
+            from="${{ github.event.before }}"
+            to="${{ github.sha }}"
+            # New branch / first push reports an all-zero before SHA; fall back to full scan.
+            if ! git rev-parse --quiet --verify "$from^{commit}" >/dev/null; then
+              uv run pre-commit run --all-files --show-diff-on-failure
+              exit $?
+            fi
+          fi
+          uv run pre-commit run --from-ref "$from" --to-ref "$to" --show-diff-on-failure
 
   test:
     runs-on: ubuntu-latest
