@@ -73,11 +73,12 @@ MAX_UNIQUE_FOR_TARGET = 20
 @router.post("/upload")
 async def upload_dataset(file: UploadFile = File(...)):
     """Upload a CSV dataset and register it."""
-    if not file.filename.endswith(".csv"):
+    filename = file.filename
+    if not filename or not filename.endswith(".csv"):
         raise HTTPException(status_code=400, detail="Only CSV files are allowed")
 
     file_id = str(uuid.uuid4())
-    file_extension = os.path.splitext(file.filename)[1]
+    file_extension = os.path.splitext(filename)[1]
     saved_filename = f"{file_id}{file_extension}"
     file_path = UPLOAD_DIR / saved_filename
 
@@ -91,7 +92,7 @@ async def upload_dataset(file: UploadFile = File(...)):
         dataset_registry.register(
             {
                 "id": file_id,
-                "name": file.filename,
+                "name": filename,
                 "source": "upload",
                 "file_path": str(file_path),
                 "rows": len(df),
