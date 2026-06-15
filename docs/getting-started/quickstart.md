@@ -9,10 +9,31 @@ A modern, drag-and-drop interface for building quantum ML workflows with real-ti
 ## 📋 Prerequisites
 
 Choose one:
-- **Docker** (easiest) - Just Docker and docker-compose
-- **Local Development** - Node.js 18+ and Python 3.10+
+- **CLI** (easiest, no Docker) - Python 3.11/3.12, Node.js 18+, and `uv`
+- **Docker** - Just Docker and docker-compose
+- **Local Development** - Node.js 18+ and Python 3.11/3.12
 
-## 🚀 Option 1: Docker (Recommended)
+## ⚡ Option 0: One Command (Recommended)
+
+From the repository root, launch the full stack (FastAPI backend + Next.js frontend) in production mode:
+
+```bash
+uv run quoptuna run
+```
+
+A gradient ASCII banner appears while QuOptuna builds the frontend and starts both services on the first free ports (defaults: `:8000` API, `:3000` UI). It then prints the access links and opens your browser. Running `uv run quoptuna` with no subcommand does the same thing.
+
+```bash
+# Custom ports / no auto-opened browser
+uv run quoptuna run --backend-port 8001 --frontend-port 3001 --no-browser
+
+# Legacy Streamlit dashboard instead of the full stack
+uv run quoptuna run --streamlit
+```
+
+Build and server logs are written under `${TMPDIR}/quoptuna/`; their paths are shown beneath the banner.
+
+## 🚀 Option 1: Docker
 
 ### Step 1: Start the Services
 

@@ -27,17 +27,25 @@ pip install quoptuna
 
 ### Launch the Application
 
-Start the interactive Streamlit interface:
+Start the full stack (FastAPI backend + Next.js frontend) in production mode with a single command. A gradient ASCII banner appears while the services boot:
 
 ```bash
-quoptuna --start
+uv run quoptuna run
 ```
 
-Or run directly with Python:
+This builds the frontend, starts both services on the first free ports (defaults: `:8000` API, `:3000` UI), waits for readiness, prints the access links, and opens your browser. Running `uv run quoptuna` with no subcommand does the same thing.
+
+Useful options:
 
 ```bash
-python -m quoptuna.frontend.app run
+# Custom ports and no auto-opened browser
+uv run quoptuna run --backend-port 8001 --frontend-port 3001 --no-browser
+
+# Legacy Streamlit dashboard instead of the full stack
+uv run quoptuna run --streamlit
 ```
+
+Build and server logs are written to files under `${TMPDIR}/quoptuna/`; their paths are shown beneath the banner.
 
 ### Basic Python Usage
 
@@ -194,7 +202,8 @@ QuOptuna provides a structured workflow:
 
 ## System Requirements
 
-- Python 3.8+
+- Python 3.11 or 3.12
+- Node.js 18+ (for the Next.js frontend)
 - 4GB+ RAM (8GB recommended for quantum models)
 - Internet connection (for UCI datasets and LLM reports)
 
@@ -292,5 +301,5 @@ Built with:
 
 ---
 
-**Ready to get started?** Check out the [Quick Start Guide](getting-started/quickstart.md) or [User Guide](guides/user-guide.md), then launch the app with `quoptuna --start`!
+**Ready to get started?** Check out the [Quick Start Guide](getting-started/quickstart.md) or [User Guide](guides/user-guide.md), then launch the app with `uv run quoptuna run`!
 

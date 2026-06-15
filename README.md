@@ -9,7 +9,7 @@
 
 ![CodeRabbit Pull Request Reviews](https://img.shields.io/coderabbit/prs/github/Qentora/quoptuna?utm_source=oss&utm_medium=github&utm_campaign=Qentora%2Fquoptuna&labelColor=171717&color=FF570A&link=https%3A%2F%2Fcoderabbit.ai&label=CodeRabbit+Reviews)
 [![License](https://img.shields.io/github/license/Qentora/quoptuna.svg)](https://github.com/Qentora/quoptuna/blob/master/LICENSE)
-[![Python 3.8+](https://img.shields.io/badge/python-3.8+-blue.svg)](https://www.python.org/downloads/)
+[![Python 3.11+](https://img.shields.io/badge/python-3.11%E2%80%933.12-blue.svg)](https://www.python.org/downloads/)
 
 [![DeepWiki](https://deepwiki.com/badge.svg)](https://deepwiki.com/Qentora/quoptuna)
 
@@ -49,7 +49,7 @@ Whether you're working with quantum machine learning models or classical algorit
 
 ## 📦 Installation
 
-QuOptuna requires Python 3.8 or higher. Install using your preferred package manager:
+QuOptuna requires Python 3.11 or 3.12. Install using your preferred package manager:
 
 ### Using UV (Recommended)
 
@@ -97,15 +97,27 @@ print(f"Best value: {study.best_value}")
 print(f"Best parameters: {study.best_params}")
 ```
 
-### 📈 Launch Interactive Dashboard
+### 🖥️ Launch the Application
 
-Monitor your optimization progress in real-time:
+QuOptuna ships a single command that boots the full stack (FastAPI backend + Next.js frontend) in production mode, greeting you with a gradient ASCII banner:
 
 ```bash
-quoptuna --start
+uv run quoptuna run
 ```
 
-This launches a Streamlit dashboard where you can visualize optimization history, parameter importance, and convergence patterns.
+This builds the frontend, starts both services on the first free ports (defaulting to `:8000` for the API and `:3000` for the UI), waits until the UI is ready, prints the access links, and opens your browser automatically.
+
+Common options:
+
+```bash
+# Pick explicit ports and skip auto-opening the browser
+uv run quoptuna run --backend-port 8001 --frontend-port 3001 --no-browser
+
+# Launch the legacy Streamlit dashboard instead of the full stack
+uv run quoptuna run --streamlit
+```
+
+Running `uv run quoptuna` with no subcommand is equivalent to `uv run quoptuna run`. Build and server logs are streamed to files under `${TMPDIR}/quoptuna/`, whose paths are printed beneath the banner.
 
 ## 📖 Documentation
 
@@ -126,8 +138,9 @@ We welcome contributions from the community! Here's how to set up your developme
 
 ### Prerequisites
 
-- Python 3.8 or higher
+- Python 3.11 or 3.12
 - UV package manager (recommended) or pip
+- Node.js 18+ (for the Next.js frontend)
 - Git
 
 ### Setup Development Environment

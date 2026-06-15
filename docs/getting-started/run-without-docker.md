@@ -1,5 +1,15 @@
 # Running QuOptuna Without Docker
 
+## Quickest: One Command
+
+If you just want to run the app, the `quoptuna` CLI builds and serves the full stack (FastAPI backend + Next.js frontend) in production mode from the repository root:
+
+```bash
+uv run quoptuna run
+```
+
+It auto-selects free ports (defaults `:8000` API, `:3000` UI), prints access links beneath a gradient ASCII banner, and opens your browser. Use `--backend-port` / `--frontend-port` to override ports, `--no-browser` to skip auto-opening, and `--streamlit` to launch the legacy Streamlit dashboard instead. The manual steps below are for development with hot-reload.
+
 ## Backend Setup
 
 ### 1. Create Virtual Environment
@@ -46,7 +56,7 @@ npm run dev
 ```
 
 **Frontend will be available at:**
-- UI: http://localhost:5173
+- UI: http://localhost:3000
 
 ## Quick Start Script
 
@@ -73,7 +83,7 @@ echo "Backend PID: $BACKEND_PID"
 echo "Frontend PID: $FRONTEND_PID"
 echo ""
 echo "Backend running at: http://localhost:8000"
-echo "Frontend running at: http://localhost:5173"
+echo "Frontend running at: http://localhost:3000"
 echo ""
 echo "Press Ctrl+C to stop both services"
 
@@ -116,8 +126,8 @@ npm install
 
 **Port already in use:**
 ```bash
-# Find and kill process on port 5173
-lsof -ti:5173 | xargs kill -9
+# Find and kill process on port 3000
+lsof -ti:3000 | xargs kill -9
 ```
 
 ## Environment Variables
@@ -125,11 +135,11 @@ lsof -ti:5173 | xargs kill -9
 ### Backend (.env in /home/user/quoptuna/backend)
 ```env
 DATABASE_URL=sqlite:///./quoptuna.db
-CORS_ORIGINS=http://localhost:5173,http://localhost:3000
+CORS_ORIGINS=http://localhost:3000
 UPLOAD_DIR=./uploads
 ```
 
 ### Frontend (.env in /home/user/quoptuna/frontend)
 ```env
-VITE_API_URL=http://localhost:8000
+NEXT_PUBLIC_API_URL=http://localhost:8000
 ```
