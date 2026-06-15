@@ -21,7 +21,7 @@ dependencies = [
     "optuna==4.0.0",
     "optuna-dashboard==0.16.2",
     "streamlit==1.38.0",
-    "python-fasthtml==0.6.9",
+    "python-fasthtml==0.14.2",
     "streamlit-elements==0.1.0",
     "plotly==5.24.1",
     "pydantic==2.9.2",
