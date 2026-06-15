@@ -10,7 +10,10 @@ dependencies = [
     "pydantic-settings>=2.0.0",
     "python-multipart>=0.0.9",
     "optuna>=4.0.0",
-    "pennylane>=0.39.0",
+    "pennylane==0.44.1",
+    "jax==0.7.1",
+    "jaxlib==0.7.1",
+    "optax==0.2.3",
     "scikit-learn>=1.5.0",
     "pandas>=2.2.0",
     "numpy>=1.24.0,<2.0.0",
@@ -28,8 +31,19 @@ dependencies = [
 dev = [
     "pytest>=8.0.0",
     "pytest-asyncio>=0.24.0",
+    "pytest-xdist>=3.6.0",
+    "pytest-timeout>=2.3.0",
     "httpx>=0.27.0",
     "ruff>=0.7.0",
+]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+# Run tests across CPU cores (-n auto, per-test distribution) and cap any
+# single test that hangs.
+addopts = "-n auto --timeout=300"
+markers = [
+    "slow: long-running quantum model fits (deselect with '-m \"not slow\"')",
 ]
 
 [build-system]

@@ -103,7 +103,7 @@ class Optimizer:
                 "gamma": trial.suggest_categorical("gamma", [0.001, 0.01, 0.1, 1]),
                 "alpha": trial.suggest_categorical("alpha", [0.01, 0.001, 0.0001]),
                 "hidden_layer_sizes": trial.suggest_categorical(
-                    "hidden_layer_sizes", ["[100,)", "(10, 10, 10, 10)", "(50, 10, 5)"]
+                    "hidden_layer_sizes", ["(100,)", "(10, 10, 10, 10)", "(50, 10, 5)"]
                 ),
                 "eta0": trial.suggest_categorical("eta0", [0.1, 1, 10]),
             }

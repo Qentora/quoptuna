@@ -397,9 +397,13 @@ class WorkflowExecutor:
         # Convert to numpy arrays for Optimizer (as shown in notebooks)
         data_dict = {
             "train_x": x_train_df.values if hasattr(x_train_df, "values") else x_train_df,
-            "train_y": y_train_df.values if hasattr(y_train_df, "values") else y_train_df,
+            "train_y": y_train_df.values.ravel()
+            if hasattr(y_train_df, "values")
+            else y_train_df.ravel(),
             "test_x": x_test_df.values if hasattr(x_test_df, "values") else x_test_df,
-            "test_y": y_test_df.values if hasattr(y_test_df, "values") else y_test_df,
+            "test_y": y_test_df.values.ravel()
+            if hasattr(y_test_df, "values")
+            else y_test_df.ravel(),
         }
 
         # Create optimizer
