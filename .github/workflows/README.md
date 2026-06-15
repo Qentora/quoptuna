@@ -79,8 +79,25 @@ Publishes releases to PyPI.
 ### dependencies.yml
 Manages dependency updates.
 
-### autofix.yml
-Automatically fixes code formatting issues.
+### autofix.yml (`autofix.ci`)
+Runs ruff safe lint fixes (excluding `F401` to preserve side-effect imports)
+and `ruff format` on the Python files changed in a pull request, then hands the
+working-tree diff to the [autofix.ci](https://github.com/apps/autofix-ci) App,
+which pushes the fix commit back to the PR branch. Covers both the root package
+(`src/quoptuna`, `tests`) and the `backend/` directory; ruff resolves the
+closest `pyproject.toml` per file.
+
+### lint.yml
+Strict checks on the Python files changed in a pull request: `ruff check
+--no-fix` (lint violations fail the build) plus `mypy`, split by project so each
+file is checked with its own config (`src/quoptuna` from `src/`, `tests` from
+the repo root, `backend/app` from `backend/`).
+
+### update-uv-lock.yml
+Regenerates `uv.lock` and `backend/uv.lock` whenever `pyproject.toml` or
+`backend/pyproject.toml` changes (push to `main`, pull requests, or manual
+dispatch) and commits the refreshed lockfiles back via the `github-actions[bot]`
+identity.
 
 ### codeflash-optimize.yaml
 Code optimization checks.

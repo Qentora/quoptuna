@@ -1,31 +1,86 @@
+# autofix.ci enforces that any workflow invoking `autofix-ci/action` is
+# named exactly `autofix.ci`. Applies ruff safe lint fixes (excluding F401
+# to preserve side-effect imports) and formatting on changed files; strict
+# lint (--no-fix) and mypy live in `.github/workflows/lint.yml`.
+#
+# Setup: install https://github.com/apps/autofix-ci on the repo (free for
+# public repos) and enable auto-apply in the autofix.ci dashboard so the
+# App pushes the format commit directly.
 name: autofix.ci
 
 on:
-  workflow_call:
   pull_request:
-  push:
-    branches: [ "main" ]
+    paths:
+      - 'src/**/*.py'
+      - 'tests/**/*.py'
+      - 'backend/**/*.py'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'backend/pyproject.toml'
+      - 'backend/uv.lock'
+      - '.github/workflows/autofix.yml'
 
+concurrency:
+  group: autofix-ci-${{ github.ref }}
+  cancel-in-progress: true
+
+# The autofix.ci GitHub App holds write capability separately; the
+# workflow token only needs read access to checkout and run ruff.
+permissions:
+  contents: read
 
 jobs:
   autofix:
+    name: ruff autofix
     runs-on: ubuntu-latest
+
     steps:
-      - uses: actions/checkout@v4
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      - uses: ./.github/actions/python-uv-env
+      - name: Install uv
+        uses: astral-sh/setup-uv@v4
+        with:
+          enable-cache: true
 
-    #   # Fix lint errors using pre-commit
-      # - name: Run pre-commit auto-fix
-      #   run: uv run pre-commit run --all-files
+      - name: Set up Python
+        run: uv python install 3.12
 
-      - name: Run Ruff Check with auto-fix
-        run: uv run ruff check --fix-only .
+      - name: Install dependencies
+        run: uv sync
 
-      - name: Run Ruff Format
-        run: uv run ruff format .
+      - name: Compute changed Python files
+        id: changed
+        run: |
+          base="${{ github.event.pull_request.base.sha }}"
+          head="${{ github.event.pull_request.head.sha }}"
+          merge_base=$(git merge-base "$base" "$head")
+          mapfile -t files < <(git diff --name-only --diff-filter=ACMR "$merge_base" "$head" -- '*.py' ':!src/quoptuna/backend/base/pennylane_models/*')
+          if [ "${#files[@]}" -eq 0 ]; then
+            echo "No Python files changed."
+            echo "files=" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          printf '%s\n' "${files[@]}"
+          echo "files=${files[*]}" >> "$GITHUB_OUTPUT"
 
-      - uses: autofix-ci/action@ff86a557419858bb967097bfc916833f5647fa8c
+      - name: Ruff lint fix (in-place)
+        if: steps.changed.outputs.files != ''
+        continue-on-error: true
+        run: uv run ruff check --fix --extend-ignore F401 ${{ steps.changed.outputs.files }}
 
-      - name: Minimize uv cache
-        run: uv cache prune --ci
+      - name: Ruff format (in-place)
+        if: steps.changed.outputs.files != ''
+        run: uv run ruff format ${{ steps.changed.outputs.files }}
+
+      # Hands any working-tree changes from the previous steps to autofix.ci.
+      # In auto-apply mode the App pushes a commit back to the PR branch;
+      # the action exits non-zero on the run that produced the diff, then
+      # the App's commit triggers a fresh CI cycle that passes.
+      - name: Apply ruff autofix via autofix.ci
+        if: steps.changed.outputs.files != ''
+        uses: autofix-ci/action@ff86a557419858bb967097bfc916833f5647fa8c
+        with:
+          commit-message: "style: ruff autofix (auto)"
