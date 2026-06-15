@@ -41,7 +41,7 @@ install_frontend:
 run_backend:
 	@echo "Starting FastAPI backend on http://localhost:8000..."
 	@echo "API docs: http://localhost:8000/docs"
-	cd backend && $(UV) run uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+	cd backend && $(UV) run --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 
 run_frontend:
 	@echo "Starting Next.js frontend on http://localhost:3000..."
