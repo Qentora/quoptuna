@@ -47,6 +47,12 @@ dependencies = [
     "ucimlrepo>=0.0.7",
     "typer>=0.12.0",
     "rich>=13.0.0",
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.32.0",
+    "pydantic-settings>=2.0.0",
+    "python-multipart>=0.0.9",
+    "langchain-core>=0.3.0",
+    "langchain-anthropic>=0.2.0",
 ]
 readme = "README.md"
 classifiers = [
@@ -115,6 +121,8 @@ ignore = [
     "S101",     # "Use of `assert` detected"
     "ARG",      # "Unused function argument". Fixtures are often unused.
     "S105",     # "Possible hardcoded password".
+    "PLR2004",  # Magic values are fine in test assertions.
+    "PLC0415",  # Lazy imports inside fixtures keep heavy deps out of collection.
 ]
 "src/quoptuna/backend/base/pennylane_models/**" = ["ALL"]
 # CLI orchestrates dev servers: prints to the console, binds all interfaces,
@@ -130,6 +138,33 @@ ignore = [
     "FBT002",
     "FBT003",
     "BLE001",
+]
+# FastAPI/service application code relocated from the backend sub-project, which
+# used a deliberately relaxed ruleset. Correctness rules (F, E, W, N, I) stay
+# active here; the codes below are opinion/style rules typical of web app code.
+"src/quoptuna/server/**" = [
+    "FA",       # `from __future__ import annotations` not needed on py311+
+    "TRY",      # exception-handling style preferences
+    "EM",       # exception message string placement
+    "B904",     # `raise ... from` inside except
+    "B008",     # function call in argument default (FastAPI Depends/File)
+    "BLE001",   # blind `except Exception` at request/service boundaries
+    "ARG",      # unused args from framework-mandated signatures
+    "G004",     # f-strings in logging calls
+    "PD011",    # `.values` on pandas objects
+    "RUF015",   # next(iter(...)) over single-element slice
+    "PLC0415",  # lazy imports of heavy deps inside functions
+    "PLR",      # complexity / magic-value heuristics
+    "C901",     # function complexity
+    "PERF",     # micro-perf suggestions
+    "DTZ",      # naive datetime usage
+    "ASYNC",    # blocking calls in async handlers
+    "PTH",      # os.path vs pathlib preference
+    "FAST002",  # FastAPI non-annotated dependency
+    "FBT",      # boolean positional args
+    "INP001",   # implicit namespace package (no __init__ in some dirs)
+    "S104",     # bind to all interfaces (intended for the server)
+    "E501",     # line length (matched the backend's ruff config)
 ]
 
 [tool.ruff.lint.mccabe]
@@ -148,6 +183,9 @@ classmethod-decorators = [
 minversion = "6.0"
 testpaths = ["tests"]
 console_output_style = "progress"
+markers = [
+    "slow: long-running quantum model fits (deselect with '-m \"not slow\"')",
+]
 filterwarnings = ["ignore::DeprecationWarning", "ignore::ResourceWarning"]
 log_cli = true
 log_cli_format = "%(asctime)s [%(levelname)8s] %(message)s (%(filename)s:%(lineno)s)"
@@ -200,3 +238,11 @@ formatter-cmds = ["ruff check --exit-zero --fix $file", "ruff format $file"]
 [build-system]
 requires = ["setuptools", "wheel"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+# Bundle the statically-exported frontend (generated into src/quoptuna/web at
+# build time) into the wheel so `uvx quoptuna` can serve the UI without Node.
+[tool.setuptools.package-data]
+quoptuna = ["web/**/*"]

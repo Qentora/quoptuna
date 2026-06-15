@@ -1,12 +1,11 @@
 """Tests for the ``quoptuna`` Typer CLI.
 
-The runner functions are monkeypatched so no real subprocesses (uv, npm,
-streamlit) are spawned; we assert dispatch, option parsing, and the pure
-helpers (port resolution, frontend env, banner rendering).
+The runner functions are monkeypatched so no real server (uvicorn, streamlit)
+is launched; we assert dispatch, option parsing, and the pure helpers (port
+resolution, banner rendering, browser launching).
 """
 
 import socket
-import subprocess
 import types
 
 import pytest
@@ -17,31 +16,6 @@ from quoptuna import cli
 runner = CliRunner()
 
 
-class FakeProc:
-    """Minimal stand-in for ``subprocess.Popen`` used by the runner tests."""
-
-    def __init__(self, polls=None, *, wait_raises=False):
-        self._polls = list(polls) if polls is not None else None
-        self._wait_raises = wait_raises
-        self.terminated = False
-        self.killed = False
-
-    def poll(self):
-        if self._polls is None:
-            return 0
-        return self._polls.pop(0) if self._polls else 0
-
-    def terminate(self):
-        self.terminated = True
-
-    def wait(self, timeout=None):
-        if self._wait_raises:
-            raise subprocess.TimeoutExpired(cmd="x", timeout=timeout)
-
-    def kill(self):
-        self.killed = True
-
-
 @pytest.fixture
 def spy_runners(monkeypatch):
     calls = []
@@ -49,16 +23,14 @@ def spy_runners(monkeypatch):
     def _fake_fullstack(
         *,
         host="localhost",
-        backend_port=8000,
-        frontend_port=3000,
+        port=8000,
         open_browser=True,
     ):
         calls.append(
             {
                 "kind": "fullstack",
                 "host": host,
-                "backend_port": backend_port,
-                "frontend_port": frontend_port,
+                "port": port,
                 "open_browser": open_browser,
             }
         )
@@ -80,8 +52,7 @@ def test_run_defaults_to_fullstack(spy_runners):
         {
             "kind": "fullstack",
             "host": "localhost",
-            "backend_port": 8000,
-            "frontend_port": 3000,
+            "port": 8000,
             "open_browser": True,
         }
     ]
@@ -94,8 +65,7 @@ def test_no_args_runs_fullstack(spy_runners):
         {
             "kind": "fullstack",
             "host": "localhost",
-            "backend_port": 8000,
-            "frontend_port": 3000,
+            "port": 8000,
             "open_browser": True,
         }
     ]
@@ -107,24 +77,15 @@ def test_run_streamlit_flag(spy_runners):
     assert spy_runners == [{"kind": "streamlit"}]
 
 
-def test_run_no_browser_and_custom_ports(spy_runners):
-    custom_backend_port = 9001
-    custom_frontend_port = 4002
+def test_run_no_browser_and_custom_port(spy_runners):
+    custom_port = 9001
     result = runner.invoke(
         cli.app,
-        [
-            "run",
-            "--no-browser",
-            "--backend-port",
-            str(custom_backend_port),
-            "--frontend-port",
-            str(custom_frontend_port),
-        ],
+        ["run", "--no-browser", "--port", str(custom_port)],
     )
     assert result.exit_code == 0
     assert spy_runners[0]["open_browser"] is False
-    assert spy_runners[0]["backend_port"] == custom_backend_port
-    assert spy_runners[0]["frontend_port"] == custom_frontend_port
+    assert spy_runners[0]["port"] == custom_port
 
 
 def test_run_propagates_exit_code(monkeypatch):
@@ -135,7 +96,7 @@ def test_run_propagates_exit_code(monkeypatch):
 
 
 def test_print_banner_renders(capsys):
-    cli.print_banner("localhost", 3000, 8000)
+    cli.print_banner("localhost", 8000)
     out = capsys.readouterr().out
     assert "QuOptuna" in out
 
@@ -179,21 +140,10 @@ def test_resolve_port_skips_occupied_port():
         assert resolved > occupied_port
 
 
-def test_frontend_env_injects_backend_url():
-    backend_port = 8123
-    env = cli._frontend_env("localhost", backend_port)
-    assert env["NEXT_PUBLIC_API_URL"] == f"http://localhost:{backend_port}"
-
-
 def test_streamlit_app_path_points_at_app_module():
     path = cli._streamlit_app_path()
     assert path.name == "app.py"
     assert path.parent.name == "frontend"
-
-
-def test_log_dir_exists():
-    path = cli._log_dir()
-    assert path.is_dir()
 
 
 # ---------------------------------------------------------------------------
@@ -248,45 +198,38 @@ def test_open_browser_handles_error(monkeypatch, capsys):
     assert "http://example.test" in capsys.readouterr().out
 
 
-def test_require_dir_passes_for_existing(tmp_path):
-    cli._require_dir(tmp_path, "backend")
+def test_open_browser_when_ready_opens_when_up(monkeypatch):
+    opened = []
+
+    class _ImmediateThread:
+        def __init__(self, *, target, daemon=False):
+            self._target = target
+
+        def start(self):
+            self._target()
+
+    monkeypatch.setattr(cli.threading, "Thread", _ImmediateThread)
+    monkeypatch.setattr(cli, "_wait_until_ready", lambda *_a, **_k: True)
+    monkeypatch.setattr(cli, "_open_browser", opened.append)
+    cli._open_browser_when_ready("http://example.test", 8000, "localhost")
+    assert opened == ["http://example.test"]
 
 
-def test_require_dir_raises_for_missing(tmp_path):
-    with pytest.raises(SystemExit):
-        cli._require_dir(tmp_path / "nope", "backend")
+def test_open_browser_when_ready_skips_when_not_up(monkeypatch):
+    opened = []
 
+    class _ImmediateThread:
+        def __init__(self, *, target, daemon=False):
+            self._target = target
 
-def test_shutdown_kills_on_timeout():
-    proc = FakeProc(polls=[None], wait_raises=True)
-    cli._shutdown([proc])
-    assert proc.terminated is True
-    assert proc.killed is True
+        def start(self):
+            self._target()
 
-
-def test_shutdown_skips_finished_process():
-    proc = FakeProc(polls=[0])
-    cli._shutdown([proc])
-    assert proc.terminated is False
-
-
-def test_print_log_locations(capsys, tmp_path):
-    cli.print_log_locations(tmp_path / "backend.log", tmp_path / "frontend.log")
-    out = capsys.readouterr().out
-    assert "backend" in out
-    assert "frontend" in out
-
-
-def test_print_log_tail_prints_content(tmp_path, capsys):
-    log = tmp_path / "log.txt"
-    log.write_text("line1\nline2\n")
-    cli._print_log_tail(log)
-    assert "line2" in capsys.readouterr().out
-
-
-def test_print_log_tail_missing_file(tmp_path, capsys):
-    cli._print_log_tail(tmp_path / "missing.log")
-    assert capsys.readouterr().out == ""
+    monkeypatch.setattr(cli.threading, "Thread", _ImmediateThread)
+    monkeypatch.setattr(cli, "_wait_until_ready", lambda *_a, **_k: False)
+    monkeypatch.setattr(cli, "_open_browser", opened.append)
+    cli._open_browser_when_ready("http://example.test", 8000, "localhost")
+    assert opened == []
 
 
 def test_print_banner_unicode_fallback(monkeypatch, capsys):
@@ -301,7 +244,7 @@ def test_print_banner_unicode_fallback(monkeypatch, capsys):
         return real_fit(*args, **kwargs)
 
     monkeypatch.setattr(cli.Panel, "fit", flaky_fit)
-    cli.print_banner("localhost", 3000, 8000)
+    cli.print_banner("localhost", 8000)
     assert "QuOptuna" in capsys.readouterr().out
 
 
@@ -337,63 +280,52 @@ def test_run_streamlit_keyboard_interrupt(monkeypatch):
     assert cli.run_streamlit() == 0
 
 
-def _setup_fullstack(monkeypatch, tmp_path, *, build_returncode, procs):
-    (tmp_path / "backend").mkdir(exist_ok=True)
-    (tmp_path / "frontend").mkdir(exist_ok=True)
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(cli, "_log_dir", lambda: tmp_path)
+def _setup_fullstack(monkeypatch):
     monkeypatch.setattr(cli, "_resolve_port", lambda port, host=cli.DEFAULT_ACCESS_HOST: port)
     monkeypatch.setattr(cli, "print_logo", lambda: None)
     monkeypatch.setattr(cli, "print_banner", lambda *_a, **_k: None)
-    monkeypatch.setattr(cli, "_open_browser", lambda _url: None)
+
+
+def test_run_fullstack_runs_uvicorn(monkeypatch):
+    expected_port = 8000
+    _setup_fullstack(monkeypatch)
+    calls = {}
+    monkeypatch.setattr(cli.uvicorn, "run", lambda app, **kwargs: calls.update(app=app, **kwargs))
+    monkeypatch.setattr(cli, "_open_browser_when_ready", lambda *_a, **_k: None)
+    assert cli.run_fullstack(port=expected_port, open_browser=False) == 0
+    assert calls["app"] == "quoptuna.server.main:app"
+    assert calls["port"] == expected_port
+    assert calls["host"] == cli.BACKEND_BIND_HOST
+
+
+def test_run_fullstack_opens_browser(monkeypatch):
+    _setup_fullstack(monkeypatch)
+    opened = {"n": 0}
+    monkeypatch.setattr(cli.uvicorn, "run", lambda *_a, **_k: None)
     monkeypatch.setattr(
-        cli.subprocess,
-        "run",
-        lambda *_a, **_k: types.SimpleNamespace(returncode=build_returncode),
+        cli, "_open_browser_when_ready", lambda *_a, **_k: opened.__setitem__("n", 1)
     )
-    monkeypatch.setattr(cli.subprocess, "Popen", lambda *_a, **_k: procs.pop(0))
-
-
-def test_run_fullstack_success(monkeypatch, tmp_path):
-    procs = [FakeProc(), FakeProc()]
-    _setup_fullstack(monkeypatch, tmp_path, build_returncode=0, procs=procs)
-    monkeypatch.setattr(cli, "_wait_until_ready", lambda *_a, **_k: True)
     assert cli.run_fullstack(open_browser=True) == 0
+    assert opened["n"] == 1
 
 
-def test_run_fullstack_not_ready_skips_browser(monkeypatch, tmp_path):
-    procs = [FakeProc(), FakeProc()]
-    _setup_fullstack(monkeypatch, tmp_path, build_returncode=0, procs=procs)
-    monkeypatch.setattr(cli, "_wait_until_ready", lambda *_a, **_k: False)
+def test_run_fullstack_no_browser_skips_launch(monkeypatch):
+    _setup_fullstack(monkeypatch)
+    opened = {"n": 0}
+    monkeypatch.setattr(cli.uvicorn, "run", lambda *_a, **_k: None)
+    monkeypatch.setattr(
+        cli, "_open_browser_when_ready", lambda *_a, **_k: opened.__setitem__("n", 1)
+    )
     assert cli.run_fullstack(open_browser=False) == 0
+    assert opened["n"] == 0
 
 
-def test_run_fullstack_waits_for_process_exit(monkeypatch, tmp_path):
-    procs = [FakeProc(polls=[None, 0]), FakeProc(polls=[None])]
-    _setup_fullstack(monkeypatch, tmp_path, build_returncode=0, procs=procs)
-    monkeypatch.setattr(cli, "_wait_until_ready", lambda *_a, **_k: True)
-    monkeypatch.setattr(cli.time, "sleep", lambda _s: None)
-    assert cli.run_fullstack(open_browser=False) == 0
-
-
-def test_run_fullstack_build_failure(monkeypatch, tmp_path):
-    _setup_fullstack(monkeypatch, tmp_path, build_returncode=1, procs=[])
-    assert cli.run_fullstack() == 1
-
-
-def test_run_fullstack_keyboard_interrupt(monkeypatch, tmp_path):
-    procs = [FakeProc(), FakeProc()]
-    _setup_fullstack(monkeypatch, tmp_path, build_returncode=0, procs=procs)
+def test_run_fullstack_keyboard_interrupt(monkeypatch):
+    _setup_fullstack(monkeypatch)
+    monkeypatch.setattr(cli, "_open_browser_when_ready", lambda *_a, **_k: None)
 
     def _raise(*_a, **_k):
         raise KeyboardInterrupt
 
-    monkeypatch.setattr(cli, "_wait_until_ready", _raise)
+    monkeypatch.setattr(cli.uvicorn, "run", _raise)
     assert cli.run_fullstack() == 0
-
-
-def test_run_fullstack_missing_dir_exits(monkeypatch, tmp_path):
-    monkeypatch.chdir(tmp_path)
-    monkeypatch.setattr(cli, "print_logo", lambda: None)
-    with pytest.raises(SystemExit):
-        cli.run_fullstack()

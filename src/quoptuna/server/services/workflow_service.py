@@ -10,16 +10,15 @@ from pathlib import Path
 from typing import Any, Dict, List
 
 import pandas as pd
-from quoptuna import XAI, DataPreparation, Optimizer, XAIConfig
 from ucimlrepo import fetch_ucirepo
+
+from quoptuna import XAI, DataPreparation, Optimizer, XAIConfig
 
 logger = logging.getLogger(__name__)
 
 
 class WorkflowExecutionError(Exception):
     """Raised when workflow execution fails"""
-
-    pass
 
 
 def build_xai(
@@ -34,6 +33,7 @@ def build_xai(
     ``trial_number`` is ``None`` the study's best trial is used.
     """
     from optuna import load_study
+
     from quoptuna import XAI, XAIConfig
     from quoptuna.backend.models import create_model
 
@@ -92,7 +92,7 @@ class WorkflowExecutor:
     def topological_sort(self) -> List[str]:
         """Sort nodes in execution order using topological sort"""
         # Build dependency graph
-        in_degree = {node_id: 0 for node_id in self.nodes}
+        in_degree = dict.fromkeys(self.nodes, 0)
         for edge in self.edges:
             in_degree[edge["target"]] += 1
 
@@ -131,36 +131,35 @@ class WorkflowExecutor:
         # Execute based on node type
         if node_type == "data-upload":
             return self._execute_data_upload(config, inputs)
-        elif node_type == "data-uci":
+        if node_type == "data-uci":
             return self._execute_data_uci(config, inputs)
-        elif node_type == "data-preview":
+        if node_type == "data-preview":
             return self._execute_data_preview(config, inputs)
-        elif node_type == "feature-selection":
+        if node_type == "feature-selection":
             return self._execute_feature_selection(config, inputs)
-        elif node_type == "train-test-split":
+        if node_type == "train-test-split":
             return self._execute_train_test_split(config, inputs)
-        elif node_type == "scaler":
+        if node_type == "scaler":
             return self._execute_scaler(config, inputs)
-        elif node_type == "label-encoding":
+        if node_type == "label-encoding":
             return self._execute_label_encoding(config, inputs)
-        elif node_type in ["quantum-model", "classical-model"]:
+        if node_type in ["quantum-model", "classical-model"]:
             return self._execute_model_config(config, inputs, node_type)
-        elif node_type == "optuna-config":
+        if node_type == "optuna-config":
             return self._execute_optuna_config(config, inputs)
-        elif node_type == "optimization":
+        if node_type == "optimization":
             return self._execute_optimization(config, inputs)
-        elif node_type == "shap-analysis":
+        if node_type == "shap-analysis":
             return self._execute_shap_analysis(config, inputs)
-        elif node_type == "confusion-matrix":
+        if node_type == "confusion-matrix":
             return self._execute_confusion_matrix(config, inputs)
-        elif node_type == "feature-importance":
+        if node_type == "feature-importance":
             return self._execute_feature_importance(config, inputs)
-        elif node_type == "export-model":
+        if node_type == "export-model":
             return self._execute_export_model(config, inputs)
-        elif node_type == "generate-report":
+        if node_type == "generate-report":
             return self._execute_generate_report(config, inputs)
-        else:
-            raise WorkflowExecutionError(f"Unknown node type: {node_type}")
+        raise WorkflowExecutionError(f"Unknown node type: {node_type}")
 
     def _execute_data_upload(self, config: Dict, inputs: Dict) -> Dict:
         """Handle CSV file upload"""
@@ -461,6 +460,7 @@ class WorkflowExecutor:
         # Load the best model from Optuna study
         import numpy as np
         from optuna import load_study
+
         from quoptuna.backend.models import create_model
 
         db_name = opt_result.get("db_name")
@@ -644,5 +644,5 @@ class WorkflowExecutor:
             return final_result
 
         except Exception as e:
-            logger.error(f"Workflow execution failed: {str(e)}")
-            raise WorkflowExecutionError(f"Execution failed: {str(e)}") from e
+            logger.error(f"Workflow execution failed: {e!s}")
+            raise WorkflowExecutionError(f"Execution failed: {e!s}") from e

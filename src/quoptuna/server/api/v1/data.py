@@ -11,8 +11,8 @@ import pandas as pd
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
-from app.core.config import settings
-from app.services import dataset_registry
+from quoptuna.server.core.config import settings
+from quoptuna.server.services import dataset_registry
 
 router = APIRouter()
 
@@ -114,7 +114,7 @@ async def upload_dataset(file: UploadFile = File(...)):
     except Exception as e:
         if file_path.exists():
             file_path.unlink()
-        raise HTTPException(status_code=400, detail=f"Failed to process CSV file: {str(e)}")
+        raise HTTPException(status_code=400, detail=f"Failed to process CSV file: {e!s}")
 
 
 @router.get("/uci")
@@ -164,7 +164,7 @@ async def load_uci_dataset(dataset_id: int):
         }
     except Exception as e:
         raise HTTPException(
-            status_code=400, detail=f"Failed to fetch UCI dataset {dataset_id}: {str(e)}"
+            status_code=400, detail=f"Failed to fetch UCI dataset {dataset_id}: {e!s}"
         )
 
 

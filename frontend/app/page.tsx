@@ -1,23 +1,19 @@
-import { type SystemInfo, type UCIDataset, getSystemInfo, listUCIDatasets } from '@/lib/api';
+'use client';
+
+import { type UCIDataset, getSystemInfo, listUCIDatasets } from '@/lib/api';
+import { useQuery } from '@tanstack/react-query';
 import { BarChart3, Brain, Database, Zap } from 'lucide-react';
 import Link from 'next/link';
 
-// Re-fetch lightweight dashboard data on each request (SSR).
-export const dynamic = 'force-dynamic';
-
-async function loadDashboardData(): Promise<{
-  info: SystemInfo | null;
-  datasets: UCIDataset[];
-}> {
-  const [info, datasets] = await Promise.all([
-    getSystemInfo().catch(() => null),
-    listUCIDatasets().catch(() => [] as UCIDataset[]),
-  ]);
-  return { info, datasets };
-}
-
-export default async function HomePage() {
-  const { info, datasets } = await loadDashboardData();
+export default function HomePage() {
+  const { data: info } = useQuery({
+    queryKey: ['system-info'],
+    queryFn: () => getSystemInfo().catch(() => null),
+  });
+  const { data: datasets = [] } = useQuery({
+    queryKey: ['uci-datasets'],
+    queryFn: () => listUCIDatasets().catch(() => [] as UCIDataset[]),
+  });
   const totalModels = info?.total_models ?? 26;
 
   return (

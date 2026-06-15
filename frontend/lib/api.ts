@@ -2,7 +2,10 @@
  * API client for communicating with the QuOptuna backend (FastAPI).
  */
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+// Default to same-origin so the statically-exported UI (served by FastAPI from
+// the wheel) calls the co-served API. In dev, set NEXT_PUBLIC_API_URL in
+// frontend/.env.local (e.g. http://localhost:8000) to point at a separate backend.
+const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
   const response = await fetch(`${API_BASE_URL}${path}`, init);
