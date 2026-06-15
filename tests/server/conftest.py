@@ -119,7 +119,7 @@ def fast_optimizer_training(monkeypatch):
     patch it there. This keeps the real create_model -> fit -> score path intact
     (still exercising all three fixes) while bounding wall-clock time.
     """
-    import quoptuna.backend.tuners.optimizer as optimizer_module
+    import quoptuna.backend.tuners.optimizer as optimizer_module  # noqa: PLC0415
 
     real_create_model = optimizer_module.create_model
 

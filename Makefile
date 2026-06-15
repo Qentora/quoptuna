@@ -1,4 +1,4 @@
-.PHONY: all init format lint build run_backend run_frontend run_cli dev help tests coverage clean_python_cache clean_all
+.PHONY: all init format lint build build_package run_backend run_frontend run_cli dev help tests coverage clean_python_cache clean_all
 
 # Configurations
 UV := uv
@@ -26,6 +26,17 @@ lint-fix:
 build:
 	$(UV) build
 
+# Production build: compile the Next.js static export, copy it into the package
+# (src/quoptuna/web), then build the wheel/sdist so `uvx quoptuna` ships the UI.
+build_package:
+	@echo "Building frontend static export..."
+	cd frontend && npm ci && npm run build
+	@echo "Bundling frontend into the package (src/quoptuna/web)..."
+	rm -rf src/quoptuna/web
+	cp -R frontend/out src/quoptuna/web
+	@echo "Building Python package..."
+	$(UV) build
+
 install_backend:
 	@echo "Installing backend dependencies..."
 	cd backend && $(UV) pip install -e .
@@ -40,8 +51,8 @@ install_frontend:
 
 run_backend:
 	@echo "Starting FastAPI backend on http://localhost:8000..."
-	@echo "API docs: http://localhost:8000/docs"
-	cd backend && $(UV) run --no-sync uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
+	@echo "API docs: http://localhost:8000/api/docs"
+	$(UV) run --no-sync uvicorn quoptuna.server.main:app --host 0.0.0.0 --port 8000 --reload
 
 run_frontend:
 	@echo "Starting Next.js frontend on http://localhost:3000..."
@@ -90,7 +101,8 @@ help:
 	@echo "  coverage          - Run tests with coverage"
 	@echo ""
 	@echo "Build & Clean:"
-	@echo "  build             - Build the project"
+	@echo "  build             - Build the Python package (wheel/sdist)"
+	@echo "  build_package     - Build frontend + bundle it + build the package (for uvx)"
 	@echo "  clean_python_cache - Clean Python cache"
 	@echo "  clean_all         - Clean all caches"
 	@echo ""
@@ -110,7 +122,7 @@ clean_python_cache:
 
 clean:
 	@echo "Stopping all services and cleaning up ports..."
-	@-pkill -f "uvicorn app.main:app" 2>/dev/null || true
+	@-pkill -f "uvicorn quoptuna.server.main:app" 2>/dev/null || true
 	@-pkill -f "next dev" 2>/dev/null || true
 	@-lsof -ti:8000 | xargs kill -9 2>/dev/null || true
 	@-lsof -ti:3000 | xargs kill -9 2>/dev/null || true

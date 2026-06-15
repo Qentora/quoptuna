@@ -109,7 +109,7 @@ def test_optimizer_ten_trials_on_banknote(
 
     study, _best = optimizer.optimize(n_trials=10)
 
-    assert len(study.trials) == 10
+    assert len(study.trials) == 10  # noqa: PLR2004
     assert all(t.state == TrialState.COMPLETE for t in study.trials)
 
     assert study.best_value is not None

@@ -99,25 +99,37 @@ print(f"Best parameters: {study.best_params}")
 
 ### 🖥️ Launch the Application
 
-QuOptuna ships a single command that boots the full stack (FastAPI backend + Next.js frontend) in production mode, greeting you with a gradient ASCII banner:
+QuOptuna bundles a pre-built web UI inside the Python package, so a single command boots the whole app — no Node.js, no repository checkout, just Python:
 
 ```bash
+# Run straight from PyPI without installing anything permanently
+uvx quoptuna
+
+# ...or, in a project/venv that already has quoptuna installed
 uv run quoptuna run
 ```
 
-This builds the frontend, starts both services on the first free ports (defaulting to `:8000` for the API and `:3000` for the UI), waits until the UI is ready, prints the access links, and opens your browser automatically.
+This starts one FastAPI/uvicorn process that serves both the JSON API and the bundled UI on a single port (defaulting to `:8000`, auto-incrementing if busy), greets you with a gradient ASCII banner, and opens your browser automatically.
+
+| URL | What |
+| --- | --- |
+| `http://localhost:8000` | Web UI |
+| `http://localhost:8000/api/v1/...` | JSON API |
+| `http://localhost:8000/api/docs` | Interactive API docs |
 
 Common options:
 
 ```bash
-# Pick explicit ports and skip auto-opening the browser
-uv run quoptuna run --backend-port 8001 --frontend-port 3001 --no-browser
+# Pick an explicit port and skip auto-opening the browser
+uv run quoptuna run --port 8001 --no-browser
 
 # Launch the legacy Streamlit dashboard instead of the full stack
 uv run quoptuna run --streamlit
 ```
 
-Running `uv run quoptuna` with no subcommand is equivalent to `uv run quoptuna run`. Build and server logs are streamed to files under `${TMPDIR}/quoptuna/`, whose paths are printed beneath the banner.
+Running `uv run quoptuna` (or `uvx quoptuna`) with no subcommand is equivalent to `uv run quoptuna run`.
+
+> **Dev vs packaged.** The command above is the *packaged* mode (one process, one port, served from the wheel). For frontend development with hot reload, use the *dev* mode — two processes — via `make run_cli` (Next.js dev server on `:3000` + FastAPI on `:8000`). See the docs for details.
 
 ## 📖 Documentation
 
@@ -140,7 +152,7 @@ We welcome contributions from the community! Here's how to set up your developme
 
 - Python 3.11 or 3.12
 - UV package manager (recommended) or pip
-- Node.js 18+ (for the Next.js frontend)
+- Node.js 18+ — only for frontend development; the published package ships a pre-built UI, so running QuOptuna does not require Node
 - Git
 
 ### Setup Development Environment

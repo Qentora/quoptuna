@@ -9,29 +9,31 @@ A modern, drag-and-drop interface for building quantum ML workflows with real-ti
 ## 📋 Prerequisites
 
 Choose one:
-- **CLI** (easiest, no Docker) - Python 3.11/3.12, Node.js 18+, and `uv`
+- **CLI** (easiest, no Docker, no Node) - just Python 3.11/3.12 and `uv`
 - **Docker** - Just Docker and docker-compose
-- **Local Development** - Node.js 18+ and Python 3.11/3.12
+- **Local Development** - Node.js 18+ and Python 3.11/3.12 (for frontend hot reload)
 
 ## ⚡ Option 0: One Command (Recommended)
 
-From the repository root, launch the full stack (FastAPI backend + Next.js frontend) in production mode:
+The published package bundles a pre-built web UI, so a single command boots the whole app from Python — no Node.js, no checkout:
 
 ```bash
+# Straight from PyPI, no permanent install
+uvx quoptuna
+
+# ...or, in an environment that already has quoptuna installed
 uv run quoptuna run
 ```
 
-A gradient ASCII banner appears while QuOptuna builds the frontend and starts both services on the first free ports (defaults: `:8000` API, `:3000` UI). It then prints the access links and opens your browser. Running `uv run quoptuna` with no subcommand does the same thing.
+A gradient ASCII banner appears while a single FastAPI/uvicorn process starts on the first free port (default `:8000`), then your browser opens automatically. The UI, JSON API, and `/api/docs` are all served from that one origin. Running `uv run quoptuna` (or `uvx quoptuna`) with no subcommand does the same thing.
 
 ```bash
-# Custom ports / no auto-opened browser
-uv run quoptuna run --backend-port 8001 --frontend-port 3001 --no-browser
+# Custom port / no auto-opened browser
+uv run quoptuna run --port 8001 --no-browser
 
 # Legacy Streamlit dashboard instead of the full stack
 uv run quoptuna run --streamlit
 ```
-
-Build and server logs are written under `${TMPDIR}/quoptuna/`; their paths are shown beneath the banner.
 
 ## 🚀 Option 1: Docker
 
