@@ -20,6 +20,7 @@ from pathlib import Path
 import typer
 from rich.console import Console
 from rich.panel import Panel
+from rich.text import Text
 
 BACKEND_BIND_HOST = "0.0.0.0"
 DEFAULT_ACCESS_HOST = "localhost"
@@ -30,6 +31,18 @@ _POLL_INTERVAL = 0.5
 _TERMINATE_GRACE = 5.0
 _READY_TIMEOUT = 120.0
 _BRAND_COLOR = "#9b59b6"
+
+# Gemini-CLI-style horizontal gradient (blue -> purple -> pink).
+_GRADIENT_STOPS = ("#4796E4", "#847ACE", "#C3677F")
+
+_LOGO = r"""
+ ██████╗ ██╗   ██╗ ██████╗ ██████╗ ████████╗██╗   ██╗███╗   ██╗ █████╗
+██╔═══██╗██║   ██║██╔═══██╗██╔══██╗╚══██╔══╝██║   ██║████╗  ██║██╔══██╗
+██║   ██║██║   ██║██║   ██║██████╔╝   ██║   ██║   ██║██╔██╗ ██║███████║
+██║▄▄ ██║██║   ██║██║   ██║██╔═══╝    ██║   ██║   ██║██║╚██╗██║██╔══██║
+╚██████╔╝╚██████╔╝╚██████╔╝██║        ██║   ╚██████╔╝██║ ╚████║██║  ██║
+ ╚══▀▀═╝  ╚═════╝  ╚═════╝ ╚═╝        ╚═╝    ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═╝
+"""
 
 GITHUB_URL = "https://github.com/Qentora/quoptuna"
 DOCS_URL = "https://Qentora.github.io/quoptuna"
@@ -115,6 +128,44 @@ def _open_browser(url: str) -> None:
         console.print(f"[dim]Could not open a browser automatically. Visit {url}[/dim]")
 
 
+def _lerp_hex(start: str, end: str, t: float) -> str:
+    """Linear interpolation between two ``#rrggbb`` colors at fraction ``t``."""
+    sr, sg, sb = (int(start[i : i + 2], 16) for i in (1, 3, 5))
+    er, eg, eb = (int(end[i : i + 2], 16) for i in (1, 3, 5))
+    r, g, b = (round(s + (e - s) * t) for s, e in ((sr, er), (sg, eg), (sb, eb)))
+    return f"#{r:02x}{g:02x}{b:02x}"
+
+
+def _gradient_color(t: float) -> str:
+    """Color at fraction ``t`` of the multi-stop ``_GRADIENT_STOPS`` ramp."""
+    stops = _GRADIENT_STOPS
+    if t <= 0:
+        return stops[0]
+    if t >= 1:
+        return stops[-1]
+    segment = t * (len(stops) - 1)
+    index = int(segment)
+    return _lerp_hex(stops[index], stops[index + 1], segment - index)
+
+
+def print_logo() -> None:
+    """Print the QuOptuna block typography with a Gemini-style gradient."""
+    try:
+        lines = _LOGO.strip("\n").splitlines()
+        width = max((len(line) for line in lines), default=1)
+        span = max(width - 1, 1)
+        for line in lines:
+            text = Text()
+            for col, char in enumerate(line):
+                if char == " ":
+                    text.append(" ")
+                else:
+                    text.append(char, style=_gradient_color(col / span))
+            console.print(text)
+    except Exception:
+        console.print(f"[bold {_BRAND_COLOR}]QuOptuna[/]")
+
+
 def print_banner(access_host: str, frontend_port: int, backend_port: int) -> None:
     """Print a Langflow-style welcome panel with access links."""
     version = _quoptuna_version()
@@ -193,6 +244,7 @@ def _shutdown(processes: list[subprocess.Popen]) -> None:
 
 def run_streamlit() -> int:
     """Run the legacy Streamlit interface (blocking, foreground)."""
+    print_logo()
     app_path = _streamlit_app_path()
     console.print(f"Starting QuOptuna Streamlit app: {app_path}")
     try:
@@ -210,6 +262,7 @@ def run_fullstack(
     open_browser: bool = True,
 ) -> int:
     """Build the frontend, then serve backend + frontend in production mode."""
+    print_logo()
     cwd = Path.cwd()
     backend_dir = cwd / "backend"
     frontend_dir = cwd / "frontend"

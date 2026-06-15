@@ -113,6 +113,27 @@ def test_print_banner_renders(capsys):
     assert "QuOptuna" in out
 
 
+def test_print_logo_renders(capsys):
+    cli.print_logo()
+    out = capsys.readouterr().out
+    assert out.strip()
+
+
+def test_print_logo_fallback(monkeypatch, capsys):
+    def _boom(*_args, **_kwargs):
+        raise RuntimeError
+
+    monkeypatch.setattr(cli, "_gradient_color", _boom)
+    cli.print_logo()
+    out = capsys.readouterr().out
+    assert "QuOptuna" in out
+
+
+def test_gradient_color_endpoints():
+    assert cli._gradient_color(0) == cli._GRADIENT_STOPS[0]
+    assert cli._gradient_color(1) == cli._GRADIENT_STOPS[-1]
+
+
 def test_resolve_port_returns_same_when_free():
     # Find a definitely-free port, then confirm _resolve_port keeps it.
     with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as probe:

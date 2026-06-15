@@ -129,6 +129,7 @@ ignore = [
     "FBT001",
     "FBT002",
     "FBT003",
+    "BLE001",
 ]
 
 [tool.ruff.lint.mccabe]
