@@ -6,7 +6,7 @@ persisted CSV file path and basic metadata. This lets the optimize/preview
 endpoints resolve a dataset by id regardless of its source.
 """
 
-from typing import Any, Dict, List, Optional, TypedDict
+from typing import Dict, List, Optional, TypedDict
 
 
 class DatasetRecord(TypedDict, total=False):
@@ -40,6 +40,6 @@ def get_file_path(dataset_id: str) -> Optional[str]:
     return record.get("file_path")
 
 
-def all_records() -> List[Dict[str, Any]]:
+def all_records() -> List[DatasetRecord]:
     """Return all registered dataset records."""
     return list(_registry.values())

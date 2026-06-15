@@ -79,7 +79,7 @@ class WorkflowExecutor:
 
         self.nodes = {node["id"]: node for node in workflow.get("nodes", [])}
         self.edges = workflow.get("edges", [])
-        self.results = {}  # Store results from each node
+        self.results: Dict[str, Any] = {}  # Store results from each node
 
     def get_node_dependencies(self, node_id: str) -> List[str]:
         """Get list of node IDs that this node depends on"""
@@ -425,6 +425,8 @@ class WorkflowExecutor:
         optimizer.optimize(n_trials=n_trials)
 
         # Get best trial
+        if optimizer.study is None:
+            raise RuntimeError("Optimization did not produce a study with a best trial")
         best_trial = optimizer.study.best_trial
 
         return {
