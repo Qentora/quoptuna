@@ -24,7 +24,9 @@ export function ReportStep({ onBack, workflowData, setWorkflowData }: StepProps)
   const [keys, setKeys] = useState<ApiKeys>({ openai: '', anthropic: '', google: '' });
 
   useEffect(() => {
-    setKeys(loadApiKeys());
+    loadApiKeys()
+      .then(setKeys)
+      .catch(() => undefined);
   }, []);
 
   const { optimization, report } = workflowData;

@@ -14,12 +14,18 @@ export default function SettingsPage() {
   const [keys, setKeys] = useState<ApiKeys>({ openai: '', anthropic: '', google: '' });
 
   useEffect(() => {
-    setKeys(loadApiKeys());
+    loadApiKeys()
+      .then(setKeys)
+      .catch(() => undefined);
   }, []);
 
-  const handleSave = () => {
-    saveApiKeys(keys);
-    toast.success('Settings saved');
+  const handleSave = async () => {
+    try {
+      await saveApiKeys(keys);
+      toast.success('Settings saved');
+    } catch {
+      toast.error('Could not save settings');
+    }
   };
 
   return (
@@ -54,7 +60,7 @@ export default function SettingsPage() {
 
         <button
           type="button"
-          onClick={handleSave}
+          onClick={() => void handleSave()}
           className="w-full py-3 bg-primary text-primary-foreground rounded-md hover:bg-primary/90 transition-colors"
         >
           Save Settings
