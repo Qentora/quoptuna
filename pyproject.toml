@@ -9,7 +9,7 @@ license = {text = "Apache-2.0"}
 requires-python = "<3.13,>=3.11"
 dependencies = [
     "pennylane==0.44.1",
-    "scikit-learn==1.5.2",
+    "scikit-learn==1.9.0",
     "matplotlib==3.9.2",
     "jax==0.7.1",
     "jaxlib==0.7.1",
