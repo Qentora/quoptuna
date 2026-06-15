@@ -61,7 +61,7 @@ jobs:
             --generate-notes
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-          
+
       - name: Deploy docs
         if: steps.check.outputs.exists == 'false'
         run: uv run mkdocs gh-deploy --force
