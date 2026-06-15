@@ -81,7 +81,8 @@ jobs:
           src_files=()
           test_files=()
           backend_files=()
-          for f in ${{ steps.changed.outputs.files }}; do
+          read -ra changed_files <<< "${{ steps.changed.outputs.files }}"
+          for f in "${changed_files[@]}"; do
             case "$f" in
               src/*) src_files+=("${f#src/}") ;;
               tests/*) test_files+=("$f") ;;
