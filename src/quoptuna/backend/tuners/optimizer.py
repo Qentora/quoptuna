@@ -1,5 +1,6 @@
 import logging
 import os
+import time
 from typing import Optional
 
 from optuna import Trial, create_study, load_study
@@ -10,6 +11,7 @@ from quoptuna.backend.models import create_model
 from quoptuna.backend.utils.data_utils.data import load_data, preprocess_data
 
 logging.getLogger().setLevel(logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 class Optimizer:
@@ -27,13 +29,15 @@ class Optimizer:
             dataset_name: The name of the dataset. If provided, the data will be loaded from a
                 CSV file located in the 'notebook' directory. Defaults to an empty string.
             data: A dictionary containing training and testing data. If not provided, an empty
-                dictionary will be used. Expected keys are 'train_x', 'test_x', 'train_y', and 'test_y'.
+                dictionary will be used. Expected keys are 'train_x', 'test_x', 'train_y', and
+                'test_y'.
             study_name: The name of the study for Optuna. Defaults to an empty string.
 
         Attributes:
             db_name: The name of the database.
             dataset_name: The name of the dataset.
-            data_path: The path to the dataset CSV file or an empty string if no dataset name is provided.
+            data_path: The path to the dataset CSV file or an empty string if no dataset name is
+                provided.
             data: The data dictionary containing training and testing data.
             train_x: The training features.
             test_x: The testing features.
@@ -141,9 +145,7 @@ class Optimizer:
 
             return f_score_  # noqa: TRY300
         except Exception:
-            import logging
-
-            logging.exception("An error occurred")  # Use logging instead of print
+            logger.exception("An error occurred")
             return 0
 
     def log_user_attributes(self, model_type, eval_scores, trial):
@@ -169,6 +171,43 @@ class Optimizer:
             study_name=self.study_name,
         )
 
+    def _create_or_load_study(self, retries: int = 5, delay: float = 0.3):
+        """Create the study, tolerating reuse and concurrent schema creation.
+
+        ``load_if_exists=True`` makes re-running an existing study name append
+        trials instead of raising ``DuplicatedStudyError``. The retry loop guards
+        against the SQLite race where a concurrent ``load_study`` (e.g. the live
+        trials-polling endpoint) initializes the same brand-new database and both
+        connections try to ``CREATE TABLE studies`` at once.
+        """
+        last_exc: Exception | None = None
+        for attempt in range(retries):
+            try:
+                return create_study(
+                    storage=self.storage_location,
+                    sampler=TPESampler(),
+                    directions=["maximize"],
+                    study_name=self.study_name,
+                    load_if_exists=True,
+                )
+            except Exception as exc:  # noqa: PERF203 - resilient retry on storage races
+                last_exc = exc
+                message = str(exc).lower()
+                if "already exists" in message or "locked" in message:
+                    logger.warning(
+                        "Study storage busy (attempt %s/%s): %s", attempt + 1, retries, exc
+                    )
+                    time.sleep(delay)
+                    continue
+                raise
+        # Final fallback: the study/tables exist, so just load it.
+        try:
+            return load_study(storage=self.storage_location, study_name=self.study_name)
+        except Exception:
+            if last_exc is not None:
+                raise last_exc from None
+            raise
+
     def optimize(self, n_trials=100):
         if (
             self.train_x is None
@@ -181,12 +220,7 @@ class Optimizer:
 
         # sqllite database
 
-        study = create_study(
-            storage=self.storage_location,
-            sampler=TPESampler(),
-            directions=["maximize"],
-            study_name=self.study_name,
-        )
+        study = self._create_or_load_study()
         self.study = study
         study.optimize(self.objective, n_trials=n_trials)
         return study, study.best_trials
