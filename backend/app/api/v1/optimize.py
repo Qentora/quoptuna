@@ -9,12 +9,18 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel
 
+from app.services import dataset_registry
 from app.services.workflow_service import WorkflowExecutor
 
 router = APIRouter()
 
 # In-memory storage for optimization jobs (replace with Redis/database in production)
 optimization_jobs: Dict[str, Dict[str, Any]] = {}
+
+
+class LabelMapping(BaseModel):
+    neg: Any
+    pos: Any
 
 
 class OptimizationRequest(BaseModel):
@@ -26,6 +32,7 @@ class OptimizationRequest(BaseModel):
     database_name: str
     num_trials: int
     model_name: str = "DataReuploading"
+    label_mapping: Optional[LabelMapping] = None
 
 
 class OptimizationStatus(BaseModel):
@@ -46,18 +53,41 @@ def run_optimization_background(job_id: str, request: OptimizationRequest):
     try:
         optimization_jobs[job_id]["status"] = "running"
 
+        # Resolve the dataset to a persisted CSV via the registry. Uploads and
+        # UCI loads both register a file_path, so we can always read by file.
+        record = dataset_registry.get(request.dataset_id)
+        if record and record.get("file_path"):
+            data_node = {
+                "id": "data",
+                "data": {
+                    "type": "data-upload",
+                    "config": {"file_path": record["file_path"]},
+                },
+            }
+        elif request.dataset_source == "uci":
+            # Fallback: fetch directly from UCI by numeric id.
+            data_node = {
+                "id": "data",
+                "data": {"type": "data-uci", "config": {"dataset_id": request.dataset_id}},
+            }
+        else:
+            raise ValueError(
+                f"Dataset '{request.dataset_id}' is not registered. Upload or load it first."
+            )
+
+        label_config: Dict[str, Any] = {}
+        if request.label_mapping is not None:
+            label_config["label_mapping"] = {
+                "neg": request.label_mapping.neg,
+                "pos": request.label_mapping.pos,
+            }
+
         # Build workflow
         workflow = {
             "id": job_id,
             "name": request.study_name,
             "nodes": [
-                {
-                    "id": "data",
-                    "data": {
-                        "type": "data-uci" if request.dataset_source == "uci" else "data-upload",
-                        "config": {"dataset_id": request.dataset_id},
-                    },
-                },
+                data_node,
                 {
                     "id": "features",
                     "data": {
@@ -69,7 +99,7 @@ def run_optimization_background(job_id: str, request: OptimizationRequest):
                     },
                 },
                 {"id": "split", "data": {"type": "train-test-split", "config": {}}},
-                {"id": "label_encode", "data": {"type": "label-encoding", "config": {}}},
+                {"id": "label_encode", "data": {"type": "label-encoding", "config": label_config}},
                 {
                     "id": "model",
                     "data": {"type": "quantum-model", "config": {"model_name": request.model_name}},

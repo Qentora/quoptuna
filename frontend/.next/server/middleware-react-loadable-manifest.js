@@ -1,0 +1,1 @@
+self.__REACT_LOADABLE_MANIFEST="{\"app/optimizer/page.tsx -> @/components/optimizer/Wizard\":{\"id\":\"app/optimizer/page.tsx -> @/components/optimizer/Wizard\",\"files\":[\"static/chunks/_app-pages-browser_components_optimizer_Wizard_tsx.js\"]}}"
