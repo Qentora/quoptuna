@@ -62,7 +62,7 @@ st.set_page_config(page_title="QuOptuna", page_icon=":atom_symbol:", layout="wid
   - Quantum Metric Learner
   - Dressed Quantum Circuit Classifier
   - And others...
-  
+
 - **Classical Models:**
   - Support Vector Classifier (SVC)
   - Multi-Layer Perceptron (MLP)
@@ -562,4 +562,3 @@ font = "sans serif"
 - **Optimization:** Trial count, database name, study name
 - **SHAP:** Subset size, probability vs class mode
 - **Reporting:** LLM provider, model name, dataset context
-

@@ -270,9 +270,9 @@ START: initialize_session_state() [app.py]
   │
   ├─ Set initial values for all keys
   └─ Create empty dict for session_state
-     
+
      ↓
-     
+
 PAGE 1: Dataset Selection
   │
   ├─ dataset_loaded = False → True
@@ -282,9 +282,9 @@ PAGE 1: Dataset Selection
   ├─ file_path = None → "data/Australian_Credit_Approval.csv"
   ├─ target_column = None → "target"
   └─ feature_columns = None → ["feat1", "feat2", ...]
-     
+
      ↓
-     
+
 PAGE 2: Optimization
   │
   ├─ data_dict = None → {"train_x": ndarray, ...}
@@ -294,9 +294,9 @@ PAGE 2: Optimization
   ├─ study = None → Optuna Study object
   ├─ best_trials = None → [Trial1, Trial2, ...]
   └─ optimization_complete = False → True
-     
+
      ↓
-     
+
 PAGE 3: SHAP Analysis
   │
   ├─ selected_trial = None → Trial object
@@ -729,4 +729,3 @@ STORAGE:
 8. **API Abstraction:** LangChain abstracts multiple LLM providers
 9. **Error Handling:** Try/except blocks with user-friendly error messages
 10. **Progressive Disclosure:** Information revealed step-by-step through pages
-
