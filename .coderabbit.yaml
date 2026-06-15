@@ -1,0 +1,11 @@
+# yaml-language-server: $schema=https://storage.googleapis.com/coderabbit_public_assets/schema.v2.json
+# CodeRabbit configuration.
+# Automatic reviews are disabled: CodeRabbit will NOT review pull requests on
+# open/update. It still responds on demand when explicitly mentioned in a PR
+# comment, e.g. `@coderabbitai review` or `@coderabbitai full review`.
+language: "en-US"
+
+reviews:
+  # Do not post reviews automatically; only act when mentioned.
+  auto_review:
+    enabled: false
