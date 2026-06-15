@@ -60,6 +60,20 @@ def test_run_defaults_to_fullstack(spy_runners):
     ]
 
 
+def test_no_args_runs_fullstack(spy_runners):
+    result = runner.invoke(cli.app, [])
+    assert result.exit_code == 0
+    assert spy_runners == [
+        {
+            "kind": "fullstack",
+            "host": "localhost",
+            "backend_port": 8000,
+            "frontend_port": 3000,
+            "open_browser": True,
+        }
+    ]
+
+
 def test_run_streamlit_flag(spy_runners):
     result = runner.invoke(cli.app, ["run", "--streamlit"])
     assert result.exit_code == 0
@@ -127,3 +141,8 @@ def test_streamlit_app_path_points_at_app_module():
     path = cli._streamlit_app_path()
     assert path.name == "app.py"
     assert path.parent.name == "frontend"
+
+
+def test_log_dir_exists():
+    path = cli._log_dir()
+    assert path.is_dir()

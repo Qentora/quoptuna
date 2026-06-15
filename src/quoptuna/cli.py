@@ -12,6 +12,7 @@ import importlib.util
 import os
 import socket
 import subprocess
+import tempfile
 import time
 import webbrowser
 from pathlib import Path
@@ -38,7 +39,6 @@ console = Console()
 app = typer.Typer(
     add_completion=True,
     help="QuOptuna command-line interface.",
-    no_args_is_help=True,
 )
 
 
@@ -52,6 +52,13 @@ def _quoptuna_version() -> str:
         return importlib.metadata.version("quoptuna")
     except importlib.metadata.PackageNotFoundError:
         return "unknown"
+
+
+def _log_dir() -> Path:
+    """Directory for backend/frontend log files (created if missing)."""
+    path = Path(tempfile.gettempdir()) / "quoptuna"
+    path.mkdir(parents=True, exist_ok=True)
+    return path
 
 
 def _streamlit_app_path() -> Path:
@@ -140,6 +147,22 @@ def print_banner(access_host: str, frontend_port: int, backend_port: int) -> Non
         console.print(Panel.fit(fallback, border_style=_BRAND_COLOR, padding=(1, 2)))
 
 
+def print_log_locations(backend_log: Path, frontend_log: Path) -> None:
+    console.print(
+        f"[dim]Logs:\n  backend  -> {backend_log}\n  frontend -> {frontend_log}[/dim]",
+    )
+
+
+def _print_log_tail(path: Path, lines: int = 20) -> None:
+    """Print the last few lines of a log file for quick debugging."""
+    try:
+        tail = path.read_text(encoding="utf-8", errors="replace").splitlines()[-lines:]
+    except OSError:
+        return
+    if tail:
+        console.print("[dim]" + "\n".join(tail) + "[/dim]")
+
+
 def _require_dir(path: Path, name: str) -> None:
     if not path.is_dir():
         console.print(
@@ -197,13 +220,29 @@ def run_fullstack(
     frontend_port = _resolve_port(frontend_port, host)
     frontend_env = _frontend_env(host, backend_port)
 
-    console.print(f"[1/4] Resolved ports (backend :{backend_port}, frontend :{frontend_port})")
+    log_dir = _log_dir()
+    build_log = log_dir / "frontend-build.log"
+    backend_log = log_dir / "backend.log"
+    frontend_log = log_dir / "frontend.log"
 
-    console.print("[2/4] Building Next.js frontend (production)...")
-    build = subprocess.run(["npm", "run", "build"], cwd=frontend_dir, env=frontend_env, check=False)
+    version = _quoptuna_version()
+    console.print(f"[bold {_BRAND_COLOR}]Setting up QuOptuna[/] [bold]v{version}[/bold]")
+    console.print(f"[green]done[/green] Ports: backend :{backend_port}, frontend :{frontend_port}")
+
+    with console.status("Setting up frontend (building)..."), build_log.open("w") as build_fh:
+        build = subprocess.run(
+            ["npm", "run", "build"],
+            cwd=frontend_dir,
+            env=frontend_env,
+            stdout=build_fh,
+            stderr=subprocess.STDOUT,
+            check=False,
+        )
     if build.returncode != 0:
-        console.print("[red]error:[/red] frontend build failed.")
+        console.print(f"[red]error:[/red] frontend build failed. See {build_log}")
+        _print_log_tail(build_log)
         return build.returncode
+    console.print("[green]done[/green] Frontend built")
 
     backend_cmd = [
         "uv",
@@ -219,14 +258,30 @@ def run_fullstack(
     frontend_cmd = ["npm", "run", "start", "--", "-p", str(frontend_port)]
 
     processes: list[subprocess.Popen] = []
+    log_handles = [backend_log.open("w"), frontend_log.open("w")]
     try:
-        console.print(f"[3/4] Starting backend (:{backend_port})...")
-        processes.append(subprocess.Popen(backend_cmd, cwd=backend_dir))
-        console.print(f"[4/4] Starting frontend (:{frontend_port})...")
-        processes.append(subprocess.Popen(frontend_cmd, cwd=frontend_dir, env=frontend_env))
+        console.print("[green]done[/green] Starting backend")
+        processes.append(
+            subprocess.Popen(
+                backend_cmd, cwd=backend_dir, stdout=log_handles[0], stderr=subprocess.STDOUT
+            )
+        )
+        console.print("[green]done[/green] Starting frontend")
+        processes.append(
+            subprocess.Popen(
+                frontend_cmd,
+                cwd=frontend_dir,
+                env=frontend_env,
+                stdout=log_handles[1],
+                stderr=subprocess.STDOUT,
+            )
+        )
 
-        if _wait_until_ready(frontend_port, host):
+        with console.status("Waiting for services to be ready..."):
+            ready = _wait_until_ready(frontend_port, host)
+        if ready:
             print_banner(host, frontend_port, backend_port)
+            print_log_locations(backend_log, frontend_log)
             if open_browser:
                 _open_browser(f"http://{host}:{frontend_port}")
 
@@ -240,6 +295,8 @@ def run_fullstack(
         return 0
     finally:
         _shutdown(processes)
+        for handle in log_handles:
+            handle.close()
 
 
 # ---------------------------------------------------------------------------
@@ -247,9 +304,11 @@ def run_fullstack(
 # ---------------------------------------------------------------------------
 
 
-@app.callback()
-def _root() -> None:
+@app.callback(invoke_without_command=True)
+def _root(ctx: typer.Context) -> None:
     """QuOptuna command-line interface."""
+    if ctx.invoked_subcommand is None:
+        raise typer.Exit(run_fullstack())
 
 
 @app.command()
