@@ -368,6 +368,14 @@ def test_run_fullstack_not_ready_skips_browser(monkeypatch, tmp_path):
     assert cli.run_fullstack(open_browser=False) == 0
 
 
+def test_run_fullstack_waits_for_process_exit(monkeypatch, tmp_path):
+    procs = [FakeProc(polls=[None, 0]), FakeProc(polls=[None])]
+    _setup_fullstack(monkeypatch, tmp_path, build_returncode=0, procs=procs)
+    monkeypatch.setattr(cli, "_wait_until_ready", lambda *_a, **_k: True)
+    monkeypatch.setattr(cli.time, "sleep", lambda _s: None)
+    assert cli.run_fullstack(open_browser=False) == 0
+
+
 def test_run_fullstack_build_failure(monkeypatch, tmp_path):
     _setup_fullstack(monkeypatch, tmp_path, build_returncode=1, procs=[])
     assert cli.run_fullstack() == 1
