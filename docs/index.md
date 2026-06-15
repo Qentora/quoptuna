@@ -302,4 +302,3 @@ Built with:
 ---
 
 **Ready to get started?** Check out the [Quick Start Guide](getting-started/quickstart.md) or [User Guide](guides/user-guide.md), then launch the app with `uv run quoptuna run`!
-
