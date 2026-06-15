@@ -1,6 +1,5 @@
 """Shared test fixtures for quoptuna tests."""
 
-
 import numpy as np
 import pandas as pd
 import pytest

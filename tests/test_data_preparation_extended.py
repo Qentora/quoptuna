@@ -232,7 +232,9 @@ def test_custom_scaler(sample_dataframe_dataset):
     x_cols = list(X.columns)
     custom_scaler = MinMaxScaler()
 
-    data_prep = DataPreparation(dataset=dataset, x_cols=x_cols, y_col="target", scaler=custom_scaler)
+    data_prep = DataPreparation(
+        dataset=dataset, x_cols=x_cols, y_col="target", scaler=custom_scaler
+    )
 
     # Verify custom scaler was used
     assert isinstance(data_prep.scaler, MinMaxScaler)
