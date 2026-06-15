@@ -8,7 +8,7 @@ dependencies = [
     "uvicorn[standard]>=0.32.0",
     "pydantic>=2.0.0",
     "pydantic-settings>=2.0.0",
-    "python-multipart>=0.0.9",
+    "python-multipart>=0.0.27",
     "optuna>=4.0.0",
     "pennylane==0.44.1",
     "jax==0.7.1",
