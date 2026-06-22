@@ -1,15 +1,21 @@
 'use client';
 
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Metric } from '@/components/ui/metric';
+import { StatusDot } from '@/components/ui/status-dot';
+import { Table, TableBody, TableContainer, TableHead, Td, Th } from '@/components/ui/table';
 import { pollOptimization, startOptimization } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import * as Progress from '@radix-ui/react-progress';
-import { BarChart3, Loader2, PlayCircle } from 'lucide-react';
-import { useState } from 'react';
-import { ErrorBanner, NavButtons } from '../NavButtons';
+import { Atom, Check, Cpu, PlayCircle, Trophy } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { ErrorBanner } from '../NavButtons';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
 import { isClassicalModel } from '../types';
 
-export function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: StepProps) {
+export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTrial, setCurrentTrial] = useState(0);
@@ -19,6 +25,10 @@ export function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: 
 
   const { dataset, features, configuration, optimization } = workflowData;
   const hasResults = optimization.status === 'completed';
+
+  useEffect(() => {
+    setFooter({ canContinue: hasResults, nextBusy: isRunning, backDisabled: isRunning });
+  }, [hasResults, isRunning, setFooter]);
 
   const run = async () => {
     if (!dataset) {
@@ -98,140 +108,177 @@ export function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: 
     }));
 
   return (
-    <div className="space-y-6">
-      <StepHeader
-        title="Run Optimization"
-        subtitle="Execute the study and pick a trial to analyze"
-      />
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="shrink-0 space-y-4">
+        <StepHeader
+          step={4}
+          title="Run Optimization"
+          subtitle="Execute the study and pick a trial to analyze"
+        />
 
-      <ErrorBanner message={error} />
+        <ErrorBanner message={error} />
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-        <BarChart3 className="w-5 h-5 text-blue-600 mt-0.5" />
-        <p className="text-sm text-blue-700">
-          Study: <strong>{configuration.studyName}</strong> | Trials:{' '}
-          <strong>{configuration.numTrials}</strong> | Features:{' '}
-          <strong>{features.selectedFeatures.length}</strong>
-        </p>
+        {!hasResults && !isRunning && (
+          <section className="rounded-lg border border-border bg-card p-6 text-center">
+            <Button type="button" size="lg" onClick={run}>
+              <PlayCircle className="h-5 w-5" />
+              Start Optimization
+            </Button>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Runs {configuration.numTrials} trials across quantum and classical models. This may
+              take several minutes.
+            </p>
+          </section>
+        )}
+
+        {isRunning && (
+          <section className="rounded-lg border border-border bg-card p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <StatusDot status="busy" />
+                <div>
+                  <p className="font-medium">Optimization in progress</p>
+                  <p className="text-sm text-muted-foreground">
+                    Trial {currentTrial} of {configuration.numTrials}
+                  </p>
+                </div>
+              </div>
+              <Metric value={`${Math.round(progress)}%`} tone="brand" className="text-2xl" />
+            </div>
+            <Progress.Root
+              className="h-2.5 w-full overflow-hidden rounded-full bg-muted"
+              value={progress}
+            >
+              <Progress.Indicator
+                className="h-full bg-brand transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </Progress.Root>
+            {bestValue !== null && (
+              <div className="mt-4 flex items-center justify-between rounded-md border border-accent-emerald bg-accent-emerald/40 p-3">
+                <span className="text-sm font-medium text-accent-emerald-foreground">
+                  Current best F1
+                </span>
+                <Metric value={bestValue.toFixed(4)} tone="emerald" className="text-lg" />
+              </div>
+            )}
+          </section>
+        )}
+
+        {(hasResults || liveTrials.length > 0) && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <BestTrialCard
+              label="Best Quantum"
+              trial={bestQuantum}
+              accent="quantum"
+              selectedTrial={optimization.selectedTrial}
+              onSelect={hasResults ? selectTrial : undefined}
+            />
+            <BestTrialCard
+              label="Best Classical"
+              trial={bestClassical}
+              accent="classical"
+              selectedTrial={optimization.selectedTrial}
+              onSelect={hasResults ? selectTrial : undefined}
+            />
+          </div>
+        )}
       </div>
 
-      {!hasResults && !isRunning && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-          <button
-            type="button"
-            onClick={run}
-            className="px-8 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold inline-flex items-center gap-2"
-          >
-            <PlayCircle className="w-5 h-5" />
-            Start Optimization
-          </button>
-          <p className="text-sm text-blue-700 mt-3">
-            Runs {configuration.numTrials} trials across quantum and classical models. This may take
-            several minutes.
-          </p>
-        </div>
-      )}
-
-      {isRunning && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
-              <div>
-                <p className="font-medium text-gray-900">Optimization in Progress</p>
-                <p className="text-sm text-gray-500">
-                  Trial {currentTrial} of {configuration.numTrials}
-                </p>
-              </div>
-            </div>
-            <span className="text-2xl font-bold text-blue-600">{Math.round(progress)}%</span>
-          </div>
-          <Progress.Root
-            className="w-full bg-gray-200 rounded-full h-3 overflow-hidden"
-            value={progress}
-          >
-            <Progress.Indicator
-              className="bg-blue-600 h-full transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </Progress.Root>
-          {bestValue !== null && (
-            <div className="mt-4 flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
-              <span className="text-sm font-medium text-green-900">Current Best F1:</span>
-              <span className="text-lg font-bold text-green-700">{bestValue.toFixed(4)}</span>
-            </div>
-          )}
-        </div>
-      )}
-
-      {(hasResults || liveTrials.length > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <BestTrialCard label="Best Quantum" trial={bestQuantum} accent="purple" />
-          <BestTrialCard label="Best Classical" trial={bestClassical} accent="orange" />
-        </div>
-      )}
-
       {allTrials.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg">
-          <div className="px-4 py-2 border-b border-gray-200 bg-gray-50">
-            <h4 className="text-sm font-semibold text-gray-700">Trials (select one to analyze)</h4>
+        <TableContainer className="flex min-h-0 flex-1 flex-col">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-muted px-4 py-3">
+            <h4 className="text-sm font-semibold text-foreground">All trials ({sorted.length})</h4>
+            {hasResults && (
+              <span className="text-xs text-muted-foreground">
+                {optimization.selectedTrial !== null ? (
+                  <>
+                    Analyzing{' '}
+                    <span className="font-medium text-brand">#{optimization.selectedTrial}</span> —
+                    click any row to change
+                  </>
+                ) : (
+                  'Click a row to choose a trial to analyze'
+                )}
+              </span>
+            )}
           </div>
-          <div className="max-h-72 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-100 sticky top-0">
+          <div className="min-h-0 flex-1 overflow-auto">
+            <Table stickyHeader>
+              <TableHead>
                 <tr>
-                  <th className="px-4 py-2 text-left font-medium text-gray-700">Trial</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-700">F1</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-700">Model</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-700">Type</th>
-                  <th className="px-4 py-2" />
+                  <Th className="w-10" />
+                  <Th className="w-12 text-right">Rank</Th>
+                  <Th className="text-right">F1 score</Th>
+                  <Th>Model</Th>
+                  <Th>Type</Th>
+                  <Th className="text-right">Trial</Th>
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
-                {sorted.map((trial) => {
+              </TableHead>
+              <TableBody>
+                {sorted.map((trial, index) => {
                   const selected = optimization.selectedTrial === trial.trial;
+                  const classical = isClassicalModel(trial.params?.model_type);
+                  const isBest = index === 0;
                   return (
-                    <tr key={trial.trial} className={selected ? 'bg-blue-50' : 'hover:bg-gray-50'}>
-                      <td className="px-4 py-2 text-gray-900">#{trial.trial}</td>
-                      <td className="px-4 py-2 font-medium text-gray-900">
-                        {trial.value.toFixed(4)}
-                      </td>
-                      <td className="px-4 py-2 text-gray-700 text-xs">
-                        {trial.params?.model_type ?? 'N/A'}
-                      </td>
-                      <td className="px-4 py-2 text-xs">
-                        {isClassicalModel(trial.params?.model_type) ? 'Classical' : 'Quantum'}
-                      </td>
-                      <td className="px-4 py-2 text-right">
-                        {hasResults && (
-                          <button
-                            type="button"
-                            onClick={() => selectTrial(trial.trial)}
-                            className={`px-3 py-1 rounded text-xs ${
-                              selected
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
-                          >
-                            {selected ? 'Selected' : 'Select'}
-                          </button>
+                    <tr
+                      key={trial.trial}
+                      onClick={hasResults ? () => selectTrial(trial.trial) : undefined}
+                      onKeyDown={
+                        hasResults
+                          ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                selectTrial(trial.trial);
+                              }
+                            }
+                          : undefined
+                      }
+                      tabIndex={hasResults ? 0 : undefined}
+                      aria-selected={selected}
+                      className={cn(
+                        'transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand',
+                        hasResults && 'cursor-pointer',
+                        selected ? 'bg-brand/10 ring-1 ring-inset ring-brand/40' : 'hover:bg-muted'
+                      )}
+                    >
+                      <Td className="text-center">
+                        {selected ? (
+                          <Check size={16} className="mx-auto text-brand" />
+                        ) : isBest ? (
+                          <Trophy size={14} className="mx-auto text-accent-amber-foreground" />
+                        ) : null}
+                      </Td>
+                      <Td className="text-right text-xs text-muted-foreground tabular-nums">
+                        {index + 1}
+                      </Td>
+                      <Td
+                        className={cn(
+                          'text-right font-semibold tabular-nums',
+                          selected && 'text-brand'
                         )}
-                      </td>
+                      >
+                        {trial.value.toFixed(4)}
+                      </Td>
+                      <Td className="text-xs text-muted-foreground">
+                        {trial.params?.model_type ?? 'N/A'}
+                      </Td>
+                      <Td className="text-xs">
+                        <Badge variant={classical ? 'classical' : 'quantum'}>
+                          {classical ? 'Classical' : 'Quantum'}
+                        </Badge>
+                      </Td>
+                      <Td className="text-right text-xs text-muted-foreground tabular-nums">
+                        #{trial.trial}
+                      </Td>
                     </tr>
                   );
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
-        </div>
+        </TableContainer>
       )}
-
-      <NavButtons
-        onBack={onBack}
-        onNext={onNext}
-        backDisabled={isRunning}
-        nextDisabled={!hasResults || isRunning}
-      />
     </div>
   );
 }
@@ -240,26 +287,77 @@ function BestTrialCard({
   label,
   trial,
   accent,
+  selectedTrial,
+  onSelect,
 }: {
   label: string;
-  trial: any;
-  accent: 'purple' | 'orange';
+  trial: { trial: number; value: number; params?: Record<string, unknown> } | undefined;
+  accent: 'quantum' | 'classical';
+  selectedTrial: number | null;
+  onSelect?: (trialNumber: number) => void;
 }) {
-  const color = accent === 'purple' ? 'text-purple-700' : 'text-orange-700';
-  const border = accent === 'purple' ? 'border-purple-200' : 'border-orange-200';
-  const bg = accent === 'purple' ? 'bg-purple-50' : 'bg-orange-50';
+  const accentClasses =
+    accent === 'quantum'
+      ? 'border-accent-purple bg-accent-purple/20'
+      : 'border-accent-orange bg-accent-orange/20';
+  const isSelected = !!trial && selectedTrial === trial.trial;
+  const Icon = accent === 'quantum' ? Atom : Cpu;
+  const modelType = (trial?.params?.model_type as string | undefined) ?? 'N/A';
+
   return (
-    <div className={`rounded-lg border ${border} ${bg} p-4`}>
-      <p className={`font-medium ${color}`}>{label}</p>
+    <div
+      className={cn(
+        'flex flex-col rounded-lg border p-4 transition-shadow',
+        accentClasses,
+        isSelected && 'ring-2 ring-inset ring-brand/50'
+      )}
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon
+            size={16}
+            className={
+              accent === 'quantum'
+                ? 'text-accent-purple-foreground'
+                : 'text-accent-orange-foreground'
+            }
+          />
+          <span className="text-sm font-semibold">{label}</span>
+        </div>
+        {isSelected && (
+          <Badge variant="emerald">
+            <Check size={12} /> Analyzing
+          </Badge>
+        )}
+      </div>
+
       {trial ? (
         <>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{trial.value.toFixed(4)}</p>
-          <p className="text-xs text-gray-600">
-            F1 · {trial.params?.model_type ?? 'N/A'} · #{trial.trial}
+          <div className="flex items-baseline gap-2">
+            <Metric
+              value={trial.value.toFixed(4)}
+              tone={accent === 'quantum' ? 'brand' : 'amber'}
+              className="text-3xl"
+            />
+            <span className="text-xs text-muted-foreground">F1</span>
+          </div>
+          <p className="mt-1 truncate text-xs text-muted-foreground">
+            {modelType} · trial #{trial.trial}
           </p>
+          {onSelect && !isSelected && (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="mt-3 self-start"
+              onClick={() => onSelect(trial.trial)}
+            >
+              Analyze this
+            </Button>
+          )}
         </>
       ) : (
-        <p className="text-sm text-gray-500 mt-1">No trial yet</p>
+        <p className="mt-1 text-sm text-muted-foreground">No trial yet</p>
       )}
     </div>
   );

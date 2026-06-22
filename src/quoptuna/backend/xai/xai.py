@@ -12,7 +12,11 @@ import matplotlib.pyplot as plt
 import pandas as pd
 import shap
 from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.prompts import ChatPromptTemplate, MessagesPlaceholder
+from langchain_core.prompts import (
+    ChatPromptTemplate,
+    HumanMessagePromptTemplate,
+    MessagesPlaceholder,
+)
 from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from shap import Explainer
@@ -38,6 +42,7 @@ if TYPE_CHECKING:
 
 # Constants
 EXPECTED_SHAP_VALUES_DIM = 2
+BINARY_CLASS_COUNT = 2
 DATA_KEY = "x_train"
 DEFAULT_MAX_DISPLAY = 20
 DEFAULT_SUBSET_SIZE = 100
@@ -160,6 +165,22 @@ class XAI:
             msg = "Model does not have a classes_ attribute"
             raise TypeError(msg)
         return self.model.classes_
+
+    def _plot_class_index(self) -> int:
+        """Class slice to use when SHAP values are per-class (ndim > 2).
+
+        Returns -1 (no slicing) for 2-D values; otherwise the positive (last)
+        class for binary, else the first. SHAP plots cannot render the full
+        ``(samples, features, classes)`` array directly.
+        """
+        try:
+            values = getattr(self.shap_values, "values", None)
+            if values is None or values.ndim <= EXPECTED_SHAP_VALUES_DIM:
+                return -1
+            classes = list(self.get_classes())
+            return int(classes[-1] if len(classes) <= BINARY_CLASS_COUNT else classes[0])
+        except Exception:  # noqa: BLE001
+            return -1
 
     def _get_explainer(self) -> Explainer:
         predict_method = self.model.predict_proba if self.use_proba else self.model.predict
@@ -429,7 +450,9 @@ class XAI:
         report = self.get_report()
         images = self._generate_report_images(num_waterfall_plots)
 
-        prompt2 = Path("prompt.txt").read_text()
+        # Resolve the prompt next to this module so it works regardless of CWD.
+        prompt_path = Path(__file__).parent / "prompt.txt"
+        prompt2 = prompt_path.read_text()
         return self._generate_final_report(chat, report, images, prompt2)
 
     def _initialize_chat(self, api_key: str, model_name: str, provider: str):
@@ -444,9 +467,12 @@ class XAI:
         images: dict[str, str] = {}  # Change type hint to allow string keys
         plot_types: list[PlotType] = ["bar", "beeswarm", "violin", "heatmap"]
 
+        # Per-class SHAP values (ndim > 2) must be sliced to one class for plotting.
+        class_index = self._plot_class_index()
+
         try:
             for plot_type in plot_types:
-                images[plot_type] = self.get_plot(plot_type)
+                images[plot_type] = self.get_plot(plot_type, class_index=class_index)
 
             if self.onsubset:
                 num_waterfall_plots = min(num_waterfall_plots, self.subset_size)
@@ -456,7 +482,9 @@ class XAI:
             indices = sorted(random.sample(range(num_waterfall_plots), num_waterfall_plots))
             for i in indices:
                 waterfall_plot_type: PlotType = "waterfall"
-                images[f"{waterfall_plot_type}_{i}"] = self.get_plot(waterfall_plot_type, index=i)
+                images[f"{waterfall_plot_type}_{i}"] = self.get_plot(
+                    waterfall_plot_type, index=i, class_index=class_index
+                )
 
             fig = self.plot_confusion_matrix()
             img_buf = io.BytesIO()
@@ -476,7 +504,11 @@ class XAI:
         prompt_template = ChatPromptTemplate(
             messages=[
                 SystemMessage(content=prompt2),
-                HumanMessage(content="Model Evaluation Report:\n```\n{report}\n```"),
+                # Use a prompt template (not a raw HumanMessage) so {report} is
+                # actually substituted with the model evaluation report.
+                HumanMessagePromptTemplate.from_template(
+                    "Model Evaluation Report:\n```\n{report}\n```"
+                ),
                 MessagesPlaceholder(variable_name="images"),
             ]
         )
@@ -493,5 +525,7 @@ class XAI:
 
         final_prompt = prompt_template.format_messages(report=str(report), images=image_messages)
 
-        response = chat(final_prompt)
+        # LangChain chat models are Runnables; the legacy ``chat(messages)`` call
+        # was removed — use ``.invoke``.
+        response = chat.invoke(final_prompt)
         return response.content

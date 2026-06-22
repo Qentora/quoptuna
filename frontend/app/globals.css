@@ -4,25 +4,167 @@
 
 @layer base {
   :root {
+    --font-sans: "Inter", sans-serif;
+    --font-mono: "JetBrains Mono", monospace;
+
+    /* Core theme colors (OpenRAG OSS theme, monochrome zinc) */
     --background: 0 0% 100%;
-    --foreground: 222 47% 11%;
+    --foreground: 0 0% 0%;
     --card: 0 0% 100%;
-    --card-foreground: 222 47% 11%;
-    --primary: 262 83% 58%;
+    --card-foreground: 0 0% 0%;
+    --popover: 0 0% 100%;
+    --popover-foreground: 0 0% 0%;
+    --primary: 0 0% 0%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 220 14% 96%;
-    --secondary-foreground: 222 47% 11%;
-    --muted: 220 14% 96%;
-    --muted-foreground: 220 9% 46%;
-    --accent: 220 14% 96%;
-    --accent-foreground: 222 47% 11%;
-    --border: 220 13% 91%;
-    --input: 220 13% 91%;
-    --ring: 262 83% 58%;
+    --primary-hover: 240 4% 16%;
+    --secondary: 0 0% 100%;
+    --secondary-foreground: 240 4% 16%;
+    --secondary-hover: 240 6% 90%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 4% 46%;
+    --accent: 240 5% 96%;
+    --accent-foreground: 0 0% 0%;
+    --border: 240 4.8% 95.9%;
+    --input: 240 6% 90%;
+    --ring: 0 0% 0%;
+    --placeholder-foreground: 240 5% 65%;
+
+    /* Semantic */
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --warning: 26 90% 37%;
+    --warning-foreground: 0 0% 100%;
+
+    /* Accent families (background / foreground pairs) */
+    --accent-emerald: 149 80% 90%;
+    --accent-emerald-foreground: 161 94% 30%;
+    --accent-amber: 48 96% 89%;
+    --accent-amber-foreground: 26 90% 37%;
+    --accent-red: 0 93% 94%;
+    --accent-red-foreground: 0 72% 51%;
+    --accent-indigo: 226 100% 94%;
+    --accent-indigo-foreground: 243 75% 59%;
+    --accent-purple: 269 100% 95%;
+    --accent-purple-foreground: 271 81% 56%;
+    --accent-orange: 34 100% 92%;
+    --accent-orange-foreground: 21 90% 48%;
+
+    /* Badge pill */
+    --badge: 0 0% 0%;
+    --badge-foreground: 0 0% 100%;
+
+    /* Brand accent (electric violet/indigo) — additive highlight */
+    --brand: 262 83% 58%;
+    --brand-foreground: 0 0% 100%;
+    --brand-glow: 262 83% 58%;
+
+    --radius: 0.5rem;
+  }
+
+  .dark {
+    --background: 240 6% 10%;
+    --foreground: 0 0% 100%;
+    --card: 240 6% 10%;
+    --card-foreground: 0 0% 100%;
+    --popover: 240 6% 10%;
+    --popover-foreground: 0 0% 100%;
+    --primary: 0 0% 100%;
+    --primary-foreground: 0 0% 0%;
+    --primary-hover: 240 6% 90%;
+    --secondary: 0 0% 0%;
+    --secondary-foreground: 240 6% 90%;
+    --secondary-hover: 240 4% 16%;
+    --muted: 240 4% 16%;
+    --muted-foreground: 240 5% 65%;
+    --accent: 240 4% 16%;
+    --accent-foreground: 0 0% 100%;
+    --border: 240 3.7% 15.9%;
+    --input: 240 5% 34%;
+    --ring: 0 0% 100%;
+    --placeholder-foreground: 240 4% 46%;
+
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
+    --warning: 46 97% 65%;
+    --warning-foreground: 0 0% 0%;
+
+    --accent-emerald: 164 86% 16%;
+    --accent-emerald-foreground: 158 64% 52%;
+    --accent-amber: 22 78% 26%;
+    --accent-amber-foreground: 46 97% 65%;
+    --accent-red: 0 63% 31%;
+    --accent-red-foreground: 0 91% 71%;
+    --accent-indigo: 242 47% 34%;
+    --accent-indigo-foreground: 234 89% 74%;
+    --accent-purple: 274 66% 32%;
+    --accent-purple-foreground: 270 95% 75%;
+    --accent-orange: 17 88% 20%;
+    --accent-orange-foreground: 27 96% 61%;
+
+    --badge: 0 0% 25%;
+    --badge-foreground: 0 0% 100%;
+
+    --brand: 255 92% 76%;
+    --brand-foreground: 240 6% 10%;
+    --brand-glow: 255 92% 76%;
+  }
+
+  * {
+    @apply border-border;
   }
 
   body {
     @apply bg-background text-foreground;
     font-feature-settings: "rlig" 1, "calt" 1;
+    font-family: var(--font-sans);
+  }
+}
+
+@layer components {
+  .primary-input {
+    @apply block h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors;
+  }
+  .primary-input::placeholder {
+    @apply text-muted-foreground;
+  }
+  .primary-input:hover {
+    @apply border-muted-foreground;
+  }
+  .primary-input:focus {
+    @apply border-foreground outline-none;
+  }
+  .primary-input:focus::placeholder {
+    color: transparent;
+  }
+  .primary-input:disabled {
+    @apply pointer-events-none cursor-not-allowed bg-muted text-muted-foreground;
+  }
+
+  /* Status dot — OpenRAG-style connector glow */
+  .status-dot {
+    @apply inline-block h-2 w-2 shrink-0 rounded-full;
+  }
+  .status-dot--online {
+    background-color: hsl(var(--accent-emerald-foreground));
+    box-shadow: 0 0 0 3px hsl(var(--accent-emerald-foreground) / 0.18), 0 0 10px
+      hsl(var(--accent-emerald-foreground) / 0.7);
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+  .status-dot--offline {
+    background-color: hsl(var(--muted-foreground));
+  }
+  .status-dot--busy {
+    background-color: hsl(var(--accent-amber-foreground));
+    box-shadow: 0 0 0 3px hsl(var(--accent-amber-foreground) / 0.18), 0 0 10px
+      hsl(var(--accent-amber-foreground) / 0.7);
+    animation: pulseGlow 1.2s ease-in-out infinite;
+  }
+  .status-dot--idle {
+    background-color: hsl(var(--muted-foreground) / 0.6);
+  }
+
+  /* Subtle glow for key numbers */
+  .text-glow {
+    text-shadow: 0 0 14px currentColor;
   }
 }

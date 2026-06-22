@@ -1,13 +1,26 @@
 'use client';
 
+import { Field } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Metric } from '@/components/ui/metric';
+import { cn } from '@/lib/utils';
 import * as Slider from '@radix-ui/react-slider';
-import { FileText } from 'lucide-react';
-import { NavButtons } from '../NavButtons';
+import { useEffect } from 'react';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
 
-export function ConfigureStep({ onNext, onBack, workflowData, setWorkflowData }: StepProps) {
-  const { configuration, features, dataset } = workflowData;
+const PRESETS = [
+  { label: 'Quick', trials: 25, hint: '~3–8 min' },
+  { label: 'Standard', trials: 50, hint: '~5–15 min' },
+  { label: 'Thorough', trials: 150, hint: '~20–45 min' },
+];
+
+export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
+  const { configuration } = workflowData;
+
+  useEffect(() => {
+    setFooter({ canContinue: true });
+  }, [setFooter]);
 
   const update = (field: keyof typeof configuration, value: string | number) =>
     setWorkflowData((prev) => ({
@@ -18,81 +31,122 @@ export function ConfigureStep({ onNext, onBack, workflowData, setWorkflowData }:
   return (
     <div className="space-y-6">
       <StepHeader
+        step={3}
         title="Optimization Configuration"
         subtitle="Set up the hyperparameter optimization study"
       />
 
-      {dataset && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-          <FileText className="w-5 h-5 text-blue-600 mt-0.5" />
+      {/* Study name */}
+      <section className="rounded-lg border border-border bg-card">
+        <div className="border-b border-border bg-muted px-4 py-3">
+          <h4 className="text-sm font-semibold">Study</h4>
+        </div>
+        <div className="p-4">
+          <Field
+            label="Study Name"
+            htmlFor="study-name"
+            helper="Unique name for this optimization study"
+          >
+            <Input
+              id="study-name"
+              type="text"
+              value={configuration.studyName}
+              onChange={(e) => update('studyName', e.target.value)}
+            />
+          </Field>
+        </div>
+      </section>
+
+      {/* Trial budget */}
+      <section className="rounded-lg border border-border bg-card">
+        <div className="flex items-center justify-between gap-3 border-b border-border bg-muted px-4 py-3">
+          <h4 className="text-sm font-semibold">Trial budget</h4>
+          <Metric value={configuration.numTrials} tone="brand" className="text-sm" />
+        </div>
+        <div className="space-y-4 p-4">
+          <div className="grid grid-cols-3 gap-3">
+            {PRESETS.map((preset) => {
+              const active = configuration.numTrials === preset.trials;
+              return (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => update('numTrials', preset.trials)}
+                  className={cn(
+                    'rounded-lg border p-3 text-left transition-colors',
+                    active
+                      ? 'border-brand bg-brand/10 text-brand'
+                      : 'border-border hover:border-foreground'
+                  )}
+                >
+                  <span className="block text-sm font-semibold">{preset.label}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {preset.trials} trials
+                  </span>
+                  <span className="mt-1 block text-xs text-muted-foreground">{preset.hint}</span>
+                </button>
+              );
+            })}
+          </div>
+
           <div>
-            <p className="font-medium text-blue-900">{dataset.name}</p>
-            <p className="text-sm text-blue-700 mt-1">
-              Features: {features.selectedFeatures.join(', ')} | Target: {features.targetColumn}
+            <label
+              className="mb-2 block text-xs font-medium text-muted-foreground"
+              htmlFor="trials"
+            >
+              Fine-tune
+            </label>
+            <Slider.Root
+              id="trials"
+              className="relative flex h-5 w-full touch-none select-none items-center"
+              min={1}
+              max={300}
+              step={1}
+              value={[configuration.numTrials]}
+              onValueChange={([v]) => update('numTrials', v)}
+            >
+              <Slider.Track className="relative h-1.5 grow rounded-full bg-muted">
+                <Slider.Range className="absolute h-full rounded-full bg-brand" />
+              </Slider.Track>
+              <Slider.Thumb className="block h-4 w-4 rounded-full border-2 border-brand bg-background focus:outline-none focus:ring-2 focus:ring-brand" />
+            </Slider.Root>
+            <p className="mt-2 text-sm text-muted-foreground">
+              More trials = better results but longer run time.
             </p>
           </div>
         </div>
-      )}
+      </section>
 
-      <div className="space-y-5">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="study-name">
-            Study Name
-          </label>
-          <input
-            id="study-name"
-            type="text"
-            value={configuration.studyName}
-            onChange={(e) => update('studyName', e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-          />
-          <p className="text-sm text-gray-500 mt-1">Unique name for this optimization study</p>
-        </div>
-
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="db-name">
-            Database Name
-          </label>
-          <input
-            id="db-name"
-            type="text"
-            value={configuration.databaseName}
-            onChange={(e) => update('databaseName', e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
-          />
-          <p className="text-sm text-gray-500 mt-1">
-            SQLite database (stored under <code>db/&lt;name&gt;.db</code>)
-          </p>
-        </div>
-
-        <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-gray-700" htmlFor="trials">
-              Number of Trials
-            </label>
-            <span className="text-sm font-semibold text-blue-600">{configuration.numTrials}</span>
+      {/* Advanced */}
+      <section className="rounded-lg border border-border bg-card">
+        <details className="group">
+          <summary className="flex cursor-pointer items-center justify-between px-4 py-3 text-sm font-semibold">
+            Advanced
+            <span className="text-xs font-normal text-muted-foreground group-open:hidden">
+              Show
+            </span>
+          </summary>
+          <div className="border-t border-border p-4">
+            <Field
+              label="Database Name"
+              htmlFor="db-name"
+              helper={
+                <>
+                  SQLite database (stored under{' '}
+                  <code className="font-mono">db/&lt;name&gt;.db</code>)
+                </>
+              }
+            >
+              <Input
+                id="db-name"
+                type="text"
+                value={configuration.databaseName}
+                onChange={(e) => update('databaseName', e.target.value)}
+              />
+            </Field>
           </div>
-          <Slider.Root
-            id="trials"
-            className="relative flex items-center select-none touch-none w-full h-5"
-            min={1}
-            max={300}
-            step={1}
-            value={[configuration.numTrials]}
-            onValueChange={([v]) => update('numTrials', v)}
-          >
-            <Slider.Track className="bg-gray-200 relative grow rounded-full h-1.5">
-              <Slider.Range className="absolute bg-blue-600 rounded-full h-full" />
-            </Slider.Track>
-            <Slider.Thumb className="block w-4 h-4 bg-white border-2 border-blue-600 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-300" />
-          </Slider.Root>
-          <p className="text-sm text-gray-500 mt-1">
-            Recommended: 50-200 trials (more trials = better results but longer run time)
-          </p>
-        </div>
-      </div>
-
-      <NavButtons onBack={onBack} onNext={onNext} />
+        </details>
+      </section>
     </div>
   );
 }

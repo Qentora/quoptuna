@@ -1,9 +1,14 @@
 'use client';
 
+import { Card, CardContent } from '@/components/ui/card';
+import { Metric } from '@/components/ui/metric';
+import { PageShell } from '@/components/ui/page-shell';
 import { type UCIDataset, getSystemInfo, listUCIDatasets } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
-import { BarChart3, Brain, Database, Zap } from 'lucide-react';
+import { BarChart3, Brain, Database, Settings, Zap } from 'lucide-react';
 import Link from 'next/link';
+
+const MAX_DATASETS = 6;
 
 export default function HomePage() {
   const { data: info } = useQuery({
@@ -15,77 +20,109 @@ export default function HomePage() {
     queryFn: () => listUCIDatasets().catch(() => [] as UCIDataset[]),
   });
   const totalModels = info?.total_models ?? 26;
+  const shownDatasets = datasets.slice(0, MAX_DATASETS);
+  const remaining = datasets.length - shownDatasets.length;
 
   return (
-    <div className="p-8">
-      <h1 className="text-3xl font-bold mb-2">QuOptuna</h1>
-      <p className="text-muted-foreground mb-8">
-        Quantum-enhanced machine learning with automated hyperparameter optimization
-      </p>
-
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-8">
+    <PageShell title="Dashboard" contentClassName="mx-auto max-w-6xl">
+      <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <StatCard
           title="Total Models"
           value={totalModels}
           subtitle="Quantum + classical"
-          icon={<Brain className="w-5 h-5 text-purple-500" />}
+          icon={<Brain className="h-5 w-5 text-accent-purple-foreground" />}
         />
         <StatCard
           title="Quantum Models"
           value={info?.quantum_models ?? 18}
           subtitle="Variational & kernel"
-          icon={<Zap className="w-5 h-5 text-blue-500" />}
+          icon={<Zap className="h-5 w-5 text-brand" />}
+          tone="brand"
         />
         <StatCard
           title="Classical Models"
           value={info?.classical_models ?? 8}
           subtitle="Baselines"
-          icon={<BarChart3 className="w-5 h-5 text-orange-500" />}
+          icon={<BarChart3 className="h-5 w-5 text-accent-orange-foreground" />}
+          tone="amber"
         />
         <StatCard
           title="UCI Datasets"
           value={datasets.length}
           subtitle="Ready to load"
-          icon={<Database className="w-5 h-5 text-green-500" />}
+          icon={<Database className="h-5 w-5 text-accent-emerald-foreground" />}
+          tone="emerald"
         />
       </div>
 
-      <div className="mb-8">
-        <h2 className="text-2xl font-bold mb-4">Get Started</h2>
-        <Link
-          href="/optimizer"
-          className="inline-flex flex-col bg-primary hover:bg-primary/90 text-primary-foreground p-6 rounded-lg transition-colors max-w-md"
-        >
-          <Zap className="w-8 h-8 mb-2" />
-          <h3 className="text-lg font-semibold mb-1">Open the Optimizer</h3>
-          <p className="text-sm opacity-90">
-            Load data, run hyperparameter optimization, explore SHAP analysis and generate an AI
-            report.
-          </p>
-        </Link>
+      <div className="mb-6">
+        <h2 className="mb-3 text-base font-semibold tracking-tight">Get Started</h2>
+        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+          <Link
+            href="/optimizer"
+            className="group rounded-lg bg-gradient-to-br from-brand to-brand/70 p-5 text-brand-foreground transition-shadow hover:shadow-glow-brand"
+          >
+            <Zap className="mb-2 h-7 w-7" />
+            <h3 className="mb-1 text-base font-semibold">Open the Optimizer</h3>
+            <p className="text-sm opacity-90">
+              Load data, run hyperparameter optimization, explore SHAP analysis and generate an AI
+              report.
+            </p>
+          </Link>
+          <Link
+            href="/settings"
+            className="group rounded-lg border border-border bg-card p-5 transition-colors hover:bg-accent"
+          >
+            <Settings className="mb-2 h-7 w-7" />
+            <h3 className="mb-1 text-base font-semibold">Configure API Keys</h3>
+            <p className="text-sm text-muted-foreground">
+              Add your OpenAI, Anthropic or Google keys to enable AI-generated reports. Stored
+              encrypted in your browser.
+            </p>
+          </Link>
+        </div>
       </div>
 
       <div>
-        <h2 className="text-2xl font-bold mb-4">Available UCI Datasets</h2>
+        <h2 className="mb-3 text-base font-semibold tracking-tight">Available UCI Datasets</h2>
         {datasets.length === 0 ? (
-          <div className="bg-card p-6 rounded-lg border border-border text-center text-muted-foreground">
-            Could not reach the backend. Start it and refresh to see available datasets.
-          </div>
+          <Card className="border-dashed">
+            <CardContent className="p-6 text-center">
+              <Database className="mx-auto mb-3 h-7 w-7 text-muted-foreground" />
+              <p className="font-medium">No datasets available</p>
+              <p className="mt-1 text-sm text-muted-foreground">
+                Could not reach the backend. Start it and refresh to see available datasets.
+              </p>
+            </CardContent>
+          </Card>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-            {datasets.map((d) => (
-              <div key={d.id} className="bg-card p-4 rounded-lg border border-border">
-                <p className="font-semibold">{d.name}</p>
-                {d.description && (
-                  <p className="text-sm text-muted-foreground mt-1">{d.description}</p>
-                )}
-                <p className="text-xs text-muted-foreground mt-2">UCI ID: {d.id}</p>
-              </div>
-            ))}
-          </div>
+          <>
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+              {shownDatasets.map((d) => (
+                <Card key={d.id} className="transition-colors hover:border-foreground/30">
+                  <CardContent className="p-3">
+                    <p className="truncate font-medium">{d.name}</p>
+                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+                      <span>UCI ID: {d.id}</span>
+                      {typeof d.num_instances === 'number' && <span>{d.num_instances} rows</span>}
+                      {typeof d.num_features === 'number' && <span>{d.num_features} features</span>}
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+            {remaining > 0 && (
+              <Link
+                href="/optimizer"
+                className="mt-3 inline-block text-sm text-muted-foreground hover:text-foreground hover:underline"
+              >
+                +{remaining} more — open the Optimizer to browse all
+              </Link>
+            )}
+          </>
         )}
       </div>
-    </div>
+    </PageShell>
   );
 }
 
@@ -94,20 +131,26 @@ function StatCard({
   value,
   subtitle,
   icon,
+  tone = 'default',
 }: {
   title: string;
   value: number;
   subtitle: string;
   icon: React.ReactNode;
+  tone?: 'default' | 'emerald' | 'brand' | 'amber';
 }) {
   return (
-    <div className="bg-card p-6 rounded-lg border border-border">
-      <div className="flex items-center justify-between mb-2">
-        <h3 className="text-lg font-semibold">{title}</h3>
-        {icon}
-      </div>
-      <p className="text-3xl font-bold">{value}</p>
-      <p className="text-sm text-muted-foreground">{subtitle}</p>
-    </div>
+    <Card className="transition-colors hover:border-foreground/30">
+      <CardContent className="p-4">
+        <div className="mb-2 flex items-center justify-between">
+          <h3 className="text-sm font-medium text-muted-foreground">{title}</h3>
+          <span className="flex h-8 w-8 items-center justify-center rounded-md bg-muted">
+            {icon}
+          </span>
+        </div>
+        <Metric value={value} tone={tone} className="block text-2xl" />
+        <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
+      </CardContent>
+    </Card>
   );
 }
