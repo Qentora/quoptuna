@@ -9,7 +9,7 @@ from typing import Any, List, Optional
 
 import numpy as np
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 # Access optimization results stored by the optimize module.
 from quoptuna.server.api.v1.optimize import optimization_jobs
@@ -39,6 +39,9 @@ class MetricsRequest(BaseModel):
 
 
 class ReportRequest(BaseModel):
+    # "model_name" collides with Pydantic's protected "model_" namespace; opt out.
+    model_config = ConfigDict(protected_namespaces=())
+
     optimization_id: str
     trial_number: Optional[int] = None
     llm_provider: str = "google"

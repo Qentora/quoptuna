@@ -7,7 +7,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
-from pydantic import BaseModel
+from pydantic import BaseModel, ConfigDict
 
 from quoptuna.server.services import dataset_registry
 from quoptuna.server.services.workflow_service import WorkflowExecutor
@@ -24,6 +24,10 @@ class LabelMapping(BaseModel):
 
 
 class OptimizationRequest(BaseModel):
+    # Several fields start with "model_", which Pydantic reserves; opt out so it
+    # does not emit protected-namespace warnings.
+    model_config = ConfigDict(protected_namespaces=())
+
     dataset_id: str
     dataset_source: str  # 'uci' or 'upload'
     selected_features: List[str]
