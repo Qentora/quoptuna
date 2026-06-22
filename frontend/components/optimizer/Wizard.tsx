@@ -1,11 +1,9 @@
 'use client';
 
-import { Card } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
-import { cn } from '@/lib/utils';
 import {
   BarChart3,
-  Check,
   Database,
   FileText,
   type LucideIcon,
@@ -14,8 +12,9 @@ import {
   SlidersHorizontal,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useState } from 'react';
-import { StudySummary } from './StudySummary';
+import { useEffect, useState } from 'react';
+import { ContextStrip } from './ContextStrip';
+import { StepProgress } from './StepProgress';
 import { AnalyzeStep } from './steps/AnalyzeStep';
 import { ConfigureStep } from './steps/ConfigureStep';
 import { DatasetStep } from './steps/DatasetStep';
@@ -36,17 +35,33 @@ const steps: Array<{ id: number; title: string; description: string; icon: Lucid
 
 const stepIcons: Record<number, LucideIcon> = Object.fromEntries(steps.map((s) => [s.id, s.icon]));
 
+export interface StepFooterState {
+  canContinue: boolean;
+  nextLabel?: string;
+  hideNext?: boolean;
+  nextBusy?: boolean;
+  backDisabled?: boolean;
+}
+
 export interface StepProps {
   onNext: () => void;
   onBack?: () => void;
   workflowData: WorkflowData;
   setWorkflowData: React.Dispatch<React.SetStateAction<WorkflowData>>;
+  setFooter: (state: StepFooterState) => void;
 }
 
 export function Wizard() {
   const [currentStep, setCurrentStep] = useState(1);
   const [completedSteps, setCompletedSteps] = useState<number[]>([]);
   const [workflowData, setWorkflowData] = useState<WorkflowData>(initialWorkflowData);
+  const [footer, setFooter] = useState<StepFooterState>({ canContinue: false });
+
+  // Reset footer on step change so a stale canContinue can't leak across steps.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run on step change is the intent.
+  useEffect(() => {
+    setFooter({ canContinue: false });
+  }, [currentStep]);
 
   const handleStepClick = (stepId: number) => {
     if (completedSteps.includes(stepId - 1) || stepId === 1) {
@@ -70,66 +85,30 @@ export function Wizard() {
     onBack: handlePreviousStep,
     workflowData,
     setWorkflowData,
+    setFooter,
   };
 
   return (
-    <div className="flex h-full flex-col bg-background">
-      <div className="border-b border-border bg-card p-6">
-        <PageHeader title="Optimizer" />
-      </div>
+    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
+      {/* Header: title + context strip + chevron stepper (pinned) */}
+      <header className="shrink-0 border-b border-border bg-card px-6 py-4">
+        <div className="flex flex-wrap items-center justify-between gap-4">
+          <PageHeader title="Optimizer" />
+          <ContextStrip workflowData={workflowData} />
+        </div>
+        <StepProgress
+          steps={steps}
+          currentStep={currentStep}
+          completedSteps={completedSteps}
+          onStepClick={handleStepClick}
+          className="mt-4"
+        />
+      </header>
 
-      <div className="grid flex-1 grid-cols-1 gap-6 overflow-hidden p-6 md:grid-cols-[200px_minmax(0,1fr)] lg:grid-cols-[200px_minmax(0,1fr)_240px]">
-        {/* Left: vertical stepper */}
-        <nav className="hidden md:block">
-          <ol className="space-y-1">
-            {steps.map((step) => {
-              const enabled = completedSteps.includes(step.id - 1) || step.id === 1;
-              const done = completedSteps.includes(step.id);
-              const current = currentStep === step.id;
-              const Icon = step.icon;
-              return (
-                <li key={step.id}>
-                  <button
-                    type="button"
-                    onClick={() => handleStepClick(step.id)}
-                    disabled={!enabled}
-                    className={cn(
-                      'flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors',
-                      current
-                        ? 'bg-brand/10 text-brand'
-                        : enabled
-                          ? 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
-                          : 'cursor-not-allowed text-muted-foreground/50'
-                    )}
-                  >
-                    <span
-                      className={cn(
-                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors',
-                        done
-                          ? 'border-transparent bg-accent-emerald text-accent-emerald-foreground'
-                          : current
-                            ? 'border-transparent bg-brand text-brand-foreground shadow-glow-brand'
-                            : 'border-border bg-card'
-                      )}
-                    >
-                      {done ? <Check size={16} /> : <Icon size={16} />}
-                    </span>
-                    <span className="min-w-0">
-                      <span className="block truncate text-sm font-medium">{step.title}</span>
-                      <span className="block text-[11px] text-muted-foreground">
-                        Step {step.id} of {steps.length}
-                      </span>
-                    </span>
-                  </button>
-                </li>
-              );
-            })}
-          </ol>
-        </nav>
-
-        {/* Center: step content (scrollable, sticky footer lives inside steps) */}
-        <div className="overflow-y-auto">
-          <Card className="p-8">
+      {/* Body: single full-width scroll container */}
+      <div className="min-h-0 flex-1 px-6 py-4">
+        <div className="h-full min-h-0 overflow-y-auto rounded-lg border border-border bg-card">
+          <div className="mx-auto max-w-4xl p-6">
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentStep}
@@ -146,14 +125,32 @@ export function Wizard() {
                 {currentStep === 6 && <ReportStep {...stepProps} />}
               </motion.div>
             </AnimatePresence>
-          </Card>
-        </div>
-
-        {/* Right: study summary rail */}
-        <div className="hidden lg:block">
-          <StudySummary workflowData={workflowData} className="sticky top-0" />
+          </div>
         </div>
       </div>
+
+      {/* Single Back/Next footer (pinned) */}
+      <footer className="shrink-0 border-t border-border bg-card/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+        <div className="flex items-center justify-between">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={handlePreviousStep}
+            disabled={currentStep === 1 || footer.backDisabled}
+          >
+            Previous
+          </Button>
+          {!footer.hideNext && (
+            <Button
+              type="button"
+              onClick={handleNextStep}
+              disabled={!footer.canContinue || footer.nextBusy}
+            >
+              {footer.nextLabel ?? 'Next Step'}
+            </Button>
+          )}
+        </div>
+      </footer>
     </div>
   );
 }

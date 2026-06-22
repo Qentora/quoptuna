@@ -11,13 +11,13 @@ import { pollOptimization, startOptimization } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import * as Progress from '@radix-ui/react-progress';
 import { Loader2, PlayCircle } from 'lucide-react';
-import { useState } from 'react';
-import { ErrorBanner, NavButtons } from '../NavButtons';
+import { useEffect, useState } from 'react';
+import { ErrorBanner } from '../NavButtons';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
 import { isClassicalModel } from '../types';
 
-export function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: StepProps) {
+export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const [isRunning, setIsRunning] = useState(false);
   const [progress, setProgress] = useState(0);
   const [currentTrial, setCurrentTrial] = useState(0);
@@ -27,6 +27,10 @@ export function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: 
 
   const { dataset, features, configuration, optimization } = workflowData;
   const hasResults = optimization.status === 'completed';
+
+  useEffect(() => {
+    setFooter({ canContinue: hasResults, nextBusy: isRunning, backDisabled: isRunning });
+  }, [hasResults, isRunning, setFooter]);
 
   const run = async () => {
     if (!dataset) {
@@ -236,13 +240,6 @@ export function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: 
           </div>
         </TableContainer>
       )}
-
-      <NavButtons
-        onBack={onBack}
-        onNext={onNext}
-        backDisabled={isRunning}
-        nextDisabled={!hasResults || isRunning}
-      />
     </div>
   );
 }

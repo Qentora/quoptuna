@@ -12,12 +12,12 @@ import {
 } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { Database, Loader2, Search, Upload } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
-import { ErrorBanner, NavButtons } from '../NavButtons';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ErrorBanner } from '../NavButtons';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
 
-export function DatasetStep({ onNext, workflowData, setWorkflowData }: StepProps) {
+export function DatasetStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const [customId, setCustomId] = useState('');
   const [search, setSearch] = useState('');
   const [dragOver, setDragOver] = useState(false);
@@ -103,6 +103,10 @@ export function DatasetStep({ onNext, workflowData, setWorkflowData }: StepProps
   };
 
   const selected = workflowData.dataset;
+
+  useEffect(() => {
+    setFooter({ canContinue: !!selected && !isLoading });
+  }, [selected, isLoading, setFooter]);
 
   return (
     <div className="space-y-6">
@@ -263,8 +267,6 @@ export function DatasetStep({ onNext, workflowData, setWorkflowData }: StepProps
           )}
         </TableContainer>
       )}
-
-      <NavButtons onNext={onNext} nextDisabled={!selected || isLoading} />
     </div>
   );
 }

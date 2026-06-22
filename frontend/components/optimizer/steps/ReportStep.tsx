@@ -12,7 +12,7 @@ import { type ApiKeys, loadApiKeys } from '@/lib/settings';
 import { Download, FileText, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
-import { ErrorBanner, NavButtons } from '../NavButtons';
+import { ErrorBanner } from '../NavButtons';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
 
@@ -23,7 +23,7 @@ const DEFAULT_MODELS: Record<Provider, string> = {
   openai: 'gpt-4o',
 };
 
-export function ReportStep({ onBack, workflowData, setWorkflowData }: StepProps) {
+export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [provider, setProvider] = useState<Provider>('google');
@@ -40,6 +40,10 @@ export function ReportStep({ onBack, workflowData, setWorkflowData }: StepProps)
   const { optimization, report } = workflowData;
   const apiKey = provider === 'google' ? keys.google : keys.openai;
   const hasReport = report.markdown !== null;
+
+  useEffect(() => {
+    setFooter({ canContinue: false, hideNext: true, backDisabled: isGenerating });
+  }, [isGenerating, setFooter]);
 
   const handleProvider = (p: Provider) => {
     setProvider(p);
@@ -159,8 +163,6 @@ export function ReportStep({ onBack, workflowData, setWorkflowData }: StepProps)
           </Card>
         </div>
       )}
-
-      <NavButtons onBack={onBack} backDisabled={isGenerating} hideNext />
     </div>
   );
 }

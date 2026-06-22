@@ -9,7 +9,7 @@ import { generateSHAP, getMetrics } from '@/lib/api';
 import * as Tabs from '@radix-ui/react-tabs';
 import { BarChart3, Download, Loader2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { ErrorBanner, NavButtons } from '../NavButtons';
+import { ErrorBanner } from '../NavButtons';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
 
@@ -30,7 +30,7 @@ function downloadDataUrl(dataUrl: string, filename: string) {
   document.body.removeChild(a);
 }
 
-export function AnalyzeStep({ onNext, onBack, workflowData, setWorkflowData }: StepProps) {
+export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [useProba, setUseProba] = useState(true);
@@ -40,6 +40,10 @@ export function AnalyzeStep({ onNext, onBack, workflowData, setWorkflowData }: S
   const { optimization, analysis } = workflowData;
   const hasSHAP = analysis.featureImportance !== null;
   const autoRan = useRef(false);
+
+  useEffect(() => {
+    setFooter({ canContinue: hasSHAP, nextBusy: isGenerating, backDisabled: isGenerating });
+  }, [hasSHAP, isGenerating, setFooter]);
 
   const runAnalysis = async () => {
     if (!optimization.executionId) {
@@ -199,7 +203,7 @@ export function AnalyzeStep({ onNext, onBack, workflowData, setWorkflowData }: S
           {analysis.featureImportance && analysis.featureImportance.length > 0 && (
             <Card className="p-6">
               <h3 className="mb-4 text-base font-semibold">Feature Importance</h3>
-              <div className="space-y-3">
+              <div className="max-h-72 space-y-3 overflow-y-auto pr-2">
                 {analysis.featureImportance.map((item) => {
                   const max = analysis.featureImportance?.[0]?.importance || 1;
                   return (
@@ -243,13 +247,6 @@ export function AnalyzeStep({ onNext, onBack, workflowData, setWorkflowData }: S
           )}
         </div>
       )}
-
-      <NavButtons
-        onBack={onBack}
-        onNext={onNext}
-        backDisabled={isGenerating}
-        nextDisabled={!hasSHAP || isGenerating}
-      />
     </div>
   );
 }

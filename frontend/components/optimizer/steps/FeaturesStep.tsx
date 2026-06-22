@@ -7,15 +7,14 @@ import { Select } from '@/components/ui/select';
 import { useDatasetPreview } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { Check, Crosshair, Search, Sparkles, X } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { NavButtons } from '../NavButtons';
+import { useEffect, useMemo, useState } from 'react';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
 
 const isNumericDtype = (dtype: string | undefined) =>
   !!dtype && /int|float|double|number/i.test(dtype);
 
-export function FeaturesStep({ onNext, onBack, workflowData, setWorkflowData }: StepProps) {
+export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const preview = useDatasetPreview(workflowData.dataset?.id ?? null);
   const { selectedFeatures, targetColumn, labelMapping } = workflowData.features;
   const [search, setSearch] = useState('');
@@ -88,6 +87,10 @@ export function FeaturesStep({ onNext, onBack, workflowData, setWorkflowData }: 
   if (selectedFeatures.length === 0) missing.push('Select at least one feature');
   if (!targetColumn) missing.push('Choose a target column');
   if (needsMapping && !mappingComplete) missing.push('Complete the label mapping');
+
+  useEffect(() => {
+    setFooter({ canContinue: canProceed });
+  }, [canProceed, setFooter]);
 
   return (
     <div className="space-y-6">
@@ -291,8 +294,6 @@ export function FeaturesStep({ onNext, onBack, workflowData, setWorkflowData }: 
           <span>{missing.join(' · ')}</span>
         )}
       </div>
-
-      <NavButtons onBack={onBack} onNext={onNext} nextDisabled={!canProceed} />
     </div>
   );
 }

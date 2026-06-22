@@ -5,7 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Metric } from '@/components/ui/metric';
 import { cn } from '@/lib/utils';
 import * as Slider from '@radix-ui/react-slider';
-import { NavButtons } from '../NavButtons';
+import { useEffect } from 'react';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
 
@@ -15,8 +15,12 @@ const PRESETS = [
   { label: 'Thorough', trials: 150, hint: '~20–45 min' },
 ];
 
-export function ConfigureStep({ onNext, onBack, workflowData, setWorkflowData }: StepProps) {
+export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const { configuration } = workflowData;
+
+  useEffect(() => {
+    setFooter({ canContinue: true });
+  }, [setFooter]);
 
   const update = (field: keyof typeof configuration, value: string | number) =>
     setWorkflowData((prev) => ({
@@ -123,8 +127,6 @@ export function ConfigureStep({ onNext, onBack, workflowData, setWorkflowData }:
           </div>
         </details>
       </div>
-
-      <NavButtons onBack={onBack} onNext={onNext} />
     </div>
   );
 }
