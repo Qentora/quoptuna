@@ -36,25 +36,35 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
         subtitle="Set up the hyperparameter optimization study"
       />
 
-      <div className="space-y-5">
-        <Field
-          label="Study Name"
-          htmlFor="study-name"
-          helper="Unique name for this optimization study"
-        >
-          <Input
-            id="study-name"
-            type="text"
-            value={configuration.studyName}
-            onChange={(e) => update('studyName', e.target.value)}
-          />
-        </Field>
+      {/* Study name */}
+      <section className="rounded-lg border border-border bg-card">
+        <div className="border-b border-border bg-muted px-4 py-3">
+          <h4 className="text-sm font-semibold">Study</h4>
+        </div>
+        <div className="p-4">
+          <Field
+            label="Study Name"
+            htmlFor="study-name"
+            helper="Unique name for this optimization study"
+          >
+            <Input
+              id="study-name"
+              type="text"
+              value={configuration.studyName}
+              onChange={(e) => update('studyName', e.target.value)}
+            />
+          </Field>
+        </div>
+      </section>
 
-        <div>
-          <label className="mb-2 block text-sm font-medium" htmlFor="trials">
-            Trial budget
-          </label>
-          <div className="mb-3 grid grid-cols-3 gap-2">
+      {/* Trial budget */}
+      <section className="rounded-lg border border-border bg-card">
+        <div className="flex items-center justify-between gap-3 border-b border-border bg-muted px-4 py-3">
+          <h4 className="text-sm font-semibold">Trial budget</h4>
+          <Metric value={configuration.numTrials} tone="brand" className="text-sm" />
+        </div>
+        <div className="space-y-4 p-4">
+          <div className="grid grid-cols-3 gap-3">
             {PRESETS.map((preset) => {
               const active = configuration.numTrials === preset.trials;
               return (
@@ -65,7 +75,7 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
                   className={cn(
                     'rounded-lg border p-3 text-left transition-colors',
                     active
-                      ? 'border-brand bg-brand/10 text-brand shadow-glow-brand'
+                      ? 'border-brand bg-brand/10 text-brand'
                       : 'border-border hover:border-foreground'
                   )}
                 >
@@ -73,40 +83,50 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
                   <span className="block text-xs text-muted-foreground">
                     {preset.trials} trials
                   </span>
-                  <span className="mt-1 block text-[11px] text-muted-foreground">
-                    {preset.hint}
-                  </span>
+                  <span className="mt-1 block text-xs text-muted-foreground">{preset.hint}</span>
                 </button>
               );
             })}
           </div>
 
-          <div className="mb-2 flex items-center justify-between">
-            <span className="text-sm text-muted-foreground">Fine-tune</span>
-            <Metric value={configuration.numTrials} tone="brand" glow className="text-sm" />
+          <div>
+            <label
+              className="mb-2 block text-xs font-medium text-muted-foreground"
+              htmlFor="trials"
+            >
+              Fine-tune
+            </label>
+            <Slider.Root
+              id="trials"
+              className="relative flex h-5 w-full touch-none select-none items-center"
+              min={1}
+              max={300}
+              step={1}
+              value={[configuration.numTrials]}
+              onValueChange={([v]) => update('numTrials', v)}
+            >
+              <Slider.Track className="relative h-1.5 grow rounded-full bg-muted">
+                <Slider.Range className="absolute h-full rounded-full bg-brand" />
+              </Slider.Track>
+              <Slider.Thumb className="block h-4 w-4 rounded-full border-2 border-brand bg-background focus:outline-none focus:ring-2 focus:ring-brand" />
+            </Slider.Root>
+            <p className="mt-2 text-sm text-muted-foreground">
+              More trials = better results but longer run time.
+            </p>
           </div>
-          <Slider.Root
-            id="trials"
-            className="relative flex h-5 w-full touch-none select-none items-center"
-            min={1}
-            max={300}
-            step={1}
-            value={[configuration.numTrials]}
-            onValueChange={([v]) => update('numTrials', v)}
-          >
-            <Slider.Track className="relative h-1.5 grow rounded-full bg-muted">
-              <Slider.Range className="absolute h-full rounded-full bg-brand" />
-            </Slider.Track>
-            <Slider.Thumb className="block h-4 w-4 rounded-full border-2 border-brand bg-background focus:outline-none focus:ring-2 focus:ring-brand" />
-          </Slider.Root>
-          <p className="mt-1 text-sm text-muted-foreground">
-            More trials = better results but longer run time.
-          </p>
         </div>
+      </section>
 
-        <details className="rounded-lg border border-border p-3">
-          <summary className="cursor-pointer text-sm font-medium">Advanced</summary>
-          <div className="mt-3">
+      {/* Advanced */}
+      <section className="rounded-lg border border-border bg-card">
+        <details className="group">
+          <summary className="flex cursor-pointer items-center justify-between px-4 py-3 text-sm font-semibold">
+            Advanced
+            <span className="text-xs font-normal text-muted-foreground group-open:hidden">
+              Show
+            </span>
+          </summary>
+          <div className="border-t border-border p-4">
             <Field
               label="Database Name"
               htmlFor="db-name"
@@ -126,7 +146,7 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
             </Field>
           </div>
         </details>
-      </div>
+      </section>
     </div>
   );
 }
