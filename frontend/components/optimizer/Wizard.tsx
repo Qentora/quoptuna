@@ -2,6 +2,7 @@
 
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
+import { cn } from '@/lib/utils';
 import {
   BarChart3,
   Database,
@@ -88,6 +89,10 @@ export function Wizard() {
     setFooter,
   };
 
+  // Dataset (1) and Features (2) manage their own height (panels fill the frame and scroll
+  // internally); every other step keeps the container's normal vertical scroll.
+  const fillsFrame = currentStep === 1 || currentStep === 2;
+
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
       {/* Header: title + context strip + chevron stepper (pinned) */}
@@ -105,13 +110,24 @@ export function Wizard() {
         />
       </header>
 
-      {/* Body: single full-width scroll container */}
+      {/* Body: content region (scrolls for most steps; DatasetStep fills the frame) */}
       <div className="min-h-0 flex-1 px-6 py-4">
-        <div className="h-full min-h-0 overflow-y-auto rounded-lg border border-border bg-card">
-          <div className="mx-auto max-w-4xl p-6">
+        <div
+          className={cn(
+            'h-full min-h-0 rounded-lg border border-border bg-card',
+            fillsFrame ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'
+          )}
+        >
+          <div
+            className={cn(
+              'mx-auto w-full max-w-4xl p-6',
+              fillsFrame && 'flex min-h-0 flex-1 flex-col'
+            )}
+          >
             <AnimatePresence mode="wait">
               <motion.div
                 key={currentStep}
+                className={fillsFrame ? 'flex min-h-0 w-full flex-1 flex-col' : undefined}
                 initial={{ opacity: 0, y: 8 }}
                 animate={{ opacity: 1, y: 0 }}
                 exit={{ opacity: 0, y: -8 }}

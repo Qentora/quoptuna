@@ -93,27 +93,25 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
   }, [canProceed, setFooter]);
 
   return (
-    <div className="space-y-6">
-      <StepHeader
-        step={2}
-        title="Feature Selection"
-        subtitle="Select input features, the target column, and map labels for binary classification"
-      />
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="shrink-0">
+        <StepHeader
+          step={2}
+          title="Feature Selection"
+          subtitle="Select input features, the target column, and map labels for binary classification"
+        />
+      </div>
 
-      <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
         {/* Left panel: searchable columns */}
-        <div className="flex flex-col rounded-lg border border-border">
-          <div className="flex items-center justify-between gap-2 border-b border-border bg-muted px-3 py-2">
-            <h3 className="text-sm font-semibold">Columns ({columns.length})</h3>
-            <button
-              type="button"
-              onClick={smartSelect}
-              className="inline-flex items-center gap-1 text-xs font-medium text-brand hover:underline"
-            >
+        <div className="flex min-h-0 flex-col rounded-lg border border-border bg-card">
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-muted px-4 py-3">
+            <h4 className="text-sm font-semibold">Columns ({columns.length})</h4>
+            <Button type="button" variant="ghost" size="sm" onClick={smartSelect}>
               <Sparkles size={14} /> Smart select
-            </button>
+            </Button>
           </div>
-          <div className="border-b border-border p-2">
+          <div className="shrink-0 border-b border-border p-3">
             <div className="relative">
               <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
@@ -124,7 +122,10 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
               />
             </div>
           </div>
-          <div className="max-h-80 overflow-y-auto p-2">
+          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
+            {filteredColumns.length === 0 && (
+              <p className="px-2 py-2 text-sm text-muted-foreground">No matching columns.</p>
+            )}
             {filteredColumns.map((column) => {
               const isFeature = selectedFeatures.includes(column);
               const isTarget = targetColumn === column;
@@ -132,7 +133,7 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
                 <div
                   key={column}
                   className={cn(
-                    'mb-1 flex items-center justify-between gap-2 rounded-md px-2 py-1.5 transition-colors',
+                    'flex items-center justify-between gap-2 rounded-md px-2 py-1.5 transition-colors',
                     isTarget ? 'bg-brand/10' : 'hover:bg-muted'
                   )}
                 >
@@ -150,20 +151,22 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
                       onClick={() => toggleFeature(column)}
                       disabled={isTarget}
                       className={cn(
-                        'rounded-md px-2 py-1 text-xs font-medium transition-colors',
+                        'inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors',
                         isFeature
                           ? 'bg-brand/15 text-brand'
                           : 'text-muted-foreground hover:bg-accent disabled:opacity-40'
                       )}
                     >
-                      {isFeature ? 'Feature ✓' : 'Feature'}
+                      {isFeature && <Check size={12} />}
+                      Feature
                     </button>
                     <button
                       type="button"
                       onClick={() => setTarget(column)}
                       title="Set as target"
+                      aria-label={`Set ${column} as target`}
                       className={cn(
-                        'rounded-md p-1 transition-colors',
+                        'inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors',
                         isTarget
                           ? 'bg-brand text-brand-foreground'
                           : 'text-muted-foreground hover:bg-accent'
@@ -179,107 +182,111 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
         </div>
 
         {/* Right panel: selection */}
-        <div className="space-y-4">
-          <div className="rounded-lg border border-border p-3">
-            <div className="mb-2 flex items-center justify-between">
-              <h3 className="text-sm font-semibold">
+        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
+          {/* Selected features */}
+          <div className="flex flex-col rounded-lg border border-border bg-card">
+            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-muted px-4 py-3">
+              <h4 className="text-sm font-semibold">
                 Selected features ({selectedFeatures.length})
-              </h3>
+              </h4>
               {selectedFeatures.length > 0 && (
-                <button
-                  type="button"
-                  onClick={clearAll}
-                  className="text-xs font-medium text-muted-foreground hover:underline"
-                >
+                <Button type="button" variant="ghost" size="sm" onClick={clearAll}>
                   Clear
-                </button>
+                </Button>
               )}
             </div>
-            {selectedFeatures.length === 0 ? (
-              <p className="text-sm text-muted-foreground">
-                No features yet — pick columns on the left or use Smart select.
-              </p>
-            ) : (
-              <div className="flex flex-wrap gap-1.5">
-                {selectedFeatures.map((f) => (
-                  <span
-                    key={f}
-                    className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2.5 py-0.5 text-xs font-medium text-brand"
-                  >
-                    {f}
-                    <button
-                      type="button"
-                      onClick={() => toggleFeature(f)}
-                      aria-label={`Remove ${f}`}
+            <div className="p-3">
+              {selectedFeatures.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  No features yet — pick columns on the left or use Smart select.
+                </p>
+              ) : (
+                <div className="flex flex-wrap gap-1.5">
+                  {selectedFeatures.map((f) => (
+                    <span
+                      key={f}
+                      className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2.5 py-0.5 text-xs font-medium text-brand"
                     >
-                      <X size={12} />
-                    </button>
-                  </span>
-                ))}
-              </div>
-            )}
+                      {f}
+                      <button
+                        type="button"
+                        onClick={() => toggleFeature(f)}
+                        aria-label={`Remove ${f}`}
+                      >
+                        <X size={12} />
+                      </button>
+                    </span>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
 
-          <div className="rounded-lg border border-border p-3">
-            <h3 className="mb-2 text-sm font-semibold">Target column</h3>
-            {targetColumn ? (
-              <Badge variant="emerald" size="md">
-                {targetColumn}
-              </Badge>
-            ) : (
-              <p className="text-sm text-muted-foreground">
-                Use the crosshair on a column to set the target.
-              </p>
-            )}
-
-            {targetColumn && needsMapping && (
-              <div className="mt-3 rounded-md border border-border bg-muted p-3">
-                <p className="text-sm font-medium">Label mapping (binary)</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Quantum models require labels encoded as -1 / 1.
+          {/* Target column */}
+          <div className="flex flex-col rounded-lg border border-border bg-card">
+            <div className="shrink-0 border-b border-border bg-muted px-4 py-3">
+              <h4 className="text-sm font-semibold">Target column</h4>
+            </div>
+            <div className="p-3">
+              {targetColumn ? (
+                <Badge variant="emerald" size="md">
+                  {targetColumn}
+                </Badge>
+              ) : (
+                <p className="text-sm text-muted-foreground">
+                  Use the crosshair on a column to set the target.
                 </p>
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <label className="text-xs" htmlFor="map-neg">
-                    <span className="mb-1 block">Maps to -1</span>
-                    <Select
-                      id="map-neg"
-                      value={labelMapping.neg === null ? '' : String(labelMapping.neg)}
-                      onChange={(e) => setMapping('neg', e.target.value)}
-                    >
-                      <option value="">Select…</option>
-                      {targetValues.map((v) => (
-                        <option key={String(v)} value={String(v)}>
-                          {String(v)}
-                        </option>
-                      ))}
-                    </Select>
-                  </label>
-                  <label className="text-xs" htmlFor="map-pos">
-                    <span className="mb-1 block">Maps to 1</span>
-                    <Select
-                      id="map-pos"
-                      value={labelMapping.pos === null ? '' : String(labelMapping.pos)}
-                      onChange={(e) => setMapping('pos', e.target.value)}
-                    >
-                      <option value="">Select…</option>
-                      {targetValues.map((v) => (
-                        <option key={String(v)} value={String(v)}>
-                          {String(v)}
-                        </option>
-                      ))}
-                    </Select>
-                  </label>
+              )}
+
+              {targetColumn && needsMapping && (
+                <div className="mt-3 rounded-md border border-border bg-muted p-3">
+                  <p className="text-sm font-medium">Label mapping (binary)</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Quantum models require labels encoded as -1 / 1.
+                  </p>
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <label className="text-xs" htmlFor="map-neg">
+                      <span className="mb-1 block">Maps to -1</span>
+                      <Select
+                        id="map-neg"
+                        value={labelMapping.neg === null ? '' : String(labelMapping.neg)}
+                        onChange={(e) => setMapping('neg', e.target.value)}
+                      >
+                        <option value="">Select…</option>
+                        {targetValues.map((v) => (
+                          <option key={String(v)} value={String(v)}>
+                            {String(v)}
+                          </option>
+                        ))}
+                      </Select>
+                    </label>
+                    <label className="text-xs" htmlFor="map-pos">
+                      <span className="mb-1 block">Maps to 1</span>
+                      <Select
+                        id="map-pos"
+                        value={labelMapping.pos === null ? '' : String(labelMapping.pos)}
+                        onChange={(e) => setMapping('pos', e.target.value)}
+                      >
+                        <option value="">Select…</option>
+                        {targetValues.map((v) => (
+                          <option key={String(v)} value={String(v)}>
+                            {String(v)}
+                          </option>
+                        ))}
+                      </Select>
+                    </label>
+                  </div>
                 </div>
-              </div>
-            )}
+              )}
+            </div>
           </div>
         </div>
       </div>
 
-      {/* Sticky validation bar */}
+      {/* Validation bar */}
       <div
         className={cn(
-          'flex items-center gap-2 rounded-lg border p-3 text-sm',
+          'flex shrink-0 items-center gap-2 rounded-lg border p-3 text-sm',
           canProceed
             ? 'border-accent-emerald bg-accent-emerald/30 text-accent-emerald-foreground'
             : 'border-accent-amber bg-accent-amber/30 text-accent-amber-foreground'
