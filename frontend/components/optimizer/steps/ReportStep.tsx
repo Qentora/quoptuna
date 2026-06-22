@@ -1,5 +1,12 @@
 'use client';
 
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Field } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Textarea } from '@/components/ui/textarea';
 import { generateReport } from '@/lib/api';
 import { type ApiKeys, loadApiKeys } from '@/lib/settings';
 import { Download, FileText, Loader2 } from 'lucide-react';
@@ -81,67 +88,50 @@ export function ReportStep({ onBack, workflowData, setWorkflowData }: StepProps)
   return (
     <div className="space-y-6">
       <StepHeader
+        step={6}
         title="Generate Summary Report"
         subtitle="AI-powered analysis report using your configured LLM provider"
       />
 
       <ErrorBanner message={error} />
 
-      <div className="bg-white border border-gray-200 rounded-lg p-4 grid grid-cols-1 md:grid-cols-2 gap-4">
-        <label className="text-sm text-gray-700">
-          <span className="block mb-1">Provider</span>
-          <select
-            value={provider}
-            onChange={(e) => handleProvider(e.target.value as Provider)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
-          >
+      <Card className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
+        <Field label="Provider">
+          <Select value={provider} onChange={(e) => handleProvider(e.target.value as Provider)}>
             <option value="google">Google (Gemini)</option>
             <option value="openai">OpenAI</option>
-          </select>
-        </label>
-        <label className="text-sm text-gray-700">
-          <span className="block mb-1">Model</span>
-          <input
-            type="text"
-            value={modelName}
-            onChange={(e) => setModelName(e.target.value)}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
-          />
-        </label>
-        <label className="text-sm text-gray-700 md:col-span-2">
-          <span className="block mb-1">Dataset description (optional)</span>
-          <textarea
+          </Select>
+        </Field>
+        <Field label="Model">
+          <Input type="text" value={modelName} onChange={(e) => setModelName(e.target.value)} />
+        </Field>
+        <Field label="Dataset description (optional)" className="md:col-span-2">
+          <Textarea
             value={datasetDescription}
             onChange={(e) => setDatasetDescription(e.target.value)}
             rows={2}
-            className="w-full px-3 py-2 border border-gray-300 rounded-md"
             placeholder="Briefly describe the dataset and prediction goal..."
           />
-        </label>
-      </div>
+        </Field>
+      </Card>
 
       {!apiKey && (
-        <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md text-sm">
+        <Alert variant="warning">
           No {provider} API key found. Add one on the Settings page to enable report generation.
-        </div>
+        </Alert>
       )}
 
       <div className="text-center">
-        <button
-          type="button"
-          onClick={run}
-          disabled={isGenerating || !apiKey}
-          className="px-8 py-3 bg-green-600 text-white rounded-md hover:bg-green-700 font-semibold inline-flex items-center gap-2 disabled:bg-gray-300"
-        >
+        <Button type="button" size="lg" onClick={run} disabled={isGenerating || !apiKey}>
           {isGenerating ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin" />
           ) : (
-            <FileText className="w-5 h-5" />
+            <FileText className="h-5 w-5" />
           )}
           {hasReport ? 'Regenerate Report' : 'Generate AI Report'}
-        </button>
+        </Button>
         {isGenerating && (
-          <p className="text-sm text-gray-500 mt-3">
+          <p className="mt-3 text-sm text-muted-foreground">
             Sending plots and metrics to the model — this can take a minute.
           </p>
         )}
@@ -150,20 +140,16 @@ export function ReportStep({ onBack, workflowData, setWorkflowData }: StepProps)
       {hasReport && report.markdown && (
         <div className="space-y-4">
           <div className="flex items-center justify-between">
-            <h3 className="text-lg font-semibold text-gray-900">Generated Report</h3>
-            <button
-              type="button"
-              onClick={download}
-              className="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 text-sm inline-flex items-center gap-2"
-            >
-              <Download className="w-4 h-4" /> Download .md
-            </button>
+            <h3 className="text-base font-semibold">Generated Report</h3>
+            <Button type="button" size="md" onClick={download}>
+              <Download className="h-4 w-4" /> Download .md
+            </Button>
           </div>
-          <div className="bg-white border border-gray-200 rounded-lg p-6 max-h-[500px] overflow-y-auto">
-            <pre className="whitespace-pre-wrap text-sm text-gray-700 font-sans">
+          <Card className="max-h-[500px] overflow-y-auto p-6">
+            <pre className="whitespace-pre-wrap font-sans text-sm text-foreground">
               {report.markdown}
             </pre>
-          </div>
+          </Card>
         </div>
       )}
 

@@ -1,5 +1,9 @@
 'use client';
 
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Table, TableBody, TableContainer, TableHead, Td, Th } from '@/components/ui/table';
 import {
   useDatasetPreview,
   useLoadUCIDataset,
@@ -82,6 +86,7 @@ export function DatasetStep({ onNext, workflowData, setWorkflowData }: StepProps
   return (
     <div className="space-y-6">
       <StepHeader
+        step={1}
         title="Dataset Selection"
         subtitle="Upload your own dataset or select from the UCI ML Repository"
       />
@@ -89,24 +94,24 @@ export function DatasetStep({ onNext, workflowData, setWorkflowData }: StepProps
       <ErrorBanner message={error} />
 
       {workflowData.dataset && (
-        <div className="bg-green-50 border border-green-200 text-green-700 px-4 py-3 rounded-md">
+        <Alert variant="success">
           <p className="font-medium">Selected: {workflowData.dataset.name}</p>
-          <p className="text-sm mt-1">
+          <p className="mt-1 text-sm">
             Source: {workflowData.dataset.source === 'upload' ? 'Uploaded File' : 'UCI Repository'}{' '}
             | Rows: {workflowData.dataset.rows} | Columns: {workflowData.dataset.columns.length}
           </p>
-        </div>
+        </Alert>
       )}
 
       <div className="grid grid-cols-2 gap-6">
         <button
           type="button"
           onClick={() => fileInputRef.current?.click()}
-          className="border-2 border-dashed border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors"
+          className="rounded-lg border-2 border-dashed border-border p-8 text-center transition-colors hover:border-foreground"
         >
-          <Upload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">Upload Dataset</h3>
-          <p className="text-sm text-gray-500">Click to browse for a CSV file</p>
+          <Upload className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+          <h3 className="mb-2 text-base font-semibold">Upload Dataset</h3>
+          <p className="text-sm text-muted-foreground">Click to browse for a CSV file</p>
           <input
             ref={fileInputRef}
             type="file"
@@ -119,74 +124,73 @@ export function DatasetStep({ onNext, workflowData, setWorkflowData }: StepProps
         <button
           type="button"
           onClick={() => setShowUCIModal(true)}
-          className="border-2 border-gray-300 rounded-lg p-8 text-center hover:border-blue-400 transition-colors"
+          className="rounded-lg border-2 border-border p-8 text-center transition-colors hover:border-foreground"
         >
-          <Database className="mx-auto h-12 w-12 text-gray-400 mb-4" />
-          <h3 className="text-lg font-semibold text-gray-900 mb-2">UCI Repository</h3>
-          <p className="text-sm text-gray-500">Select from popular datasets</p>
+          <Database className="mx-auto mb-4 h-12 w-12 text-muted-foreground" />
+          <h3 className="mb-2 text-base font-semibold">UCI Repository</h3>
+          <p className="text-sm text-muted-foreground">Select from popular datasets</p>
         </button>
       </div>
 
-      {/* Preview table */}
       {workflowData.dataset && (
-        <div className="border border-gray-200 rounded-lg">
-          <div className="px-4 py-2 border-b border-gray-200 bg-gray-50 flex items-center justify-between">
-            <h4 className="text-sm font-semibold text-gray-700">Data Preview</h4>
-            {preview.isFetching && <Loader2 className="w-4 h-4 animate-spin text-gray-400" />}
+        <TableContainer>
+          <div className="flex items-center justify-between border-b border-border bg-muted px-4 py-2">
+            <h4 className="text-sm font-semibold text-foreground">Data Preview</h4>
+            {preview.isFetching && (
+              <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
+            )}
           </div>
           {preview.isError && (
-            <p className="px-4 py-3 text-sm text-red-600">Could not load preview.</p>
+            <p className="px-4 py-3 text-sm text-destructive">Could not load preview.</p>
           )}
           {preview.data && (
-            <div className="overflow-x-auto max-h-72">
-              <table className="w-full text-sm">
-                <thead className="bg-gray-100 sticky top-0">
+            <div className="max-h-72 overflow-x-auto">
+              <Table>
+                <TableHead className="sticky top-0">
                   <tr>
                     {preview.data.columns.map((col) => (
-                      <th key={col} className="px-3 py-2 text-left font-medium text-gray-700">
+                      <Th key={col}>
                         {col}
-                        <span className="block text-[10px] font-normal text-gray-400">
+                        <span className="block text-[10px] font-normal text-muted-foreground">
                           {preview.data?.dtypes[col]}
                         </span>
-                      </th>
+                      </Th>
                     ))}
                   </tr>
-                </thead>
-                <tbody className="divide-y divide-gray-200">
+                </TableHead>
+                <TableBody>
                   {preview.data.head.map((row, i) => (
                     <tr key={i}>
                       {preview.data?.columns.map((col) => (
-                        <td key={col} className="px-3 py-1.5 text-gray-600 whitespace-nowrap">
+                        <Td key={col} className="whitespace-nowrap text-muted-foreground">
                           {String(row[col])}
-                        </td>
+                        </Td>
                       ))}
                     </tr>
                   ))}
-                </tbody>
-              </table>
+                </TableBody>
+              </Table>
             </div>
           )}
-        </div>
+        </TableContainer>
       )}
 
       <NavButtons onNext={onNext} nextDisabled={!workflowData.dataset || isLoading} />
 
       <Dialog.Root open={showUCIModal} onOpenChange={setShowUCIModal}>
         <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 bg-black/50 z-40" />
-          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 rounded-lg bg-white shadow-xl flex flex-col max-h-[80vh]">
-            <div className="flex items-center justify-between p-6 border-b border-gray-200">
-              <Dialog.Title className="text-xl font-bold text-gray-900">
-                Select UCI Dataset
-              </Dialog.Title>
-              <Dialog.Close className="text-gray-400 hover:text-gray-600">
-                <X className="w-6 h-6" />
+          <Dialog.Overlay className="fixed inset-0 z-40 bg-black/50 data-[state=open]:animate-overlayShow" />
+          <Dialog.Content className="fixed left-1/2 top-1/2 z-50 flex max-h-[80vh] w-full max-w-2xl -translate-x-1/2 -translate-y-1/2 flex-col rounded-xl border border-border bg-popover text-popover-foreground shadow-lg data-[state=open]:animate-contentShow">
+            <div className="flex items-center justify-between border-b border-border p-6">
+              <Dialog.Title className="text-lg font-bold">Select UCI Dataset</Dialog.Title>
+              <Dialog.Close className="text-muted-foreground transition-colors hover:text-foreground">
+                <X className="h-6 w-6" />
               </Dialog.Close>
             </div>
-            <div className="flex-1 overflow-y-auto p-6 space-y-3">
+            <div className="flex-1 space-y-3 overflow-y-auto p-6">
               {uciDatasets.isLoading && (
-                <div className="flex items-center gap-2 text-gray-500">
-                  <Loader2 className="w-4 h-4 animate-spin" /> Loading datasets...
+                <div className="flex items-center gap-2 text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" /> Loading datasets...
                 </div>
               )}
               {uciDatasets.data?.map((dataset) => (
@@ -195,32 +199,30 @@ export function DatasetStep({ onNext, workflowData, setWorkflowData }: StepProps
                   type="button"
                   onClick={() => handleUCISelect(dataset.id)}
                   disabled={isLoading}
-                  className="w-full text-left p-4 border border-gray-300 rounded-lg hover:border-blue-400 hover:bg-blue-50 transition-colors disabled:opacity-50"
+                  className="w-full rounded-lg border border-border p-4 text-left transition-colors hover:border-foreground hover:bg-accent disabled:opacity-50"
                 >
-                  <h4 className="font-semibold text-gray-900">{dataset.name}</h4>
+                  <h4 className="font-semibold">{dataset.name}</h4>
                   {dataset.description && (
-                    <p className="text-sm text-gray-500 mt-1">{dataset.description}</p>
+                    <p className="mt-1 text-sm text-muted-foreground">{dataset.description}</p>
                   )}
-                  <p className="text-xs text-gray-400 mt-1">Dataset ID: {dataset.id}</p>
+                  <p className="mt-1 text-xs text-muted-foreground">Dataset ID: {dataset.id}</p>
                 </button>
               ))}
             </div>
-            <div className="p-6 border-t border-gray-200 bg-gray-50 flex items-center gap-2">
-              <input
+            <div className="flex items-center gap-2 border-t border-border bg-muted p-6">
+              <Input
                 type="number"
                 value={customId}
                 onChange={(e) => setCustomId(e.target.value)}
                 placeholder="Enter a UCI dataset ID"
-                className="flex-1 px-3 py-2 border border-gray-300 rounded-md text-sm"
               />
-              <button
+              <Button
                 type="button"
                 disabled={!customId || isLoading}
                 onClick={() => handleUCISelect(Number(customId))}
-                className="px-4 py-2 bg-blue-600 text-white rounded-md text-sm hover:bg-blue-700 disabled:bg-gray-300"
               >
                 {isLoading ? 'Loading...' : 'Load by ID'}
-              </button>
+              </Button>
             </div>
           </Dialog.Content>
         </Dialog.Portal>

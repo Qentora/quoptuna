@@ -1,5 +1,8 @@
 'use client';
 
+import { Alert } from '@/components/ui/alert';
+import { Select } from '@/components/ui/select';
+import { Table, TableBody, TableContainer, TableHead, Td, Th } from '@/components/ui/table';
 import { useDatasetPreview } from '@/lib/hooks';
 import { FileText } from 'lucide-react';
 import { NavButtons } from '../NavButtons';
@@ -68,90 +71,97 @@ export function FeaturesStep({ onNext, onBack, workflowData, setWorkflowData }: 
   return (
     <div className="space-y-6">
       <StepHeader
+        step={2}
         title="Feature Selection"
         subtitle="Select input features, the target column, and map labels for binary classification"
       />
 
       {workflowData.dataset && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-          <FileText className="w-5 h-5 text-blue-600 mt-0.5" />
-          <div>
-            <p className="font-medium text-blue-900">{workflowData.dataset.name}</p>
-            <p className="text-sm text-blue-700">
-              {workflowData.dataset.rows} rows × {workflowData.dataset.columns.length} columns
-            </p>
+        <Alert variant="info" icon={false}>
+          <div className="flex items-start gap-3">
+            <FileText className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-medium">{workflowData.dataset.name}</p>
+              <p className="text-sm opacity-80">
+                {workflowData.dataset.rows} rows × {workflowData.dataset.columns.length} columns
+              </p>
+            </div>
           </div>
-        </div>
+        </Alert>
       )}
 
       <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <h3 className="text-lg font-semibold text-gray-900">Columns</h3>
+          <h3 className="text-base font-semibold">Columns</h3>
           <div className="flex gap-2 text-sm">
-            <button type="button" onClick={selectAll} className="text-blue-600 hover:text-blue-700">
+            <button
+              type="button"
+              onClick={selectAll}
+              className="font-medium text-foreground hover:underline"
+            >
               Select All as Features
             </button>
-            <span className="text-gray-300">|</span>
-            <button type="button" onClick={clearAll} className="text-blue-600 hover:text-blue-700">
+            <span className="text-border">|</span>
+            <button
+              type="button"
+              onClick={clearAll}
+              className="font-medium text-foreground hover:underline"
+            >
               Clear Selection
             </button>
           </div>
         </div>
 
-        <div className="border border-gray-200 rounded-lg overflow-hidden">
-          <table className="w-full">
-            <thead className="bg-gray-50 border-b border-gray-200">
+        <TableContainer>
+          <Table>
+            <TableHead>
               <tr>
-                <th className="px-4 py-3 text-left text-sm font-semibold text-gray-900">Column</th>
-                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900">
-                  Feature
-                </th>
-                <th className="px-4 py-3 text-center text-sm font-semibold text-gray-900">
-                  Target
-                </th>
+                <Th className="text-foreground">Column</Th>
+                <Th className="text-center text-foreground">Feature</Th>
+                <Th className="text-center text-foreground">Target</Th>
               </tr>
-            </thead>
-            <tbody className="divide-y divide-gray-200">
+            </TableHead>
+            <TableBody>
               {(workflowData.dataset?.columns ?? []).map((column) => (
-                <tr key={column} className="hover:bg-gray-50">
-                  <td className="px-4 py-3 text-sm text-gray-900">{column}</td>
-                  <td className="px-4 py-3 text-center">
+                <tr key={column} className="hover:bg-muted">
+                  <Td>{column}</Td>
+                  <Td className="text-center">
                     <input
                       type="checkbox"
                       checked={selectedFeatures.includes(column)}
                       onChange={() => toggleFeature(column)}
                       disabled={targetColumn === column}
-                      className="w-4 h-4 text-blue-600 rounded disabled:opacity-50"
+                      className="h-4 w-4 rounded accent-primary disabled:opacity-50"
                     />
-                  </td>
-                  <td className="px-4 py-3 text-center">
+                  </Td>
+                  <Td className="text-center">
                     <input
                       type="radio"
                       name="target"
                       checked={targetColumn === column}
                       onChange={() => setTarget(column)}
-                      className="w-4 h-4 text-blue-600"
+                      className="h-4 w-4 accent-primary"
                     />
-                  </td>
+                  </Td>
                 </tr>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </TableBody>
+          </Table>
+        </TableContainer>
 
         {targetColumn && needsMapping && (
-          <div className="bg-purple-50 border border-purple-200 rounded-lg p-4 space-y-3">
-            <p className="font-medium text-purple-900">Label Mapping (binary classification)</p>
-            <p className="text-sm text-purple-700">
+          <Alert variant="info" icon={false} className="block">
+            <p className="font-medium">Label Mapping (binary classification)</p>
+            <p className="mt-1 text-sm opacity-80">
               Quantum models require labels encoded as -1 / 1. Map each target value below.
             </p>
-            <div className="grid grid-cols-2 gap-4">
-              <label className="text-sm">
-                <span className="block mb-1 text-gray-700">Maps to -1 (negative)</span>
-                <select
+            <div className="mt-3 grid grid-cols-2 gap-4">
+              <label className="text-sm" htmlFor="map-neg">
+                <span className="mb-1 block">Maps to -1 (negative)</span>
+                <Select
+                  id="map-neg"
                   value={labelMapping.neg === null ? '' : String(labelMapping.neg)}
                   onChange={(e) => setMapping('neg', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 >
                   <option value="">Select...</option>
                   {targetValues.map((v) => (
@@ -159,14 +169,14 @@ export function FeaturesStep({ onNext, onBack, workflowData, setWorkflowData }: 
                       {String(v)}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
-              <label className="text-sm">
-                <span className="block mb-1 text-gray-700">Maps to 1 (positive)</span>
-                <select
+              <label className="text-sm" htmlFor="map-pos">
+                <span className="mb-1 block">Maps to 1 (positive)</span>
+                <Select
+                  id="map-pos"
                   value={labelMapping.pos === null ? '' : String(labelMapping.pos)}
                   onChange={(e) => setMapping('pos', e.target.value)}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-md"
                 >
                   <option value="">Select...</option>
                   {targetValues.map((v) => (
@@ -174,28 +184,28 @@ export function FeaturesStep({ onNext, onBack, workflowData, setWorkflowData }: 
                       {String(v)}
                     </option>
                   ))}
-                </select>
+                </Select>
               </label>
             </div>
-          </div>
+          </Alert>
         )}
 
-        <div className="bg-gray-50 rounded-lg p-4 space-y-2 text-sm">
+        <div className="space-y-2 rounded-lg bg-muted p-4 text-sm">
           <div className="flex justify-between">
-            <span className="text-gray-600">Selected Features:</span>
-            <span className="font-medium text-gray-900">{selectedFeatures.length} column(s)</span>
+            <span className="text-muted-foreground">Selected Features:</span>
+            <span className="font-medium">{selectedFeatures.length} column(s)</span>
           </div>
           <div className="flex justify-between">
-            <span className="text-gray-600">Target Column:</span>
-            <span className="font-medium text-gray-900">{targetColumn || 'Not selected'}</span>
+            <span className="text-muted-foreground">Target Column:</span>
+            <span className="font-medium">{targetColumn || 'Not selected'}</span>
           </div>
         </div>
 
         {!canProceed && (
-          <div className="bg-yellow-50 border border-yellow-200 text-yellow-700 px-4 py-3 rounded-md text-sm">
+          <Alert variant="warning">
             Select at least one feature, a target column, and (for binary targets) a complete label
             mapping to continue.
-          </div>
+          </Alert>
         )}
       </div>
 

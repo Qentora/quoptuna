@@ -1,5 +1,10 @@
 'use client';
 
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Field } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import { generateSHAP, getMetrics } from '@/lib/api';
 import * as Tabs from '@radix-ui/react-tabs';
 import { BarChart3, Download, Loader2 } from 'lucide-react';
@@ -77,81 +82,72 @@ export function AnalyzeStep({ onNext, onBack, workflowData, setWorkflowData }: S
   return (
     <div className="space-y-6">
       <StepHeader
+        step={5}
         title="SHAP Analysis & Visualizations"
         subtitle="Explain the selected model with SHAP plots and classification metrics"
       />
 
       {optimization.bestValue !== null && (
-        <div className="bg-green-50 border border-green-200 rounded-lg p-4 flex items-start gap-3">
-          <BarChart3 className="w-5 h-5 text-green-600 mt-0.5" />
-          <p className="text-sm text-green-700">
+        <Alert variant="success">
+          <span className="text-sm">
             Analyzing trial <strong>#{optimization.selectedTrial ?? 'best'}</strong> · Best F1{' '}
             <strong>{optimization.bestValue.toFixed(4)}</strong>
-          </p>
-        </div>
+          </span>
+        </Alert>
       )}
 
       <ErrorBanner message={error} />
 
-      <div className="bg-white border border-gray-200 rounded-lg p-4 grid grid-cols-1 md:grid-cols-3 gap-4">
-        <label className="flex items-center gap-2 text-sm text-gray-700">
+      <Card className="grid grid-cols-1 gap-4 p-4 md:grid-cols-3">
+        <label className="flex items-center gap-2 text-sm">
           <input
             type="checkbox"
             checked={useProba}
             onChange={(e) => setUseProba(e.target.checked)}
-            className="w-4 h-4 text-blue-600 rounded"
+            className="h-4 w-4 rounded accent-primary"
           />
           Use prediction probabilities
         </label>
-        <label className="text-sm text-gray-700">
-          <span className="block mb-1">Subset size</span>
-          <input
+        <Field label="Subset size">
+          <Input
             type="number"
             min={10}
             max={500}
             value={subsetSize}
             onChange={(e) => setSubsetSize(Number(e.target.value))}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md"
           />
-        </label>
-        <label className="text-sm text-gray-700">
-          <span className="block mb-1">Waterfall sample index</span>
-          <input
+        </Field>
+        <Field label="Waterfall sample index">
+          <Input
             type="number"
             min={0}
             value={sampleIndex}
             onChange={(e) => setSampleIndex(Number(e.target.value))}
-            className="w-full px-3 py-1.5 border border-gray-300 rounded-md"
           />
-        </label>
-      </div>
+        </Field>
+      </Card>
 
       <div className="text-center">
-        <button
-          type="button"
-          onClick={runAnalysis}
-          disabled={isGenerating}
-          className="px-8 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold inline-flex items-center gap-2 disabled:bg-gray-300"
-        >
+        <Button type="button" size="lg" onClick={runAnalysis} disabled={isGenerating}>
           {isGenerating ? (
-            <Loader2 className="w-5 h-5 animate-spin" />
+            <Loader2 className="h-5 w-5 animate-spin" />
           ) : (
-            <BarChart3 className="w-5 h-5" />
+            <BarChart3 className="h-5 w-5" />
           )}
           {hasSHAP ? 'Re-run Analysis' : 'Generate SHAP Analysis'}
-        </button>
+        </Button>
       </div>
 
       {hasSHAP && (
         <div className="space-y-6">
           {availableTabs.length > 0 && (
             <Tabs.Root defaultValue={availableTabs[0].id} className="w-full">
-              <Tabs.List className="flex gap-2 overflow-x-auto border-b border-gray-200 mb-4">
+              <Tabs.List className="mb-4 flex gap-2 overflow-x-auto border-b border-border">
                 {availableTabs.map((t) => (
                   <Tabs.Trigger
                     key={t.id}
                     value={t.id}
-                    className="px-4 py-2 text-sm font-medium text-gray-600 data-[state=active]:text-blue-600 data-[state=active]:border-b-2 data-[state=active]:border-blue-600"
+                    className="border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground"
                   >
                     {t.label}
                   </Tabs.Trigger>
@@ -159,20 +155,21 @@ export function AnalyzeStep({ onNext, onBack, workflowData, setWorkflowData }: S
               </Tabs.List>
               {availableTabs.map((t) => (
                 <Tabs.Content key={t.id} value={t.id}>
-                  <div className="border border-gray-200 rounded-lg p-4">
+                  <div className="rounded-lg border border-border bg-card p-4">
                     <img
                       src={analysis.plots[t.id]}
                       alt={`${t.label} SHAP plot`}
                       className="mx-auto max-h-[480px]"
                     />
-                    <div className="text-right mt-2">
-                      <button
+                    <div className="mt-2 text-right">
+                      <Button
                         type="button"
+                        variant="link"
+                        size="sm"
                         onClick={() => downloadDataUrl(analysis.plots[t.id], `shap-${t.id}.png`)}
-                        className="text-sm text-blue-600 hover:text-blue-700 inline-flex items-center gap-1"
                       >
-                        <Download className="w-4 h-4" /> Download
-                      </button>
+                        <Download className="h-4 w-4" /> Download
+                      </Button>
                     </div>
                   </div>
                 </Tabs.Content>
@@ -181,52 +178,49 @@ export function AnalyzeStep({ onNext, onBack, workflowData, setWorkflowData }: S
           )}
 
           {analysis.featureImportance && analysis.featureImportance.length > 0 && (
-            <div className="bg-white border border-gray-200 rounded-lg p-6">
-              <h3 className="text-lg font-semibold text-gray-900 mb-4">Feature Importance</h3>
+            <Card className="p-6">
+              <h3 className="mb-4 text-base font-semibold">Feature Importance</h3>
               <div className="space-y-3">
-                {analysis.featureImportance.map((item, index) => {
+                {analysis.featureImportance.map((item) => {
                   const max = analysis.featureImportance?.[0]?.importance || 1;
                   return (
                     <div key={item.feature} className="space-y-1">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium text-gray-700">{item.feature}</span>
-                        <span className="text-gray-500">{item.importance.toFixed(3)}</span>
+                        <span className="font-medium">{item.feature}</span>
+                        <span className="text-muted-foreground">{item.importance.toFixed(3)}</span>
                       </div>
-                      <div className="w-full bg-gray-200 rounded-full h-2.5 overflow-hidden">
+                      <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                         <div
-                          className="h-full rounded-full"
-                          style={{
-                            width: `${(item.importance / max) * 100}%`,
-                            backgroundColor: `hsl(${220 - index * 18}, 70%, 50%)`,
-                          }}
+                          className="h-full rounded-full bg-primary"
+                          style={{ width: `${(item.importance / max) * 100}%` }}
                         />
                       </div>
                     </div>
                   );
                 })}
               </div>
-            </div>
+            </Card>
           )}
 
           {(analysis.confusionMatrixPlot || analysis.metrics) && (
-            <div className="bg-white border border-gray-200 rounded-lg p-6 grid grid-cols-1 md:grid-cols-2 gap-6">
+            <Card className="grid grid-cols-1 gap-6 p-6 md:grid-cols-2">
               {analysis.confusionMatrixPlot && (
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Confusion Matrix</h3>
+                  <h3 className="mb-2 text-base font-semibold">Confusion Matrix</h3>
                   <img
                     src={analysis.confusionMatrixPlot}
                     alt="Confusion matrix"
-                    className="max-h-80 mx-auto"
+                    className="mx-auto max-h-80"
                   />
                 </div>
               )}
               {analysis.metrics && (
                 <div>
-                  <h3 className="text-lg font-semibold text-gray-900 mb-2">Metrics</h3>
+                  <h3 className="mb-2 text-base font-semibold">Metrics</h3>
                   <MetricsList metrics={analysis.metrics} />
                 </div>
               )}
-            </div>
+            </Card>
           )}
         </div>
       )}
@@ -253,16 +247,16 @@ function MetricsList({ metrics }: { metrics: Record<string, any> }) {
         {scalarEntries
           .filter(([k]) => k !== 'classification_report')
           .map(([key, value]) => (
-            <div key={key} className="flex justify-between border-b border-gray-100 py-1">
-              <dt className="text-gray-600">{key}</dt>
-              <dd className="font-medium text-gray-900">
+            <div key={key} className="flex justify-between border-b border-border py-1">
+              <dt className="text-muted-foreground">{key}</dt>
+              <dd className="font-medium">
                 {typeof value === 'number' ? value.toFixed(4) : String(value)}
               </dd>
             </div>
           ))}
       </dl>
       {typeof report === 'string' && (
-        <pre className="text-xs bg-gray-50 border border-gray-200 rounded-md p-3 overflow-x-auto">
+        <pre className="overflow-x-auto rounded-md border border-border bg-muted p-3 font-mono text-xs">
           {report}
         </pre>
       )}

@@ -1,5 +1,8 @@
 'use client';
 
+import { Alert } from '@/components/ui/alert';
+import { Field } from '@/components/ui/field';
+import { Input } from '@/components/ui/input';
 import * as Slider from '@radix-ui/react-slider';
 import { FileText } from 'lucide-react';
 import { NavButtons } from '../NavButtons';
@@ -18,75 +21,78 @@ export function ConfigureStep({ onNext, onBack, workflowData, setWorkflowData }:
   return (
     <div className="space-y-6">
       <StepHeader
+        step={3}
         title="Optimization Configuration"
         subtitle="Set up the hyperparameter optimization study"
       />
 
       {dataset && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-          <FileText className="w-5 h-5 text-blue-600 mt-0.5" />
-          <div>
-            <p className="font-medium text-blue-900">{dataset.name}</p>
-            <p className="text-sm text-blue-700 mt-1">
-              Features: {features.selectedFeatures.join(', ')} | Target: {features.targetColumn}
-            </p>
+        <Alert variant="info" icon={false}>
+          <div className="flex items-start gap-3">
+            <FileText className="mt-0.5 h-5 w-5 shrink-0" />
+            <div>
+              <p className="font-medium">{dataset.name}</p>
+              <p className="mt-1 text-sm opacity-80">
+                Features: {features.selectedFeatures.join(', ')} | Target: {features.targetColumn}
+              </p>
+            </div>
           </div>
-        </div>
+        </Alert>
       )}
 
       <div className="space-y-5">
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="study-name">
-            Study Name
-          </label>
-          <input
+        <Field
+          label="Study Name"
+          htmlFor="study-name"
+          helper="Unique name for this optimization study"
+        >
+          <Input
             id="study-name"
             type="text"
             value={configuration.studyName}
             onChange={(e) => update('studyName', e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
           />
-          <p className="text-sm text-gray-500 mt-1">Unique name for this optimization study</p>
-        </div>
+        </Field>
 
-        <div>
-          <label className="block text-sm font-medium text-gray-700 mb-2" htmlFor="db-name">
-            Database Name
-          </label>
-          <input
+        <Field
+          label="Database Name"
+          htmlFor="db-name"
+          helper={
+            <>
+              SQLite database (stored under <code className="font-mono">db/&lt;name&gt;.db</code>)
+            </>
+          }
+        >
+          <Input
             id="db-name"
             type="text"
             value={configuration.databaseName}
             onChange={(e) => update('databaseName', e.target.value)}
-            className="w-full px-4 py-2 border border-gray-300 rounded-md focus:ring-2 focus:ring-blue-500"
           />
-          <p className="text-sm text-gray-500 mt-1">
-            SQLite database (stored under <code>db/&lt;name&gt;.db</code>)
-          </p>
-        </div>
+        </Field>
 
         <div>
-          <div className="flex items-center justify-between mb-2">
-            <label className="block text-sm font-medium text-gray-700" htmlFor="trials">
+          <div className="mb-2 flex items-center justify-between">
+            <label className="text-sm font-medium" htmlFor="trials">
               Number of Trials
             </label>
-            <span className="text-sm font-semibold text-blue-600">{configuration.numTrials}</span>
+            <span className="text-sm font-semibold">{configuration.numTrials}</span>
           </div>
           <Slider.Root
             id="trials"
-            className="relative flex items-center select-none touch-none w-full h-5"
+            className="relative flex h-5 w-full touch-none select-none items-center"
             min={1}
             max={300}
             step={1}
             value={[configuration.numTrials]}
             onValueChange={([v]) => update('numTrials', v)}
           >
-            <Slider.Track className="bg-gray-200 relative grow rounded-full h-1.5">
-              <Slider.Range className="absolute bg-blue-600 rounded-full h-full" />
+            <Slider.Track className="relative h-1.5 grow rounded-full bg-muted">
+              <Slider.Range className="absolute h-full rounded-full bg-primary" />
             </Slider.Track>
-            <Slider.Thumb className="block w-4 h-4 bg-white border-2 border-blue-600 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-300" />
+            <Slider.Thumb className="block h-4 w-4 rounded-full border-2 border-primary bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
           </Slider.Root>
-          <p className="text-sm text-gray-500 mt-1">
+          <p className="mt-1 text-sm text-muted-foreground">
             Recommended: 50-200 trials (more trials = better results but longer run time)
           </p>
         </div>

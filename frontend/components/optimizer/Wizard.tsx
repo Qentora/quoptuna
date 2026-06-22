@@ -1,6 +1,17 @@
 'use client';
 
-import { BarChart3, CheckCircle2, Circle } from 'lucide-react';
+import { Card } from '@/components/ui/card';
+import { cn } from '@/lib/utils';
+import {
+  BarChart3,
+  Check,
+  Database,
+  FileText,
+  type LucideIcon,
+  PlayCircle,
+  Settings2,
+  SlidersHorizontal,
+} from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
 import { AnalyzeStep } from './steps/AnalyzeStep';
@@ -12,14 +23,16 @@ import { ReportStep } from './steps/ReportStep';
 import type { WorkflowData } from './types';
 import { initialWorkflowData } from './types';
 
-const steps = [
-  { id: 1, title: 'Dataset', description: 'Upload or select your dataset' },
-  { id: 2, title: 'Features', description: 'Select features and target' },
-  { id: 3, title: 'Configure', description: 'Setup optimization parameters' },
-  { id: 4, title: 'Optimize', description: 'Run hyperparameter optimization' },
-  { id: 5, title: 'Analyze', description: 'SHAP analysis and visualizations' },
-  { id: 6, title: 'Report', description: 'Generate AI summary' },
+const steps: Array<{ id: number; title: string; description: string; icon: LucideIcon }> = [
+  { id: 1, title: 'Dataset', description: 'Upload or select your dataset', icon: Database },
+  { id: 2, title: 'Features', description: 'Select features and target', icon: SlidersHorizontal },
+  { id: 3, title: 'Configure', description: 'Setup optimization parameters', icon: Settings2 },
+  { id: 4, title: 'Optimize', description: 'Run hyperparameter optimization', icon: PlayCircle },
+  { id: 5, title: 'Analyze', description: 'SHAP analysis and visualizations', icon: BarChart3 },
+  { id: 6, title: 'Report', description: 'Generate AI summary', icon: FileText },
 ];
+
+const stepIcons: Record<number, LucideIcon> = Object.fromEntries(steps.map((s) => [s.id, s.icon]));
 
 export interface StepProps {
   onNext: () => void;
@@ -58,59 +71,65 @@ export function Wizard() {
   };
 
   return (
-    <div className="h-full flex flex-col bg-gray-50">
-      <div className="bg-white border-b border-gray-200 px-8 py-6">
-        <h1 className="text-3xl font-bold text-gray-900">QuOptuna Optimizer</h1>
-        <p className="text-gray-600 mt-2">
-          Quantum-Enhanced Machine Learning with Automated Hyperparameter Optimization
+    <div className="flex h-full flex-col bg-background">
+      <div className="border-b border-border bg-card px-8 py-6">
+        <h1 className="text-2xl font-bold tracking-tight">QuOptuna Optimizer</h1>
+        <p className="mt-1 text-sm text-muted-foreground">
+          Quantum-enhanced machine learning with automated hyperparameter optimization
         </p>
       </div>
 
-      <div className="bg-white border-b border-gray-200 px-8 py-4">
-        <div className="flex items-center justify-between max-w-5xl mx-auto">
+      <div className="border-b border-border bg-card px-8 py-4">
+        <div className="mx-auto flex max-w-5xl items-center justify-between">
           {steps.map((step, index) => {
             const enabled = completedSteps.includes(step.id - 1) || step.id === 1;
+            const done = completedSteps.includes(step.id);
+            const current = currentStep === step.id;
+            const Icon = step.icon;
             return (
-              <div key={step.id} className="flex items-center flex-1">
-                <div className="flex flex-col items-center flex-1">
+              <div key={step.id} className="flex flex-1 items-center">
+                <div className="flex flex-1 flex-col items-center">
                   <button
                     type="button"
                     onClick={() => handleStepClick(step.id)}
                     disabled={!enabled}
-                    className={`w-10 h-10 rounded-full flex items-center justify-center border-2 transition-all ${
-                      completedSteps.includes(step.id)
-                        ? 'bg-green-500 border-green-500 text-white'
-                        : currentStep === step.id
-                          ? 'bg-blue-500 border-blue-500 text-white'
-                          : 'bg-white border-gray-300 text-gray-400'
-                    } ${enabled && currentStep !== step.id ? 'hover:border-blue-400 cursor-pointer' : 'cursor-not-allowed'}`}
-                  >
-                    {completedSteps.includes(step.id) ? (
-                      <CheckCircle2 className="w-5 h-5" />
-                    ) : (
-                      <Circle className="w-5 h-5" />
+                    className={cn(
+                      'flex h-10 w-10 items-center justify-center rounded-full border transition-colors',
+                      done
+                        ? 'border-transparent bg-accent-emerald text-accent-emerald-foreground'
+                        : current
+                          ? 'border-transparent bg-primary text-primary-foreground'
+                          : 'border-border bg-card text-muted-foreground',
+                      enabled && !current ? 'cursor-pointer hover:border-foreground' : '',
+                      !enabled && 'cursor-not-allowed'
                     )}
+                  >
+                    {done ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
                   </button>
-                  <div className="text-center mt-2">
+                  <div className="mt-2 text-center">
                     <p
-                      className={`text-sm font-medium ${
-                        currentStep === step.id
-                          ? 'text-blue-600'
-                          : completedSteps.includes(step.id)
-                            ? 'text-green-600'
-                            : 'text-gray-400'
-                      }`}
+                      className={cn(
+                        'text-sm font-medium',
+                        current
+                          ? 'text-foreground'
+                          : done
+                            ? 'text-accent-emerald-foreground'
+                            : 'text-muted-foreground'
+                      )}
                     >
                       {step.title}
                     </p>
-                    <p className="text-xs text-gray-500 mt-1 max-w-[120px]">{step.description}</p>
+                    <p className="mt-1 max-w-[120px] text-xs text-muted-foreground">
+                      {step.description}
+                    </p>
                   </div>
                 </div>
                 {index < steps.length - 1 && (
                   <div
-                    className={`h-0.5 flex-1 mx-2 ${
-                      completedSteps.includes(step.id) ? 'bg-green-500' : 'bg-gray-300'
-                    }`}
+                    className={cn(
+                      'mx-2 h-0.5 flex-1',
+                      done ? 'bg-accent-emerald-foreground' : 'bg-border'
+                    )}
                   />
                 )}
               </div>
@@ -120,7 +139,7 @@ export function Wizard() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-8 py-6">
-        <div className="max-w-5xl mx-auto bg-white rounded-lg shadow-sm border border-gray-200 p-8">
+        <Card className="mx-auto max-w-5xl p-8">
           <AnimatePresence mode="wait">
             <motion.div
               key={currentStep}
@@ -137,20 +156,29 @@ export function Wizard() {
               {currentStep === 6 && <ReportStep {...stepProps} />}
             </motion.div>
           </AnimatePresence>
-        </div>
+        </Card>
       </div>
     </div>
   );
 }
 
-export function StepHeader({ title, subtitle }: { title: string; subtitle: string }) {
+export function StepHeader({
+  title,
+  subtitle,
+  step,
+}: {
+  title: string;
+  subtitle: string;
+  step?: number;
+}) {
+  const Icon = step ? stepIcons[step] : BarChart3;
   return (
     <div>
-      <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
-        <BarChart3 className="w-6 h-6 text-blue-600" />
+      <h2 className="flex items-center gap-2 text-xl font-bold tracking-tight">
+        {Icon && <Icon className="h-6 w-6 text-muted-foreground" />}
         {title}
       </h2>
-      <p className="text-gray-600 mt-2">{subtitle}</p>
+      <p className="mt-1 text-sm text-muted-foreground">{subtitle}</p>
     </div>
   );
 }

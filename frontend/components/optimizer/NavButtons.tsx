@@ -1,5 +1,8 @@
 'use client';
 
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+
 export function NavButtons({
   onBack,
   onNext,
@@ -18,26 +21,16 @@ export function NavButtons({
   return (
     <div className="flex justify-between pt-4">
       {onBack ? (
-        <button
-          type="button"
-          onClick={onBack}
-          disabled={backDisabled}
-          className="px-6 py-2 border border-gray-300 text-gray-700 rounded-md hover:bg-gray-50 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
-        >
+        <Button type="button" variant="outline" onClick={onBack} disabled={backDisabled}>
           Previous
-        </button>
+        </Button>
       ) : (
         <span />
       )}
       {!hideNext && (
-        <button
-          type="button"
-          onClick={onNext}
-          disabled={nextDisabled}
-          className="px-6 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed"
-        >
+        <Button type="button" onClick={onNext} disabled={nextDisabled}>
           {nextLabel}
-        </button>
+        </Button>
       )}
     </div>
   );
@@ -45,9 +38,5 @@ export function NavButtons({
 
 export function ErrorBanner({ message }: { message: string | null }) {
   if (!message) return null;
-  return (
-    <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-md">
-      {message}
-    </div>
-  );
+  return <Alert variant="destructive">{message}</Alert>;
 }

@@ -1,8 +1,13 @@
 'use client';
 
+import { Alert } from '@/components/ui/alert';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Table, TableBody, TableContainer, TableHead, Td, Th } from '@/components/ui/table';
 import { pollOptimization, startOptimization } from '@/lib/api';
+import { cn } from '@/lib/utils';
 import * as Progress from '@radix-ui/react-progress';
-import { BarChart3, Loader2, PlayCircle } from 'lucide-react';
+import { Loader2, PlayCircle } from 'lucide-react';
 import { useState } from 'react';
 import { ErrorBanner, NavButtons } from '../NavButtons';
 import { StepHeader } from '../Wizard';
@@ -100,130 +105,137 @@ export function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: 
   return (
     <div className="space-y-6">
       <StepHeader
+        step={4}
         title="Run Optimization"
         subtitle="Execute the study and pick a trial to analyze"
       />
 
       <ErrorBanner message={error} />
 
-      <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 flex items-start gap-3">
-        <BarChart3 className="w-5 h-5 text-blue-600 mt-0.5" />
-        <p className="text-sm text-blue-700">
+      <Alert variant="info">
+        <span className="text-sm">
           Study: <strong>{configuration.studyName}</strong> | Trials:{' '}
           <strong>{configuration.numTrials}</strong> | Features:{' '}
           <strong>{features.selectedFeatures.length}</strong>
-        </p>
-      </div>
+        </span>
+      </Alert>
 
       {!hasResults && !isRunning && (
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-6 text-center">
-          <button
-            type="button"
-            onClick={run}
-            className="px-8 py-3 bg-blue-600 text-white rounded-md hover:bg-blue-700 font-semibold inline-flex items-center gap-2"
-          >
-            <PlayCircle className="w-5 h-5" />
+        <Card className="bg-muted p-6 text-center">
+          <Button type="button" size="lg" onClick={run}>
+            <PlayCircle className="h-5 w-5" />
             Start Optimization
-          </button>
-          <p className="text-sm text-blue-700 mt-3">
+          </Button>
+          <p className="mt-3 text-sm text-muted-foreground">
             Runs {configuration.numTrials} trials across quantum and classical models. This may take
             several minutes.
           </p>
-        </div>
+        </Card>
       )}
 
       {isRunning && (
-        <div className="bg-white border border-gray-200 rounded-lg p-6">
-          <div className="flex items-center justify-between mb-4">
+        <Card className="p-6">
+          <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Loader2 className="w-6 h-6 text-blue-600 animate-spin" />
+              <Loader2 className="h-6 w-6 animate-spin text-foreground" />
               <div>
-                <p className="font-medium text-gray-900">Optimization in Progress</p>
-                <p className="text-sm text-gray-500">
+                <p className="font-medium">Optimization in Progress</p>
+                <p className="text-sm text-muted-foreground">
                   Trial {currentTrial} of {configuration.numTrials}
                 </p>
               </div>
             </div>
-            <span className="text-2xl font-bold text-blue-600">{Math.round(progress)}%</span>
+            <span className="text-2xl font-bold">{Math.round(progress)}%</span>
           </div>
           <Progress.Root
-            className="w-full bg-gray-200 rounded-full h-3 overflow-hidden"
+            className="h-3 w-full overflow-hidden rounded-full bg-muted"
             value={progress}
           >
             <Progress.Indicator
-              className="bg-blue-600 h-full transition-all duration-300"
+              className="h-full bg-primary transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </Progress.Root>
           {bestValue !== null && (
-            <div className="mt-4 flex items-center justify-between p-3 bg-green-50 border border-green-200 rounded-md">
-              <span className="text-sm font-medium text-green-900">Current Best F1:</span>
-              <span className="text-lg font-bold text-green-700">{bestValue.toFixed(4)}</span>
+            <div className="mt-4 flex items-center justify-between rounded-md border border-accent-emerald bg-accent-emerald/40 p-3">
+              <span className="text-sm font-medium text-accent-emerald-foreground">
+                Current Best F1:
+              </span>
+              <span className="text-lg font-bold text-accent-emerald-foreground">
+                {bestValue.toFixed(4)}
+              </span>
             </div>
           )}
-        </div>
+        </Card>
       )}
 
       {(hasResults || liveTrials.length > 0) && (
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-          <BestTrialCard label="Best Quantum" trial={bestQuantum} accent="purple" />
-          <BestTrialCard label="Best Classical" trial={bestClassical} accent="orange" />
+        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+          <BestTrialCard label="Best Quantum" trial={bestQuantum} accent="quantum" />
+          <BestTrialCard label="Best Classical" trial={bestClassical} accent="classical" />
         </div>
       )}
 
       {allTrials.length > 0 && (
-        <div className="bg-white border border-gray-200 rounded-lg">
-          <div className="px-4 py-2 border-b border-gray-200 bg-gray-50">
-            <h4 className="text-sm font-semibold text-gray-700">Trials (select one to analyze)</h4>
+        <TableContainer>
+          <div className="border-b border-border bg-muted px-4 py-2">
+            <h4 className="text-sm font-semibold text-foreground">
+              Trials (select one to analyze)
+            </h4>
           </div>
           <div className="max-h-72 overflow-y-auto">
-            <table className="w-full text-sm">
-              <thead className="bg-gray-100 sticky top-0">
+            <Table>
+              <TableHead className="sticky top-0">
                 <tr>
-                  <th className="px-4 py-2 text-left font-medium text-gray-700">Trial</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-700">F1</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-700">Model</th>
-                  <th className="px-4 py-2 text-left font-medium text-gray-700">Type</th>
-                  <th className="px-4 py-2" />
+                  <Th>Trial</Th>
+                  <Th>F1</Th>
+                  <Th>Model</Th>
+                  <Th>Type</Th>
+                  <Th />
                 </tr>
-              </thead>
-              <tbody className="divide-y divide-gray-200">
+              </TableHead>
+              <TableBody>
                 {sorted.map((trial) => {
                   const selected = optimization.selectedTrial === trial.trial;
+                  const classical = isClassicalModel(trial.params?.model_type);
                   return (
-                    <tr key={trial.trial} className={selected ? 'bg-blue-50' : 'hover:bg-gray-50'}>
-                      <td className="px-4 py-2 text-gray-900">#{trial.trial}</td>
-                      <td className="px-4 py-2 font-medium text-gray-900">
-                        {trial.value.toFixed(4)}
-                      </td>
-                      <td className="px-4 py-2 text-gray-700 text-xs">
+                    <tr key={trial.trial} className={selected ? 'bg-accent' : 'hover:bg-muted'}>
+                      <Td>#{trial.trial}</Td>
+                      <Td className="font-medium">{trial.value.toFixed(4)}</Td>
+                      <Td className="text-xs text-muted-foreground">
                         {trial.params?.model_type ?? 'N/A'}
-                      </td>
-                      <td className="px-4 py-2 text-xs">
-                        {isClassicalModel(trial.params?.model_type) ? 'Classical' : 'Quantum'}
-                      </td>
-                      <td className="px-4 py-2 text-right">
+                      </Td>
+                      <Td className="text-xs">
+                        <span
+                          className={cn(
+                            'rounded-full px-2 py-0.5 text-xs font-semibold',
+                            classical
+                              ? 'bg-accent-orange text-accent-orange-foreground'
+                              : 'bg-accent-purple text-accent-purple-foreground'
+                          )}
+                        >
+                          {classical ? 'Classical' : 'Quantum'}
+                        </span>
+                      </Td>
+                      <Td className="text-right">
                         {hasResults && (
-                          <button
+                          <Button
                             type="button"
+                            size="sm"
+                            variant={selected ? 'default' : 'secondary'}
                             onClick={() => selectTrial(trial.trial)}
-                            className={`px-3 py-1 rounded text-xs ${
-                              selected
-                                ? 'bg-blue-600 text-white'
-                                : 'bg-gray-100 text-gray-700 hover:bg-gray-200'
-                            }`}
                           >
                             {selected ? 'Selected' : 'Select'}
-                          </button>
+                          </Button>
                         )}
-                      </td>
+                      </Td>
                     </tr>
                   );
                 })}
-              </tbody>
-            </table>
+              </TableBody>
+            </Table>
           </div>
-        </div>
+        </TableContainer>
       )}
 
       <NavButtons
@@ -243,23 +255,24 @@ function BestTrialCard({
 }: {
   label: string;
   trial: any;
-  accent: 'purple' | 'orange';
+  accent: 'quantum' | 'classical';
 }) {
-  const color = accent === 'purple' ? 'text-purple-700' : 'text-orange-700';
-  const border = accent === 'purple' ? 'border-purple-200' : 'border-orange-200';
-  const bg = accent === 'purple' ? 'bg-purple-50' : 'bg-orange-50';
+  const classes =
+    accent === 'quantum'
+      ? 'border-accent-purple bg-accent-purple/30 text-accent-purple-foreground'
+      : 'border-accent-orange bg-accent-orange/30 text-accent-orange-foreground';
   return (
-    <div className={`rounded-lg border ${border} ${bg} p-4`}>
-      <p className={`font-medium ${color}`}>{label}</p>
+    <div className={cn('rounded-lg border p-4', classes)}>
+      <p className="font-medium">{label}</p>
       {trial ? (
         <>
-          <p className="text-2xl font-bold text-gray-900 mt-1">{trial.value.toFixed(4)}</p>
-          <p className="text-xs text-gray-600">
+          <p className="mt-1 text-2xl font-bold text-foreground">{trial.value.toFixed(4)}</p>
+          <p className="text-xs text-muted-foreground">
             F1 · {trial.params?.model_type ?? 'N/A'} · #{trial.trial}
           </p>
         </>
       ) : (
-        <p className="text-sm text-gray-500 mt-1">No trial yet</p>
+        <p className="mt-1 text-sm text-muted-foreground">No trial yet</p>
       )}
     </div>
   );
