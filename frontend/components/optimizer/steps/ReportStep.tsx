@@ -11,6 +11,7 @@ import { generateReport } from '@/lib/api';
 import { type ApiKeys, loadApiKeys } from '@/lib/settings';
 import { Download, FileText, Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
+import ReactMarkdown from 'react-markdown';
 import { ErrorBanner, NavButtons } from '../NavButtons';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
@@ -122,7 +123,13 @@ export function ReportStep({ onBack, workflowData, setWorkflowData }: StepProps)
       )}
 
       <div className="text-center">
-        <Button type="button" size="lg" onClick={run} disabled={isGenerating || !apiKey}>
+        <Button
+          type="button"
+          variant="brand"
+          size="lg"
+          onClick={run}
+          disabled={isGenerating || !apiKey}
+        >
           {isGenerating ? (
             <Loader2 className="h-5 w-5 animate-spin" />
           ) : (
@@ -146,9 +153,9 @@ export function ReportStep({ onBack, workflowData, setWorkflowData }: StepProps)
             </Button>
           </div>
           <Card className="max-h-[500px] overflow-y-auto p-6">
-            <pre className="whitespace-pre-wrap font-sans text-sm text-foreground">
-              {report.markdown}
-            </pre>
+            <div className="prose prose-sm max-w-none dark:prose-invert">
+              <ReactMarkdown>{report.markdown}</ReactMarkdown>
+            </div>
           </Card>
         </div>
       )}

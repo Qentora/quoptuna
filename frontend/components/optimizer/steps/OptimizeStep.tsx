@@ -1,8 +1,11 @@
 'use client';
 
 import { Alert } from '@/components/ui/alert';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { Metric } from '@/components/ui/metric';
+import { StatusDot } from '@/components/ui/status-dot';
 import { Table, TableBody, TableContainer, TableHead, Td, Th } from '@/components/ui/table';
 import { pollOptimization, startOptimization } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -137,7 +140,7 @@ export function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: 
         <Card className="p-6">
           <div className="mb-4 flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <Loader2 className="h-6 w-6 animate-spin text-foreground" />
+              <StatusDot status="busy" />
               <div>
                 <p className="font-medium">Optimization in Progress</p>
                 <p className="text-sm text-muted-foreground">
@@ -145,14 +148,14 @@ export function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: 
                 </p>
               </div>
             </div>
-            <span className="text-2xl font-bold">{Math.round(progress)}%</span>
+            <Metric value={`${Math.round(progress)}%`} tone="brand" glow className="text-2xl" />
           </div>
           <Progress.Root
             className="h-3 w-full overflow-hidden rounded-full bg-muted"
             value={progress}
           >
             <Progress.Indicator
-              className="h-full bg-primary transition-all duration-300"
+              className="h-full bg-brand shadow-glow-brand transition-all duration-300"
               style={{ width: `${progress}%` }}
             />
           </Progress.Root>
@@ -161,9 +164,7 @@ export function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: 
               <span className="text-sm font-medium text-accent-emerald-foreground">
                 Current Best F1:
               </span>
-              <span className="text-lg font-bold text-accent-emerald-foreground">
-                {bestValue.toFixed(4)}
-              </span>
+              <Metric value={bestValue.toFixed(4)} tone="emerald" glow className="text-lg" />
             </div>
           )}
         </Card>
@@ -180,12 +181,12 @@ export function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: 
         <TableContainer>
           <div className="border-b border-border bg-muted px-4 py-2">
             <h4 className="text-sm font-semibold text-foreground">
-              Trials (select one to analyze)
+              {hasResults ? 'Best trial auto-selected — pick another to analyze instead' : 'Trials'}
             </h4>
           </div>
-          <div className="max-h-72 overflow-y-auto">
-            <Table>
-              <TableHead className="sticky top-0">
+          <div className="max-h-72 overflow-y-auto overflow-x-auto">
+            <Table stickyHeader>
+              <TableHead>
                 <tr>
                   <Th>Trial</Th>
                   <Th>F1</Th>
@@ -199,23 +200,21 @@ export function OptimizeStep({ onNext, onBack, workflowData, setWorkflowData }: 
                   const selected = optimization.selectedTrial === trial.trial;
                   const classical = isClassicalModel(trial.params?.model_type);
                   return (
-                    <tr key={trial.trial} className={selected ? 'bg-accent' : 'hover:bg-muted'}>
+                    <tr
+                      key={trial.trial}
+                      className={cn(
+                        selected ? 'bg-brand/10 ring-1 ring-inset ring-brand/40' : 'hover:bg-muted'
+                      )}
+                    >
                       <Td>#{trial.trial}</Td>
                       <Td className="font-medium">{trial.value.toFixed(4)}</Td>
                       <Td className="text-xs text-muted-foreground">
                         {trial.params?.model_type ?? 'N/A'}
                       </Td>
                       <Td className="text-xs">
-                        <span
-                          className={cn(
-                            'rounded-full px-2 py-0.5 text-xs font-semibold',
-                            classical
-                              ? 'bg-accent-orange text-accent-orange-foreground'
-                              : 'bg-accent-purple text-accent-purple-foreground'
-                          )}
-                        >
+                        <Badge variant={classical ? 'classical' : 'quantum'}>
                           {classical ? 'Classical' : 'Quantum'}
-                        </span>
+                        </Badge>
                       </Td>
                       <Td className="text-right">
                         {hasResults && (
@@ -259,14 +258,18 @@ function BestTrialCard({
 }) {
   const classes =
     accent === 'quantum'
-      ? 'border-accent-purple bg-accent-purple/30 text-accent-purple-foreground'
-      : 'border-accent-orange bg-accent-orange/30 text-accent-orange-foreground';
+      ? 'border-accent-purple bg-accent-purple/30 text-accent-purple-foreground shadow-glow-quantum'
+      : 'border-accent-orange bg-accent-orange/30 text-accent-orange-foreground shadow-glow-classical';
   return (
     <div className={cn('rounded-lg border p-4', classes)}>
       <p className="font-medium">{label}</p>
       {trial ? (
         <>
-          <p className="mt-1 text-2xl font-bold text-foreground">{trial.value.toFixed(4)}</p>
+          <Metric
+            value={trial.value.toFixed(4)}
+            tone={accent === 'quantum' ? 'brand' : 'amber'}
+            className="mt-1 block text-2xl"
+          />
           <p className="text-xs text-muted-foreground">
             F1 · {trial.params?.model_type ?? 'N/A'} · #{trial.trial}
           </p>

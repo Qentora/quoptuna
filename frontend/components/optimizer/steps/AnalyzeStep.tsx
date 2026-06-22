@@ -8,7 +8,7 @@ import { Input } from '@/components/ui/input';
 import { generateSHAP, getMetrics } from '@/lib/api';
 import * as Tabs from '@radix-ui/react-tabs';
 import { BarChart3, Download, Loader2 } from 'lucide-react';
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { ErrorBanner, NavButtons } from '../NavButtons';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
@@ -39,6 +39,7 @@ export function AnalyzeStep({ onNext, onBack, workflowData, setWorkflowData }: S
 
   const { optimization, analysis } = workflowData;
   const hasSHAP = analysis.featureImportance !== null;
+  const autoRan = useRef(false);
 
   const runAnalysis = async () => {
     if (!optimization.executionId) {
@@ -77,6 +78,15 @@ export function AnalyzeStep({ onNext, onBack, workflowData, setWorkflowData }: S
     }
   };
 
+  // Auto-run SHAP once on entering the step when results exist and none yet.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount.
+  useEffect(() => {
+    if (!autoRan.current && optimization.executionId && !hasSHAP) {
+      autoRan.current = true;
+      void runAnalysis();
+    }
+  }, []);
+
   const availableTabs = PLOT_TABS.filter((t) => analysis.plots[t.id]);
 
   return (
@@ -98,34 +108,43 @@ export function AnalyzeStep({ onNext, onBack, workflowData, setWorkflowData }: S
 
       <ErrorBanner message={error} />
 
-      <Card className="grid grid-cols-1 gap-4 p-4 md:grid-cols-3">
-        <label className="flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={useProba}
-            onChange={(e) => setUseProba(e.target.checked)}
-            className="h-4 w-4 rounded accent-primary"
-          />
-          Use prediction probabilities
-        </label>
-        <Field label="Subset size">
-          <Input
-            type="number"
-            min={10}
-            max={500}
-            value={subsetSize}
-            onChange={(e) => setSubsetSize(Number(e.target.value))}
-          />
-        </Field>
-        <Field label="Waterfall sample index">
-          <Input
-            type="number"
-            min={0}
-            value={sampleIndex}
-            onChange={(e) => setSampleIndex(Number(e.target.value))}
-          />
-        </Field>
-      </Card>
+      <details className="rounded-lg border border-border p-4">
+        <summary className="cursor-pointer text-sm font-medium">Advanced options</summary>
+        <div className="mt-4 grid grid-cols-1 gap-4 md:grid-cols-3">
+          <label className="flex items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={useProba}
+              onChange={(e) => setUseProba(e.target.checked)}
+              className="h-4 w-4 rounded accent-brand"
+            />
+            Use prediction probabilities
+          </label>
+          <Field label="Subset size">
+            <Input
+              type="number"
+              min={10}
+              max={500}
+              value={subsetSize}
+              onChange={(e) => setSubsetSize(Number(e.target.value))}
+            />
+          </Field>
+          <Field label="Waterfall sample index">
+            <Input
+              type="number"
+              min={0}
+              value={sampleIndex}
+              onChange={(e) => setSampleIndex(Number(e.target.value))}
+            />
+          </Field>
+        </div>
+      </details>
+
+      {isGenerating && !hasSHAP && (
+        <div className="flex items-center justify-center gap-2 py-6 text-sm text-muted-foreground">
+          <Loader2 className="h-5 w-5 animate-spin" /> Running SHAP analysis…
+        </div>
+      )}
 
       <div className="text-center">
         <Button type="button" size="lg" onClick={runAnalysis} disabled={isGenerating}>
@@ -147,7 +166,7 @@ export function AnalyzeStep({ onNext, onBack, workflowData, setWorkflowData }: S
                   <Tabs.Trigger
                     key={t.id}
                     value={t.id}
-                    className="border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-foreground data-[state=active]:text-foreground"
+                    className="border-b-2 border-transparent px-4 py-2 text-sm font-medium text-muted-foreground transition-colors hover:text-foreground data-[state=active]:border-brand data-[state=active]:text-brand"
                   >
                     {t.label}
                   </Tabs.Trigger>
@@ -191,7 +210,7 @@ export function AnalyzeStep({ onNext, onBack, workflowData, setWorkflowData }: S
                       </div>
                       <div className="h-2.5 w-full overflow-hidden rounded-full bg-muted">
                         <div
-                          className="h-full rounded-full bg-primary"
+                          className="h-full rounded-full bg-gradient-to-r from-brand to-brand/60"
                           style={{ width: `${(item.importance / max) * 100}%` }}
                         />
                       </div>

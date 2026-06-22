@@ -1,16 +1,22 @@
 'use client';
 
-import { Alert } from '@/components/ui/alert';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
+import { Metric } from '@/components/ui/metric';
+import { cn } from '@/lib/utils';
 import * as Slider from '@radix-ui/react-slider';
-import { FileText } from 'lucide-react';
 import { NavButtons } from '../NavButtons';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
 
+const PRESETS = [
+  { label: 'Quick', trials: 25, hint: '~3–8 min' },
+  { label: 'Standard', trials: 50, hint: '~5–15 min' },
+  { label: 'Thorough', trials: 150, hint: '~20–45 min' },
+];
+
 export function ConfigureStep({ onNext, onBack, workflowData, setWorkflowData }: StepProps) {
-  const { configuration, features, dataset } = workflowData;
+  const { configuration } = workflowData;
 
   const update = (field: keyof typeof configuration, value: string | number) =>
     setWorkflowData((prev) => ({
@@ -26,20 +32,6 @@ export function ConfigureStep({ onNext, onBack, workflowData, setWorkflowData }:
         subtitle="Set up the hyperparameter optimization study"
       />
 
-      {dataset && (
-        <Alert variant="info" icon={false}>
-          <div className="flex items-start gap-3">
-            <FileText className="mt-0.5 h-5 w-5 shrink-0" />
-            <div>
-              <p className="font-medium">{dataset.name}</p>
-              <p className="mt-1 text-sm opacity-80">
-                Features: {features.selectedFeatures.join(', ')} | Target: {features.targetColumn}
-              </p>
-            </div>
-          </div>
-        </Alert>
-      )}
-
       <div className="space-y-5">
         <Field
           label="Study Name"
@@ -54,29 +46,40 @@ export function ConfigureStep({ onNext, onBack, workflowData, setWorkflowData }:
           />
         </Field>
 
-        <Field
-          label="Database Name"
-          htmlFor="db-name"
-          helper={
-            <>
-              SQLite database (stored under <code className="font-mono">db/&lt;name&gt;.db</code>)
-            </>
-          }
-        >
-          <Input
-            id="db-name"
-            type="text"
-            value={configuration.databaseName}
-            onChange={(e) => update('databaseName', e.target.value)}
-          />
-        </Field>
-
         <div>
+          <label className="mb-2 block text-sm font-medium" htmlFor="trials">
+            Trial budget
+          </label>
+          <div className="mb-3 grid grid-cols-3 gap-2">
+            {PRESETS.map((preset) => {
+              const active = configuration.numTrials === preset.trials;
+              return (
+                <button
+                  key={preset.label}
+                  type="button"
+                  onClick={() => update('numTrials', preset.trials)}
+                  className={cn(
+                    'rounded-lg border p-3 text-left transition-colors',
+                    active
+                      ? 'border-brand bg-brand/10 text-brand shadow-glow-brand'
+                      : 'border-border hover:border-foreground'
+                  )}
+                >
+                  <span className="block text-sm font-semibold">{preset.label}</span>
+                  <span className="block text-xs text-muted-foreground">
+                    {preset.trials} trials
+                  </span>
+                  <span className="mt-1 block text-[11px] text-muted-foreground">
+                    {preset.hint}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
           <div className="mb-2 flex items-center justify-between">
-            <label className="text-sm font-medium" htmlFor="trials">
-              Number of Trials
-            </label>
-            <span className="text-sm font-semibold">{configuration.numTrials}</span>
+            <span className="text-sm text-muted-foreground">Fine-tune</span>
+            <Metric value={configuration.numTrials} tone="brand" glow className="text-sm" />
           </div>
           <Slider.Root
             id="trials"
@@ -88,14 +91,37 @@ export function ConfigureStep({ onNext, onBack, workflowData, setWorkflowData }:
             onValueChange={([v]) => update('numTrials', v)}
           >
             <Slider.Track className="relative h-1.5 grow rounded-full bg-muted">
-              <Slider.Range className="absolute h-full rounded-full bg-primary" />
+              <Slider.Range className="absolute h-full rounded-full bg-brand" />
             </Slider.Track>
-            <Slider.Thumb className="block h-4 w-4 rounded-full border-2 border-primary bg-background focus:outline-none focus:ring-2 focus:ring-ring" />
+            <Slider.Thumb className="block h-4 w-4 rounded-full border-2 border-brand bg-background focus:outline-none focus:ring-2 focus:ring-brand" />
           </Slider.Root>
           <p className="mt-1 text-sm text-muted-foreground">
-            Recommended: 50-200 trials (more trials = better results but longer run time)
+            More trials = better results but longer run time.
           </p>
         </div>
+
+        <details className="rounded-lg border border-border p-3">
+          <summary className="cursor-pointer text-sm font-medium">Advanced</summary>
+          <div className="mt-3">
+            <Field
+              label="Database Name"
+              htmlFor="db-name"
+              helper={
+                <>
+                  SQLite database (stored under{' '}
+                  <code className="font-mono">db/&lt;name&gt;.db</code>)
+                </>
+              }
+            >
+              <Input
+                id="db-name"
+                type="text"
+                value={configuration.databaseName}
+                onChange={(e) => update('databaseName', e.target.value)}
+              />
+            </Field>
+          </div>
+        </details>
       </div>
 
       <NavButtons onBack={onBack} onNext={onNext} />

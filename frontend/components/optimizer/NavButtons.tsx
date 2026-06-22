@@ -19,7 +19,7 @@ export function NavButtons({
   hideNext?: boolean;
 }) {
   return (
-    <div className="flex justify-between pt-4">
+    <div className="sticky bottom-0 -mx-8 -mb-8 mt-2 flex justify-between border-t border-border bg-card/95 px-8 py-4 backdrop-blur supports-[backdrop-filter]:bg-card/80">
       {onBack ? (
         <Button type="button" variant="outline" onClick={onBack} disabled={backDisabled}>
           Previous

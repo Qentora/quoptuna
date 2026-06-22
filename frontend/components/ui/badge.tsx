@@ -28,12 +28,31 @@ const badgeVariants = cva(
   }
 );
 
+const glowByVariant: Record<string, string> = {
+  emerald: 'shadow-glow-emerald',
+  amber: 'shadow-glow-amber',
+  quantum: 'shadow-glow-quantum',
+  classical: 'shadow-glow-classical',
+};
+
 export interface BadgeProps
   extends React.HTMLAttributes<HTMLSpanElement>,
-    VariantProps<typeof badgeVariants> {}
+    VariantProps<typeof badgeVariants> {
+  /** Apply a subtle matching glow shadow for the variant. */
+  glow?: boolean;
+}
 
-export function Badge({ className, variant, size, ...props }: BadgeProps) {
-  return <span className={cn(badgeVariants({ variant, size }), className)} {...props} />;
+export function Badge({ className, variant, size, glow = false, ...props }: BadgeProps) {
+  return (
+    <span
+      className={cn(
+        badgeVariants({ variant, size }),
+        glow && glowByVariant[variant ?? 'default'],
+        className
+      )}
+      {...props}
+    />
+  );
 }
 
 export { badgeVariants };

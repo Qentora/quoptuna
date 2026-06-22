@@ -1,6 +1,7 @@
 'use client';
 
 import { Card } from '@/components/ui/card';
+import { PageHeader } from '@/components/ui/page-header';
 import { cn } from '@/lib/utils';
 import {
   BarChart3,
@@ -14,6 +15,7 @@ import {
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
 import { useState } from 'react';
+import { StudySummary } from './StudySummary';
 import { AnalyzeStep } from './steps/AnalyzeStep';
 import { ConfigureStep } from './steps/ConfigureStep';
 import { DatasetStep } from './steps/DatasetStep';
@@ -72,91 +74,85 @@ export function Wizard() {
 
   return (
     <div className="flex h-full flex-col bg-background">
-      <div className="border-b border-border bg-card px-8 py-6">
-        <h1 className="text-2xl font-bold tracking-tight">QuOptuna Optimizer</h1>
-        <p className="mt-1 text-sm text-muted-foreground">
-          Quantum-enhanced machine learning with automated hyperparameter optimization
-        </p>
+      <div className="border-b border-border bg-card p-6">
+        <PageHeader title="Optimizer" />
       </div>
 
-      <div className="border-b border-border bg-card px-8 py-4">
-        <div className="mx-auto flex max-w-5xl items-center justify-between">
-          {steps.map((step, index) => {
-            const enabled = completedSteps.includes(step.id - 1) || step.id === 1;
-            const done = completedSteps.includes(step.id);
-            const current = currentStep === step.id;
-            const Icon = step.icon;
-            return (
-              <div key={step.id} className="flex flex-1 items-center">
-                <div className="flex flex-1 flex-col items-center">
+      <div className="grid flex-1 grid-cols-1 gap-6 overflow-hidden p-6 md:grid-cols-[200px_minmax(0,1fr)] lg:grid-cols-[200px_minmax(0,1fr)_240px]">
+        {/* Left: vertical stepper */}
+        <nav className="hidden md:block">
+          <ol className="space-y-1">
+            {steps.map((step) => {
+              const enabled = completedSteps.includes(step.id - 1) || step.id === 1;
+              const done = completedSteps.includes(step.id);
+              const current = currentStep === step.id;
+              const Icon = step.icon;
+              return (
+                <li key={step.id}>
                   <button
                     type="button"
                     onClick={() => handleStepClick(step.id)}
                     disabled={!enabled}
                     className={cn(
-                      'flex h-10 w-10 items-center justify-center rounded-full border transition-colors',
-                      done
-                        ? 'border-transparent bg-accent-emerald text-accent-emerald-foreground'
-                        : current
-                          ? 'border-transparent bg-primary text-primary-foreground'
-                          : 'border-border bg-card text-muted-foreground',
-                      enabled && !current ? 'cursor-pointer hover:border-foreground' : '',
-                      !enabled && 'cursor-not-allowed'
+                      'flex w-full items-center gap-3 rounded-lg px-2 py-2 text-left transition-colors',
+                      current
+                        ? 'bg-brand/10 text-brand'
+                        : enabled
+                          ? 'text-muted-foreground hover:bg-accent/60 hover:text-foreground'
+                          : 'cursor-not-allowed text-muted-foreground/50'
                     )}
                   >
-                    {done ? <Check className="h-5 w-5" /> : <Icon className="h-5 w-5" />}
-                  </button>
-                  <div className="mt-2 text-center">
-                    <p
+                    <span
                       className={cn(
-                        'text-sm font-medium',
-                        current
-                          ? 'text-foreground'
-                          : done
-                            ? 'text-accent-emerald-foreground'
-                            : 'text-muted-foreground'
+                        'flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors',
+                        done
+                          ? 'border-transparent bg-accent-emerald text-accent-emerald-foreground'
+                          : current
+                            ? 'border-transparent bg-brand text-brand-foreground shadow-glow-brand'
+                            : 'border-border bg-card'
                       )}
                     >
-                      {step.title}
-                    </p>
-                    <p className="mt-1 max-w-[120px] text-xs text-muted-foreground">
-                      {step.description}
-                    </p>
-                  </div>
-                </div>
-                {index < steps.length - 1 && (
-                  <div
-                    className={cn(
-                      'mx-2 h-0.5 flex-1',
-                      done ? 'bg-accent-emerald-foreground' : 'bg-border'
-                    )}
-                  />
-                )}
-              </div>
-            );
-          })}
-        </div>
-      </div>
+                      {done ? <Check size={16} /> : <Icon size={16} />}
+                    </span>
+                    <span className="min-w-0">
+                      <span className="block truncate text-sm font-medium">{step.title}</span>
+                      <span className="block text-[11px] text-muted-foreground">
+                        Step {step.id} of {steps.length}
+                      </span>
+                    </span>
+                  </button>
+                </li>
+              );
+            })}
+          </ol>
+        </nav>
 
-      <div className="flex-1 overflow-y-auto px-8 py-6">
-        <Card className="mx-auto max-w-5xl p-8">
-          <AnimatePresence mode="wait">
-            <motion.div
-              key={currentStep}
-              initial={{ opacity: 0, y: 8 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: -8 }}
-              transition={{ duration: 0.18 }}
-            >
-              {currentStep === 1 && <DatasetStep {...stepProps} />}
-              {currentStep === 2 && <FeaturesStep {...stepProps} />}
-              {currentStep === 3 && <ConfigureStep {...stepProps} />}
-              {currentStep === 4 && <OptimizeStep {...stepProps} />}
-              {currentStep === 5 && <AnalyzeStep {...stepProps} />}
-              {currentStep === 6 && <ReportStep {...stepProps} />}
-            </motion.div>
-          </AnimatePresence>
-        </Card>
+        {/* Center: step content (scrollable, sticky footer lives inside steps) */}
+        <div className="overflow-y-auto">
+          <Card className="p-8">
+            <AnimatePresence mode="wait">
+              <motion.div
+                key={currentStep}
+                initial={{ opacity: 0, y: 8 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -8 }}
+                transition={{ duration: 0.18 }}
+              >
+                {currentStep === 1 && <DatasetStep {...stepProps} />}
+                {currentStep === 2 && <FeaturesStep {...stepProps} />}
+                {currentStep === 3 && <ConfigureStep {...stepProps} />}
+                {currentStep === 4 && <OptimizeStep {...stepProps} />}
+                {currentStep === 5 && <AnalyzeStep {...stepProps} />}
+                {currentStep === 6 && <ReportStep {...stepProps} />}
+              </motion.div>
+            </AnimatePresence>
+          </Card>
+        </div>
+
+        {/* Right: study summary rail */}
+        <div className="hidden lg:block">
+          <StudySummary workflowData={workflowData} className="sticky top-0" />
+        </div>
       </div>
     </div>
   );

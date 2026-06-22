@@ -19,6 +19,21 @@ export function useSystemInfo() {
   return useQuery({ queryKey: ['system-info'], queryFn: getSystemInfo });
 }
 
+/**
+ * Lightweight backend reachability for status dots. Swallows errors so an
+ * offline backend resolves to `online: false` rather than throwing.
+ */
+export function useBackendStatus() {
+  const { data, isLoading, isFetched } = useQuery({
+    queryKey: ['system-info'],
+    queryFn: () => getSystemInfo().catch(() => null),
+  });
+  return {
+    online: Boolean(data),
+    loading: isLoading || !isFetched,
+  } as const;
+}
+
 export function useUCIDatasets() {
   return useQuery({ queryKey: ['uci-datasets'], queryFn: listUCIDatasets });
 }

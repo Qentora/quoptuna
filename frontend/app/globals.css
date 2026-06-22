@@ -53,6 +53,11 @@
     --badge: 0 0% 0%;
     --badge-foreground: 0 0% 100%;
 
+    /* Brand accent (electric violet/indigo) — additive highlight */
+    --brand: 262 83% 58%;
+    --brand-foreground: 0 0% 100%;
+    --brand-glow: 262 83% 58%;
+
     --radius: 0.5rem;
   }
 
@@ -98,6 +103,10 @@
 
     --badge: 0 0% 25%;
     --badge-foreground: 0 0% 100%;
+
+    --brand: 255 92% 76%;
+    --brand-foreground: 240 6% 10%;
+    --brand-glow: 255 92% 76%;
   }
 
   * {
@@ -129,5 +138,33 @@
   }
   .primary-input:disabled {
     @apply pointer-events-none cursor-not-allowed bg-muted text-muted-foreground;
+  }
+
+  /* Status dot — OpenRAG-style connector glow */
+  .status-dot {
+    @apply inline-block h-2 w-2 shrink-0 rounded-full;
+  }
+  .status-dot--online {
+    background-color: hsl(var(--accent-emerald-foreground));
+    box-shadow: 0 0 0 3px hsl(var(--accent-emerald-foreground) / 0.18), 0 0 10px
+      hsl(var(--accent-emerald-foreground) / 0.7);
+    animation: pulseGlow 2s ease-in-out infinite;
+  }
+  .status-dot--offline {
+    background-color: hsl(var(--muted-foreground));
+  }
+  .status-dot--busy {
+    background-color: hsl(var(--accent-amber-foreground));
+    box-shadow: 0 0 0 3px hsl(var(--accent-amber-foreground) / 0.18), 0 0 10px
+      hsl(var(--accent-amber-foreground) / 0.7);
+    animation: pulseGlow 1.2s ease-in-out infinite;
+  }
+  .status-dot--idle {
+    background-color: hsl(var(--muted-foreground) / 0.6);
+  }
+
+  /* Subtle glow for key numbers */
+  .text-glow {
+    text-shadow: 0 0 14px currentColor;
   }
 }

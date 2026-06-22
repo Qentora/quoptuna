@@ -5,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { PageHeader } from '@/components/ui/page-header';
+import { PageShell } from '@/components/ui/page-shell';
 import { type ApiKeys, loadApiKeys, saveApiKeys } from '@/lib/settings';
 import { Eye, EyeOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -69,12 +69,11 @@ export default function SettingsPage() {
   };
 
   return (
-    <div className="mx-auto max-w-2xl p-6 md:p-8">
-      <PageHeader
-        title="Settings"
-        subtitle="API keys are stored encrypted in your browser only and are sent to the backend solely to generate reports."
-        className="mb-8"
-      />
+    <PageShell title="Settings" contentClassName="mx-auto max-w-2xl">
+      <p className="mb-6 text-sm text-muted-foreground">
+        API keys are stored encrypted in your browser only and are sent to the backend solely to
+        generate reports.
+      </p>
 
       <div className="space-y-6">
         <Card>
@@ -140,6 +139,6 @@ export default function SettingsPage() {
           {saving ? 'Saving…' : dirty ? 'Save Settings' : 'Saved'}
         </Button>
       </div>
-    </div>
+    </PageShell>
   );
 }

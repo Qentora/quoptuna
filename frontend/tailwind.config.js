@@ -87,6 +87,22 @@ export default {
           DEFAULT: 'hsl(var(--badge))',
           foreground: 'hsl(var(--badge-foreground))',
         },
+        brand: {
+          DEFAULT: 'hsl(var(--brand))',
+          foreground: 'hsl(var(--brand-foreground))',
+        },
+      },
+      boxShadow: {
+        'glow-brand':
+          '0 0 0 1px hsl(var(--brand) / 0.25), 0 0 14px -2px hsl(var(--brand-glow) / 0.55)',
+        'glow-emerald':
+          '0 0 0 1px hsl(var(--accent-emerald-foreground) / 0.25), 0 0 14px -2px hsl(var(--accent-emerald-foreground) / 0.55)',
+        'glow-amber':
+          '0 0 0 1px hsl(var(--accent-amber-foreground) / 0.25), 0 0 14px -2px hsl(var(--accent-amber-foreground) / 0.55)',
+        'glow-quantum':
+          '0 0 0 1px hsl(var(--accent-purple-foreground) / 0.25), 0 0 14px -2px hsl(var(--accent-purple-foreground) / 0.55)',
+        'glow-classical':
+          '0 0 0 1px hsl(var(--accent-orange-foreground) / 0.25), 0 0 14px -2px hsl(var(--accent-orange-foreground) / 0.55)',
       },
       borderRadius: {
         lg: 'var(--radius)',
@@ -112,10 +128,15 @@ export default {
             transform: 'translate(-50%, -50%) scale(1)',
           },
         },
+        pulseGlow: {
+          '0%, 100%': { opacity: 1 },
+          '50%': { opacity: 0.55 },
+        },
       },
       animation: {
         overlayShow: 'overlayShow 200ms cubic-bezier(0.16, 1, 0.3, 1)',
         contentShow: 'contentShow 200ms cubic-bezier(0.16, 1, 0.3, 1)',
+        pulseGlow: 'pulseGlow 2s ease-in-out infinite',
       },
     },
   },

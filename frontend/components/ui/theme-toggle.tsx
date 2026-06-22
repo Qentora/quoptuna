@@ -33,7 +33,7 @@ export function ThemeToggle({ expanded }: { expanded: boolean }) {
         aria-label="Toggle theme"
         className="flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground"
       >
-        <Active className="h-5 w-5" />
+        <Active size={18} />
       </button>
     );
   }
