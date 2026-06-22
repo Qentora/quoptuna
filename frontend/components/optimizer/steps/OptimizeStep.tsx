@@ -8,7 +8,7 @@ import { Table, TableBody, TableContainer, TableHead, Td, Th } from '@/component
 import { pollOptimization, startOptimization } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import * as Progress from '@radix-ui/react-progress';
-import { Loader2, PlayCircle } from 'lucide-react';
+import { Atom, Check, Cpu, PlayCircle, Trophy } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { ErrorBanner } from '../NavButtons';
 import { StepHeader } from '../Wizard';
@@ -167,43 +167,99 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
 
         {(hasResults || liveTrials.length > 0) && (
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            <BestTrialCard label="Best Quantum" trial={bestQuantum} accent="quantum" />
-            <BestTrialCard label="Best Classical" trial={bestClassical} accent="classical" />
+            <BestTrialCard
+              label="Best Quantum"
+              trial={bestQuantum}
+              accent="quantum"
+              selectedTrial={optimization.selectedTrial}
+              onSelect={hasResults ? selectTrial : undefined}
+            />
+            <BestTrialCard
+              label="Best Classical"
+              trial={bestClassical}
+              accent="classical"
+              selectedTrial={optimization.selectedTrial}
+              onSelect={hasResults ? selectTrial : undefined}
+            />
           </div>
         )}
       </div>
 
       {allTrials.length > 0 && (
         <TableContainer className="flex min-h-0 flex-1 flex-col">
-          <div className="shrink-0 border-b border-border bg-muted px-4 py-3">
-            <h4 className="text-sm font-semibold text-foreground">
-              {hasResults ? 'Best trial auto-selected — pick another to analyze instead' : 'Trials'}
-            </h4>
+          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-muted px-4 py-3">
+            <h4 className="text-sm font-semibold text-foreground">All trials ({sorted.length})</h4>
+            {hasResults && (
+              <span className="text-xs text-muted-foreground">
+                {optimization.selectedTrial !== null ? (
+                  <>
+                    Analyzing{' '}
+                    <span className="font-medium text-brand">#{optimization.selectedTrial}</span> —
+                    click any row to change
+                  </>
+                ) : (
+                  'Click a row to choose a trial to analyze'
+                )}
+              </span>
+            )}
           </div>
           <div className="min-h-0 flex-1 overflow-auto">
             <Table stickyHeader>
               <TableHead>
                 <tr>
-                  <Th>Trial</Th>
-                  <Th>F1</Th>
+                  <Th className="w-10" />
+                  <Th className="w-12 text-right">Rank</Th>
+                  <Th className="text-right">F1 score</Th>
                   <Th>Model</Th>
                   <Th>Type</Th>
-                  <Th />
+                  <Th className="text-right">Trial</Th>
                 </tr>
               </TableHead>
               <TableBody>
-                {sorted.map((trial) => {
+                {sorted.map((trial, index) => {
                   const selected = optimization.selectedTrial === trial.trial;
                   const classical = isClassicalModel(trial.params?.model_type);
+                  const isBest = index === 0;
                   return (
                     <tr
                       key={trial.trial}
+                      onClick={hasResults ? () => selectTrial(trial.trial) : undefined}
+                      onKeyDown={
+                        hasResults
+                          ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                selectTrial(trial.trial);
+                              }
+                            }
+                          : undefined
+                      }
+                      tabIndex={hasResults ? 0 : undefined}
+                      aria-selected={selected}
                       className={cn(
+                        'transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand',
+                        hasResults && 'cursor-pointer',
                         selected ? 'bg-brand/10 ring-1 ring-inset ring-brand/40' : 'hover:bg-muted'
                       )}
                     >
-                      <Td>#{trial.trial}</Td>
-                      <Td className="font-medium">{trial.value.toFixed(4)}</Td>
+                      <Td className="text-center">
+                        {selected ? (
+                          <Check size={16} className="mx-auto text-brand" />
+                        ) : isBest ? (
+                          <Trophy size={14} className="mx-auto text-accent-amber-foreground" />
+                        ) : null}
+                      </Td>
+                      <Td className="text-right text-xs text-muted-foreground tabular-nums">
+                        {index + 1}
+                      </Td>
+                      <Td
+                        className={cn(
+                          'text-right font-semibold tabular-nums',
+                          selected && 'text-brand'
+                        )}
+                      >
+                        {trial.value.toFixed(4)}
+                      </Td>
                       <Td className="text-xs text-muted-foreground">
                         {trial.params?.model_type ?? 'N/A'}
                       </Td>
@@ -212,17 +268,8 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
                           {classical ? 'Classical' : 'Quantum'}
                         </Badge>
                       </Td>
-                      <Td className="text-right">
-                        {hasResults && (
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant={selected ? 'default' : 'secondary'}
-                            onClick={() => selectTrial(trial.trial)}
-                          >
-                            {selected ? 'Selected' : 'Select'}
-                          </Button>
-                        )}
+                      <Td className="text-right text-xs text-muted-foreground tabular-nums">
+                        #{trial.trial}
                       </Td>
                     </tr>
                   );
@@ -240,28 +287,74 @@ function BestTrialCard({
   label,
   trial,
   accent,
+  selectedTrial,
+  onSelect,
 }: {
   label: string;
-  trial: any;
+  trial: { trial: number; value: number; params?: Record<string, unknown> } | undefined;
   accent: 'quantum' | 'classical';
+  selectedTrial: number | null;
+  onSelect?: (trialNumber: number) => void;
 }) {
-  const classes =
+  const accentClasses =
     accent === 'quantum'
-      ? 'border-accent-purple bg-accent-purple/30 text-accent-purple-foreground'
-      : 'border-accent-orange bg-accent-orange/30 text-accent-orange-foreground';
+      ? 'border-accent-purple bg-accent-purple/20'
+      : 'border-accent-orange bg-accent-orange/20';
+  const isSelected = !!trial && selectedTrial === trial.trial;
+  const Icon = accent === 'quantum' ? Atom : Cpu;
+  const modelType = (trial?.params?.model_type as string | undefined) ?? 'N/A';
+
   return (
-    <div className={cn('rounded-lg border p-4', classes)}>
-      <p className="font-medium">{label}</p>
+    <div
+      className={cn(
+        'flex flex-col rounded-lg border p-4 transition-shadow',
+        accentClasses,
+        isSelected && 'ring-2 ring-inset ring-brand/50'
+      )}
+    >
+      <div className="mb-2 flex items-center justify-between">
+        <div className="flex items-center gap-2">
+          <Icon
+            size={16}
+            className={
+              accent === 'quantum'
+                ? 'text-accent-purple-foreground'
+                : 'text-accent-orange-foreground'
+            }
+          />
+          <span className="text-sm font-semibold">{label}</span>
+        </div>
+        {isSelected && (
+          <Badge variant="emerald">
+            <Check size={12} /> Analyzing
+          </Badge>
+        )}
+      </div>
+
       {trial ? (
         <>
-          <Metric
-            value={trial.value.toFixed(4)}
-            tone={accent === 'quantum' ? 'brand' : 'amber'}
-            className="mt-1 block text-2xl"
-          />
-          <p className="text-xs text-muted-foreground">
-            F1 · {trial.params?.model_type ?? 'N/A'} · #{trial.trial}
+          <div className="flex items-baseline gap-2">
+            <Metric
+              value={trial.value.toFixed(4)}
+              tone={accent === 'quantum' ? 'brand' : 'amber'}
+              className="text-3xl"
+            />
+            <span className="text-xs text-muted-foreground">F1</span>
+          </div>
+          <p className="mt-1 truncate text-xs text-muted-foreground">
+            {modelType} · trial #{trial.trial}
           </p>
+          {onSelect && !isSelected && (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              className="mt-3 self-start"
+              onClick={() => onSelect(trial.trial)}
+            >
+              Analyze this
+            </Button>
+          )}
         </>
       ) : (
         <p className="mt-1 text-sm text-muted-foreground">No trial yet</p>
