@@ -26,9 +26,12 @@ export interface WorkflowData {
   };
   analysis: {
     featureImportance: Array<{ feature: string; importance: number }> | null;
+    // SHAP plots plus reserved keys: rocCurve, prCurve, optimizationHistory, paramImportances.
     plots: Record<string, string>;
     metrics: Record<string, any> | null;
     confusionMatrixPlot: string | null;
+    rocAuc: number | null;
+    averagePrecision: number | null;
   };
   report: {
     markdown: string | null;
@@ -56,6 +59,8 @@ export const initialWorkflowData: WorkflowData = {
     plots: {},
     metrics: null,
     confusionMatrixPlot: null,
+    rocAuc: null,
+    averagePrecision: null,
   },
   report: { markdown: null },
 };

@@ -237,6 +237,48 @@ export async function getMetrics(
   });
 }
 
+export interface CurvesResponse {
+  optimization_id: string;
+  roc_curve_plot: string | null;
+  pr_curve_plot: string | null;
+  roc_auc: number | null;
+  average_precision: number | null;
+  status: string;
+}
+
+export async function getCurves(
+  optimizationId: string,
+  trialNumber?: number,
+  useProba = true,
+  subsetSize = 50
+): Promise<CurvesResponse> {
+  return request<CurvesResponse>('/api/v1/analysis/curves', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({
+      optimization_id: optimizationId,
+      trial_number: trialNumber,
+      use_proba: useProba,
+      subset_size: subsetSize,
+    }),
+  });
+}
+
+export interface StudyPlotsResponse {
+  optimization_id: string;
+  optimization_history_plot: string | null;
+  param_importances_plot: string | null;
+  status: string;
+}
+
+export async function getStudyPlots(optimizationId: string): Promise<StudyPlotsResponse> {
+  return request<StudyPlotsResponse>('/api/v1/analysis/study-plots', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ optimization_id: optimizationId }),
+  });
+}
+
 export interface ReportRequest {
   optimization_id: string;
   trial_number?: number;
