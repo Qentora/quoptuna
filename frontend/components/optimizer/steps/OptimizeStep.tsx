@@ -1,9 +1,7 @@
 'use client';
 
-import { Alert } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
 import { Metric } from '@/components/ui/metric';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Table, TableBody, TableContainer, TableHead, Td, Th } from '@/components/ui/table';
@@ -110,85 +108,79 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
     }));
 
   return (
-    <div className="space-y-6">
-      <StepHeader
-        step={4}
-        title="Run Optimization"
-        subtitle="Execute the study and pick a trial to analyze"
-      />
+    <div className="flex h-full min-h-0 flex-col gap-4">
+      <div className="shrink-0 space-y-4">
+        <StepHeader
+          step={4}
+          title="Run Optimization"
+          subtitle="Execute the study and pick a trial to analyze"
+        />
 
-      <ErrorBanner message={error} />
+        <ErrorBanner message={error} />
 
-      <Alert variant="info">
-        <span className="text-sm">
-          Study: <strong>{configuration.studyName}</strong> | Trials:{' '}
-          <strong>{configuration.numTrials}</strong> | Features:{' '}
-          <strong>{features.selectedFeatures.length}</strong>
-        </span>
-      </Alert>
+        {!hasResults && !isRunning && (
+          <section className="rounded-lg border border-border bg-card p-6 text-center">
+            <Button type="button" size="lg" onClick={run}>
+              <PlayCircle className="h-5 w-5" />
+              Start Optimization
+            </Button>
+            <p className="mt-3 text-sm text-muted-foreground">
+              Runs {configuration.numTrials} trials across quantum and classical models. This may
+              take several minutes.
+            </p>
+          </section>
+        )}
 
-      {!hasResults && !isRunning && (
-        <Card className="bg-muted p-6 text-center">
-          <Button type="button" size="lg" onClick={run}>
-            <PlayCircle className="h-5 w-5" />
-            Start Optimization
-          </Button>
-          <p className="mt-3 text-sm text-muted-foreground">
-            Runs {configuration.numTrials} trials across quantum and classical models. This may take
-            several minutes.
-          </p>
-        </Card>
-      )}
-
-      {isRunning && (
-        <Card className="p-6">
-          <div className="mb-4 flex items-center justify-between">
-            <div className="flex items-center gap-3">
-              <StatusDot status="busy" />
-              <div>
-                <p className="font-medium">Optimization in Progress</p>
-                <p className="text-sm text-muted-foreground">
-                  Trial {currentTrial} of {configuration.numTrials}
-                </p>
+        {isRunning && (
+          <section className="rounded-lg border border-border bg-card p-4">
+            <div className="mb-4 flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <StatusDot status="busy" />
+                <div>
+                  <p className="font-medium">Optimization in progress</p>
+                  <p className="text-sm text-muted-foreground">
+                    Trial {currentTrial} of {configuration.numTrials}
+                  </p>
+                </div>
               </div>
+              <Metric value={`${Math.round(progress)}%`} tone="brand" className="text-2xl" />
             </div>
-            <Metric value={`${Math.round(progress)}%`} tone="brand" glow className="text-2xl" />
-          </div>
-          <Progress.Root
-            className="h-3 w-full overflow-hidden rounded-full bg-muted"
-            value={progress}
-          >
-            <Progress.Indicator
-              className="h-full bg-brand shadow-glow-brand transition-all duration-300"
-              style={{ width: `${progress}%` }}
-            />
-          </Progress.Root>
-          {bestValue !== null && (
-            <div className="mt-4 flex items-center justify-between rounded-md border border-accent-emerald bg-accent-emerald/40 p-3">
-              <span className="text-sm font-medium text-accent-emerald-foreground">
-                Current Best F1:
-              </span>
-              <Metric value={bestValue.toFixed(4)} tone="emerald" glow className="text-lg" />
-            </div>
-          )}
-        </Card>
-      )}
+            <Progress.Root
+              className="h-2.5 w-full overflow-hidden rounded-full bg-muted"
+              value={progress}
+            >
+              <Progress.Indicator
+                className="h-full bg-brand transition-all duration-300"
+                style={{ width: `${progress}%` }}
+              />
+            </Progress.Root>
+            {bestValue !== null && (
+              <div className="mt-4 flex items-center justify-between rounded-md border border-accent-emerald bg-accent-emerald/40 p-3">
+                <span className="text-sm font-medium text-accent-emerald-foreground">
+                  Current best F1
+                </span>
+                <Metric value={bestValue.toFixed(4)} tone="emerald" className="text-lg" />
+              </div>
+            )}
+          </section>
+        )}
 
-      {(hasResults || liveTrials.length > 0) && (
-        <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-          <BestTrialCard label="Best Quantum" trial={bestQuantum} accent="quantum" />
-          <BestTrialCard label="Best Classical" trial={bestClassical} accent="classical" />
-        </div>
-      )}
+        {(hasResults || liveTrials.length > 0) && (
+          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+            <BestTrialCard label="Best Quantum" trial={bestQuantum} accent="quantum" />
+            <BestTrialCard label="Best Classical" trial={bestClassical} accent="classical" />
+          </div>
+        )}
+      </div>
 
       {allTrials.length > 0 && (
-        <TableContainer>
-          <div className="border-b border-border bg-muted px-4 py-2">
+        <TableContainer className="flex min-h-0 flex-1 flex-col">
+          <div className="shrink-0 border-b border-border bg-muted px-4 py-3">
             <h4 className="text-sm font-semibold text-foreground">
               {hasResults ? 'Best trial auto-selected — pick another to analyze instead' : 'Trials'}
             </h4>
           </div>
-          <div className="max-h-72 overflow-y-auto overflow-x-auto">
+          <div className="min-h-0 flex-1 overflow-auto">
             <Table stickyHeader>
               <TableHead>
                 <tr>
@@ -255,8 +247,8 @@ function BestTrialCard({
 }) {
   const classes =
     accent === 'quantum'
-      ? 'border-accent-purple bg-accent-purple/30 text-accent-purple-foreground shadow-glow-quantum'
-      : 'border-accent-orange bg-accent-orange/30 text-accent-orange-foreground shadow-glow-classical';
+      ? 'border-accent-purple bg-accent-purple/30 text-accent-purple-foreground'
+      : 'border-accent-orange bg-accent-orange/30 text-accent-orange-foreground';
   return (
     <div className={cn('rounded-lg border p-4', classes)}>
       <p className="font-medium">{label}</p>

@@ -89,9 +89,9 @@ export function Wizard() {
     setFooter,
   };
 
-  // Dataset (1) and Features (2) manage their own height (panels fill the frame and scroll
-  // internally); every other step keeps the container's normal vertical scroll.
-  const fillsFrame = currentStep === 1 || currentStep === 2;
+  // Dataset (1), Features (2) and Optimize (4) manage their own height (panels fill the frame and
+  // scroll internally); every other step keeps the container's normal vertical scroll.
+  const fillsFrame = currentStep === 1 || currentStep === 2 || currentStep === 4;
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
