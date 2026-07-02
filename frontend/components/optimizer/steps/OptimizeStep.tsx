@@ -42,8 +42,11 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
     setError(null);
     try {
       const finalStatus = await pollOptimization(id, (status, trialsData) => {
-        setCurrentTrial(status.current_trial);
-        setProgress(status.total_trials ? (status.current_trial / status.total_trials) * 100 : 0);
+        // The live trial list from the Optuna DB is fresher than the job's
+        // current_trial counter; prefer it when available.
+        const trialCount = trialsData?.trials?.length ?? status.current_trial;
+        setCurrentTrial(trialCount);
+        setProgress(status.total_trials ? (trialCount / status.total_trials) * 100 : 0);
         if (trialsData?.trials) {
           setLiveTrials(trialsData.trials);
           if (trialsData.best_trial) setBestValue(trialsData.best_trial.value);

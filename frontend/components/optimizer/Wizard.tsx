@@ -82,32 +82,37 @@ export function Wizard() {
 
   const handleReset = () => {
     clearWizardState();
+    setFooter({ canContinue: false });
     setCurrentStep(1);
     setCompletedSteps([]);
     setWorkflowData(initialWorkflowData);
   };
 
-  // Reset footer on step change so a stale canContinue can't leak across steps.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run on step change is the intent.
-  useEffect(() => {
+  // Reset the footer when navigating so a stale canContinue can't leak across
+  // steps. Done in the handlers (not an effect keyed on currentStep) so it
+  // never runs after the incoming step's own setFooter — an effect-based reset
+  // fires post-mount with restored state (and twice under dev StrictMode),
+  // wrongly greying out Next on steps that are already complete.
+  const goToStep = (stepId: number) => {
     setFooter({ canContinue: false });
-  }, [currentStep]);
+    setCurrentStep(stepId);
+  };
 
   const handleStepClick = (stepId: number) => {
     if (completedSteps.includes(stepId - 1) || stepId === 1) {
-      setCurrentStep(stepId);
+      goToStep(stepId);
     }
   };
 
   const handleNextStep = () => {
     if (currentStep < steps.length) {
       setCompletedSteps((prev) => Array.from(new Set([...prev, currentStep])));
-      setCurrentStep((s) => s + 1);
+      goToStep(currentStep + 1);
     }
   };
 
   const handlePreviousStep = () => {
-    if (currentStep > 1) setCurrentStep((s) => s - 1);
+    if (currentStep > 1) goToStep(currentStep - 1);
   };
 
   const stepProps: StepProps = {

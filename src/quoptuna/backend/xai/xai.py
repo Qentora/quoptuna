@@ -528,4 +528,11 @@ class XAI:
         # LangChain chat models are Runnables; the legacy ``chat(messages)`` call
         # was removed — use ``.invoke``.
         response = chat.invoke(final_prompt)
-        return response.content
+        content = response.content
+        # Newer models return content as a list of blocks; flatten to markdown text.
+        if isinstance(content, list):
+            content = "".join(
+                part.get("text", "") if isinstance(part, dict) else str(part)
+                for part in content
+            )
+        return content

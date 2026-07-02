@@ -77,7 +77,17 @@ run_streamlit:
 	$(UV) run streamlit run src/quoptuna/frontend/app.py
 
 dev:
-	# Add dev environment setup commands here
+	@echo "Starting QuOptuna dev environment..."
+	@echo ""
+	@echo "Backend:  http://localhost:8000 (API docs: /api/docs)"
+	@echo "Frontend: http://localhost:3000"
+	@echo ""
+	@echo "Press Ctrl+C to stop both services"
+	@echo ""
+	@trap '$(MAKE) clean' EXIT INT TERM; \
+	$(MAKE) run_backend & \
+	$(MAKE) run_frontend & \
+	wait
 
 help:
 	@echo "QuOptuna Development Commands"
@@ -88,6 +98,7 @@ help:
 	@echo "  install_frontend  - Install frontend dependencies"
 	@echo ""
 	@echo "Running:"
+	@echo "  dev               - Run backend + frontend together (Ctrl+C stops both)"
 	@echo "  run_backend       - Run FastAPI backend (port 8000)"
 	@echo "  run_frontend      - Run Next.js frontend (port 3000)"
 	@echo "  run_cli           - Run both backend and frontend"

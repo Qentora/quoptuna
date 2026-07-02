@@ -310,6 +310,24 @@ async def get_optimization_detail(optimization_id: str):
 async def get_optimization_status(optimization_id: str):
     """Get optimization status"""
     job = get_job(optimization_id)
+
+    # The background task only writes current_trial at completion; while the
+    # run is live, read real progress from the Optuna study on disk.
+    if job["status"] == "running":
+        try:
+            from optuna import load_study
+
+            request_data = job.get("request", {})
+            study = load_study(
+                storage=optuna_storage_url(request_data.get("database_name", "results")),
+                study_name=request_data.get("study_name", "workflow_study"),
+                sampler=None,
+            )
+            # Count only finished trials — a trial enters study.trials as
+            # RUNNING the moment it starts, which would advance progress early.
+            job["current_trial"] = sum(1 for t in study.trials if t.state.is_finished())
+        except Exception:  # noqa: S110
+            pass  # study not created yet — keep the stored value
     return OptimizationStatus(
         id=job["id"],
         status=job["status"],
@@ -346,6 +364,10 @@ async def get_optimization_trials(optimization_id: str):
         best_params = None
 
         for trial in study.trials:
+            # Skip in-flight trials: they have no value yet and would both
+            # inflate the progress count and show up as a bogus 0.0 score.
+            if not trial.state.is_finished():
+                continue
             trial_data = {
                 "trial": trial.number,
                 "value": trial.value if trial.value is not None else 0.0,

@@ -213,18 +213,22 @@ export async function deleteOptimization(id: string): Promise<{ message: string 
   return request<{ message: string }>(`/api/v1/optimize/${id}`, { method: 'DELETE' });
 }
 
+const POLL_MAX_CONSECUTIVE_FAILURES = 5;
+
 export async function pollOptimization(
   optimizationId: string,
   onUpdate: (status: OptimizationStatus, trials?: OptimizationTrials | null) => void,
   intervalMs = 2000
 ): Promise<OptimizationStatus> {
   return new Promise((resolve, reject) => {
+    let failures = 0;
     const poll = async () => {
       try {
         const [status, trialsData] = await Promise.all([
           getOptimizationStatus(optimizationId),
           fetchOptimizationTrials(optimizationId).catch(() => null),
         ]);
+        failures = 0;
         onUpdate(status, trialsData);
         if (status.status !== 'pending' && status.status !== 'running') {
           resolve(status);
@@ -232,7 +236,14 @@ export async function pollOptimization(
           setTimeout(poll, intervalMs);
         }
       } catch (error) {
-        reject(error);
+        // Heavy trials can starve the backend and make a poll time out;
+        // keep polling through transient failures instead of giving up.
+        failures += 1;
+        if (failures >= POLL_MAX_CONSECUTIVE_FAILURES) {
+          reject(error);
+        } else {
+          setTimeout(poll, intervalMs);
+        }
       }
     };
     poll();
