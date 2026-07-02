@@ -18,8 +18,13 @@ from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
 
 # Access optimization results stored by the optimize module.
-from quoptuna.server.api.v1.optimize import optimization_jobs
-from quoptuna.server.services.workflow_service import build_xai
+from quoptuna.server.api.v1.optimize import (
+    OptimizationRequest,
+    build_workflow,
+    get_job,
+)
+from quoptuna.server.services.storage import optuna_storage_url
+from quoptuna.server.services.workflow_service import WorkflowExecutor, build_xai
 
 logger = logging.getLogger(__name__)
 
@@ -60,10 +65,40 @@ class StudyPlotsRequest(BaseModel):
     optimization_id: str
 
 
+def _rehydrate_result(job: dict) -> dict:
+    """Re-derive the analysis result for a completed run after a restart.
+
+    The train/test split is deterministic (fixed random_state), so re-running
+    only the data-prep nodes from the persisted request reproduces the exact
+    DataFrames; best value/params are reloaded from the Optuna study on disk.
+    """
+    request = OptimizationRequest(**job["request"])
+    workflow = build_workflow(job["id"], request, include_optimize=False)
+    node_results = WorkflowExecutor(workflow).execute()["node_results"]
+    # The optuna-config node's output merges all upstream data-prep outputs
+    # (x_train/x_test/y_train/y_test/x_columns/y_column + study/db config).
+    result = dict(node_results["optuna"])
+
+    from optuna import load_study
+
+    study = load_study(
+        storage=optuna_storage_url(request.database_name), study_name=request.study_name
+    )
+    best_trial = study.best_trial
+    result.update(
+        {
+            "type": "optimization_result",
+            "best_value": best_trial.value,
+            "best_params": best_trial.params,
+            "best_trial_number": best_trial.number,
+            "model_name": request.model_name,
+        }
+    )
+    return result
+
+
 def _get_completed_result(optimization_id: str) -> dict:
-    if optimization_id not in optimization_jobs:
-        raise HTTPException(status_code=404, detail="Optimization not found")
-    job = optimization_jobs[optimization_id]
+    job = get_job(optimization_id)
     if job["status"] != "completed":
         raise HTTPException(
             status_code=400,
@@ -71,7 +106,14 @@ def _get_completed_result(optimization_id: str) -> dict:
         )
     result = job.get("result")
     if not result:
-        raise HTTPException(status_code=500, detail="Optimization result not found")
+        try:
+            result = _rehydrate_result(job)
+        except Exception as e:
+            logger.exception("Failed to rehydrate result for %s", optimization_id)
+            raise HTTPException(
+                status_code=500, detail=f"Optimization result not found: {e!s}"
+            )
+        job["result"] = result  # cache for subsequent analysis calls
     return result
 
 
@@ -345,7 +387,7 @@ async def generate_study_plots(request: StudyPlotsRequest):
     study_name = opt_result.get("study_name")
     try:
         # Storage string mirrors workflow_service.build_xai exactly.
-        study = load_study(storage=f"sqlite:///db/{db_name}.db", study_name=study_name)
+        study = load_study(storage=optuna_storage_url(db_name), study_name=study_name)
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load study: {e!s}")
 

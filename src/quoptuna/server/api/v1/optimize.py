@@ -9,13 +9,17 @@ from typing import Any, Dict, List, Optional
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, ConfigDict
 
-from quoptuna.server.services import dataset_registry
+from quoptuna.server.services import dataset_registry, run_store
+from quoptuna.server.services.storage import optuna_storage_url
 from quoptuna.server.services.workflow_service import WorkflowExecutor
 
 router = APIRouter()
 
-# In-memory storage for optimization jobs (replace with Redis/database in production)
+# Hot cache of optimization jobs; the durable copy lives in run_store (SQLite).
 optimization_jobs: Dict[str, Dict[str, Any]] = {}
+
+# Runs left 'running'/'pending' by a previous process can never finish.
+run_store.mark_stale_runs_interrupted()
 
 
 class LabelMapping(BaseModel):
@@ -33,7 +37,8 @@ class OptimizationRequest(BaseModel):
     selected_features: List[str]
     target_column: str
     study_name: str
-    database_name: str
+    # Optuna storage database; a global app setting on the frontend side.
+    database_name: str = "results"
     num_trials: int
     model_name: str = "DataReuploading"
     label_mapping: Optional[LabelMapping] = None
@@ -55,86 +60,95 @@ class OptimizationStatus(BaseModel):
     error: Optional[str]
 
 
+def build_workflow(job_id: str, request: OptimizationRequest, include_optimize: bool = True) -> Dict:
+    """Build the node-graph workflow for a request.
+
+    With ``include_optimize=False`` the graph stops after model/optuna config,
+    which re-derives the data-prep outputs (train/test splits) without running
+    any trials — used to rehydrate analysis after a backend restart.
+    """
+    # Resolve the dataset to a persisted CSV via the registry. Uploads and
+    # UCI loads both register a file_path, so we can always read by file.
+    record = dataset_registry.get(request.dataset_id)
+    if record and record.get("file_path"):
+        data_node = {
+            "id": "data",
+            "data": {
+                "type": "data-upload",
+                "config": {"file_path": record["file_path"]},
+            },
+        }
+    elif request.dataset_source == "uci":
+        # Fallback: fetch directly from UCI by numeric id.
+        data_node = {
+            "id": "data",
+            "data": {"type": "data-uci", "config": {"dataset_id": request.dataset_id}},
+        }
+    else:
+        raise ValueError(
+            f"Dataset '{request.dataset_id}' is not registered. Upload or load it first."
+        )
+
+    label_config: Dict[str, Any] = {}
+    if request.label_mapping is not None:
+        label_config["label_mapping"] = {
+            "neg": request.label_mapping.neg,
+            "pos": request.label_mapping.pos,
+        }
+
+    nodes = [
+        data_node,
+        {
+            "id": "features",
+            "data": {
+                "type": "feature-selection",
+                "config": {
+                    "x_columns": request.selected_features,
+                    "y_column": request.target_column,
+                },
+            },
+        },
+        {"id": "split", "data": {"type": "train-test-split", "config": {}}},
+        {"id": "label_encode", "data": {"type": "label-encoding", "config": label_config}},
+        {
+            "id": "model",
+            "data": {"type": "quantum-model", "config": {"model_name": request.model_name}},
+        },
+        {
+            "id": "optuna",
+            "data": {
+                "type": "optuna-config",
+                "config": {
+                    "study_name": request.study_name,
+                    "n_trials": request.num_trials,
+                    "db_name": request.database_name,
+                    "model_types": request.model_types,
+                    "search_space": request.search_space,
+                },
+            },
+        },
+    ]
+    edges = [
+        {"source": "data", "target": "features"},
+        {"source": "features", "target": "split"},
+        {"source": "split", "target": "label_encode"},
+        {"source": "label_encode", "target": "model"},
+        {"source": "model", "target": "optuna"},
+    ]
+    if include_optimize:
+        nodes.append({"id": "optimize", "data": {"type": "optimization", "config": {}}})
+        edges.append({"source": "optuna", "target": "optimize"})
+
+    return {"id": job_id, "name": request.study_name, "nodes": nodes, "edges": edges}
+
+
 def run_optimization_background(job_id: str, request: OptimizationRequest):
     """Background task to run optimization"""
     try:
         optimization_jobs[job_id]["status"] = "running"
+        run_store.update_run(job_id, status="running")
 
-        # Resolve the dataset to a persisted CSV via the registry. Uploads and
-        # UCI loads both register a file_path, so we can always read by file.
-        record = dataset_registry.get(request.dataset_id)
-        if record and record.get("file_path"):
-            data_node = {
-                "id": "data",
-                "data": {
-                    "type": "data-upload",
-                    "config": {"file_path": record["file_path"]},
-                },
-            }
-        elif request.dataset_source == "uci":
-            # Fallback: fetch directly from UCI by numeric id.
-            data_node = {
-                "id": "data",
-                "data": {"type": "data-uci", "config": {"dataset_id": request.dataset_id}},
-            }
-        else:
-            raise ValueError(
-                f"Dataset '{request.dataset_id}' is not registered. Upload or load it first."
-            )
-
-        label_config: Dict[str, Any] = {}
-        if request.label_mapping is not None:
-            label_config["label_mapping"] = {
-                "neg": request.label_mapping.neg,
-                "pos": request.label_mapping.pos,
-            }
-
-        # Build workflow
-        workflow = {
-            "id": job_id,
-            "name": request.study_name,
-            "nodes": [
-                data_node,
-                {
-                    "id": "features",
-                    "data": {
-                        "type": "feature-selection",
-                        "config": {
-                            "x_columns": request.selected_features,
-                            "y_column": request.target_column,
-                        },
-                    },
-                },
-                {"id": "split", "data": {"type": "train-test-split", "config": {}}},
-                {"id": "label_encode", "data": {"type": "label-encoding", "config": label_config}},
-                {
-                    "id": "model",
-                    "data": {"type": "quantum-model", "config": {"model_name": request.model_name}},
-                },
-                {
-                    "id": "optuna",
-                    "data": {
-                        "type": "optuna-config",
-                        "config": {
-                            "study_name": request.study_name,
-                            "n_trials": request.num_trials,
-                            "db_name": request.database_name,
-                            "model_types": request.model_types,
-                            "search_space": request.search_space,
-                        },
-                    },
-                },
-                {"id": "optimize", "data": {"type": "optimization", "config": {}}},
-            ],
-            "edges": [
-                {"source": "data", "target": "features"},
-                {"source": "features", "target": "split"},
-                {"source": "split", "target": "label_encode"},
-                {"source": "label_encode", "target": "model"},
-                {"source": "model", "target": "optuna"},
-                {"source": "optuna", "target": "optimize"},
-            ],
-        }
+        workflow = build_workflow(job_id, request)
 
         # Execute workflow
         executor = WorkflowExecutor(workflow)
@@ -159,6 +173,7 @@ def run_optimization_background(job_id: str, request: OptimizationRequest):
                 for i in range(min(10, request.num_trials))
             ]
 
+        completed_at = datetime.now().isoformat()
         optimization_jobs[job_id].update(
             {
                 "status": "completed",
@@ -166,15 +181,56 @@ def run_optimization_background(job_id: str, request: OptimizationRequest):
                 "best_value": opt_result["best_value"],
                 "best_params": opt_result["best_params"],
                 "trials": trials,
-                "completed_at": datetime.now().isoformat(),
+                "completed_at": completed_at,
                 "result": opt_result,  # Store full result for SHAP
             }
         )
+        run_store.update_run(
+            job_id,
+            status="completed",
+            current_trial=request.num_trials,
+            best_value=opt_result["best_value"],
+            best_params=opt_result["best_params"],
+            completed_at=completed_at,
+        )
 
     except Exception as e:
+        completed_at = datetime.now().isoformat()
         optimization_jobs[job_id].update(
-            {"status": "failed", "error": str(e), "completed_at": datetime.now().isoformat()}
+            {"status": "failed", "error": str(e), "completed_at": completed_at}
         )
+        run_store.update_run(job_id, status="failed", error=str(e), completed_at=completed_at)
+
+
+def get_job(job_id: str) -> Dict[str, Any]:
+    """Resolve a job from the hot cache, rehydrating from run_store if needed.
+
+    Raises 404 when the job is unknown to both. Rehydrated jobs are cached
+    back into ``optimization_jobs`` so subsequent lookups are cheap.
+    """
+    job = optimization_jobs.get(job_id)
+    if job is not None:
+        return job
+
+    run = run_store.get_run(job_id)
+    if run is None:
+        raise HTTPException(status_code=404, detail="Optimization not found")
+
+    job = {
+        "id": run["job_id"],
+        "status": run["status"],
+        "current_trial": run.get("current_trial") or 0,
+        "total_trials": run.get("total_trials") or 0,
+        "best_value": run.get("best_value"),
+        "best_params": run.get("best_params"),
+        "trials": None,
+        "started_at": run.get("started_at") or "",
+        "completed_at": run.get("completed_at"),
+        "error": run.get("error"),
+        "request": run.get("request") or {},
+    }
+    optimization_jobs[job_id] = job
+    return job
 
 
 @router.post("", response_model=Dict[str, str])
@@ -195,19 +251,65 @@ async def start_optimization(request: OptimizationRequest, background_tasks: Bac
         "error": None,
         "request": request.dict(),  # Store request for later use
     }
+    run_store.save_run(optimization_jobs[job_id])
 
     background_tasks.add_task(run_optimization_background, job_id, request)
 
     return {"id": job_id, "status": "pending"}
 
 
+@router.get("")
+async def list_optimizations():
+    """List all persisted optimization runs (newest first)."""
+    runs = run_store.list_runs()
+    summaries = []
+    for run in runs:
+        # Prefer live in-memory state for jobs running in this process.
+        live = optimization_jobs.get(run["job_id"])
+        request_data = run.get("request") or {}
+        record = dataset_registry.get(request_data.get("dataset_id", ""))
+        summaries.append(
+            {
+                "id": run["job_id"],
+                "study_name": run.get("study_name"),
+                "db_name": run.get("db_name"),
+                "status": live["status"] if live else run.get("status"),
+                "started_at": run.get("started_at"),
+                "completed_at": (live or run).get("completed_at"),
+                "best_value": (live or run).get("best_value"),
+                "current_trial": (live or run).get("current_trial"),
+                "total_trials": run.get("total_trials"),
+                "dataset_name": (record or {}).get("name") or request_data.get("dataset_id"),
+            }
+        )
+    return {"runs": summaries}
+
+
+@router.get("/{optimization_id}/detail")
+async def get_optimization_detail(optimization_id: str):
+    """Full rehydration payload: run summary plus the original request config."""
+    job = get_job(optimization_id)
+    request_data = job.get("request") or {}
+    record = dataset_registry.get(request_data.get("dataset_id", ""))
+    return {
+        "id": job["id"],
+        "status": job["status"],
+        "started_at": job["started_at"],
+        "completed_at": job.get("completed_at"),
+        "best_value": job.get("best_value"),
+        "best_params": job.get("best_params"),
+        "current_trial": job.get("current_trial"),
+        "total_trials": job.get("total_trials"),
+        "error": job.get("error"),
+        "request": request_data,
+        "dataset": record,
+    }
+
+
 @router.get("/{optimization_id}", response_model=OptimizationStatus)
 async def get_optimization_status(optimization_id: str):
     """Get optimization status"""
-    if optimization_id not in optimization_jobs:
-        raise HTTPException(status_code=404, detail="Optimization not found")
-
-    job = optimization_jobs[optimization_id]
+    job = get_job(optimization_id)
     return OptimizationStatus(
         id=job["id"],
         status=job["status"],
@@ -225,10 +327,7 @@ async def get_optimization_status(optimization_id: str):
 @router.get("/{optimization_id}/trials")
 async def get_optimization_trials(optimization_id: str):
     """Get trial history from Optuna database in real-time"""
-    if optimization_id not in optimization_jobs:
-        raise HTTPException(status_code=404, detail="Optimization not found")
-
-    job = optimization_jobs[optimization_id]
+    job = get_job(optimization_id)
 
     # Try to fetch live data from Optuna database
     try:
@@ -237,7 +336,7 @@ async def get_optimization_trials(optimization_id: str):
         request_data = job.get("request", {})
         db_name = request_data.get("database_name", "workflow_optimization.db")
         study_name = request_data.get("study_name", "workflow_study")
-        storage_location = f"sqlite:///db/{db_name}.db"
+        storage_location = optuna_storage_url(db_name)
 
         # Load study and get all trials
         study = load_study(storage=storage_location, study_name=study_name, sampler=None)
@@ -267,6 +366,10 @@ async def get_optimization_trials(optimization_id: str):
         if best_value is not None:
             job["best_value"] = best_value
             job["best_params"] = best_params
+        progress: Dict[str, Any] = {"current_trial": len(trials)}
+        if best_value is not None:
+            progress.update(best_value=best_value, best_params=best_params)
+        run_store.update_run(optimization_id, **progress)
 
         return {
             "trials": trials,
@@ -286,13 +389,19 @@ async def get_optimization_trials(optimization_id: str):
 
 @router.delete("/{optimization_id}")
 async def cancel_optimization(optimization_id: str):
-    """Cancel a running optimization"""
-    if optimization_id not in optimization_jobs:
-        raise HTTPException(status_code=404, detail="Optimization not found")
+    """Cancel a running optimization, or delete a finished run's record.
 
-    job = optimization_jobs[optimization_id]
-    if job["status"] == "running":
+    The Optuna study database itself is left untouched.
+    """
+    job = get_job(optimization_id)
+    if job["status"] in ("running", "pending"):
         job["status"] = "cancelled"
         job["completed_at"] = datetime.now().isoformat()
+        run_store.update_run(
+            optimization_id, status="cancelled", completed_at=job["completed_at"]
+        )
+        return {"message": "Optimization cancelled"}
 
-    return {"message": "Optimization cancelled"}
+    run_store.delete_run(optimization_id)
+    optimization_jobs.pop(optimization_id, None)
+    return {"message": "Optimization run deleted"}

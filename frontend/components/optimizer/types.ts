@@ -13,12 +13,11 @@ export interface WorkflowData {
   };
   configuration: {
     studyName: string;
-    databaseName: string;
     numTrials: number;
   };
   optimization: {
     executionId: string | null;
-    status: 'idle' | 'running' | 'completed' | 'failed';
+    status: 'idle' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted';
     bestValue: number | null;
     bestParams: Record<string, any> | null;
     trials: Array<{ trial: number; value: number; params: Record<string, any>; state?: string }>;
@@ -43,7 +42,6 @@ export const initialWorkflowData: WorkflowData = {
   features: { selectedFeatures: [], targetColumn: null, labelMapping: { neg: null, pos: null } },
   configuration: {
     studyName: 'my-optimization-study',
-    databaseName: 'results',
     numTrials: 50,
   },
   optimization: {

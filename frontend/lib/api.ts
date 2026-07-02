@@ -109,9 +109,17 @@ export interface OptimizationRequest {
   label_mapping?: LabelMapping;
 }
 
+export type RunStatus =
+  | 'pending'
+  | 'running'
+  | 'completed'
+  | 'failed'
+  | 'cancelled'
+  | 'interrupted';
+
 export interface OptimizationStatus {
   id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: RunStatus;
   current_trial: number;
   total_trials: number;
   best_value: number | null;
@@ -157,6 +165,54 @@ export async function fetchOptimizationTrials(id: string): Promise<OptimizationT
   return request<OptimizationTrials>(`/api/v1/optimize/${id}/trials`);
 }
 
+export interface PastRun {
+  id: string;
+  study_name: string | null;
+  db_name: string | null;
+  status: RunStatus;
+  started_at: string | null;
+  completed_at: string | null;
+  best_value: number | null;
+  current_trial: number | null;
+  total_trials: number | null;
+  dataset_name: string | null;
+}
+
+export async function listOptimizations(): Promise<PastRun[]> {
+  const data = await request<{ runs: PastRun[] }>('/api/v1/optimize');
+  return data.runs;
+}
+
+export interface OptimizationDetail {
+  id: string;
+  status: RunStatus;
+  started_at: string;
+  completed_at: string | null;
+  best_value: number | null;
+  best_params: Record<string, any> | null;
+  current_trial: number | null;
+  total_trials: number | null;
+  error: string | null;
+  request: Partial<OptimizationRequest>;
+  dataset: {
+    id: string;
+    name: string;
+    source: 'upload' | 'uci';
+    file_path?: string;
+    rows?: number;
+    columns?: string[];
+  } | null;
+}
+
+export async function getOptimizationDetail(id: string): Promise<OptimizationDetail> {
+  return request<OptimizationDetail>(`/api/v1/optimize/${id}/detail`);
+}
+
+/** Cancels a running optimization or deletes a finished run's record. */
+export async function deleteOptimization(id: string): Promise<{ message: string }> {
+  return request<{ message: string }>(`/api/v1/optimize/${id}`, { method: 'DELETE' });
+}
+
 export async function pollOptimization(
   optimizationId: string,
   onUpdate: (status: OptimizationStatus, trials?: OptimizationTrials | null) => void,
@@ -170,7 +226,7 @@ export async function pollOptimization(
           fetchOptimizationTrials(optimizationId).catch(() => null),
         ]);
         onUpdate(status, trialsData);
-        if (status.status === 'completed' || status.status === 'failed') {
+        if (status.status !== 'pending' && status.status !== 'running') {
           resolve(status);
         } else {
           setTimeout(poll, intervalMs);

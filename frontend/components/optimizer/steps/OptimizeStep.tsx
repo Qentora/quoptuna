@@ -5,11 +5,12 @@ import { Button } from '@/components/ui/button';
 import { Metric } from '@/components/ui/metric';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Table, TableBody, TableContainer, TableHead, Td, Th } from '@/components/ui/table';
-import { pollOptimization, startOptimization } from '@/lib/api';
+import { fetchOptimizationTrials, pollOptimization, startOptimization } from '@/lib/api';
+import { getDatabaseName } from '@/lib/appSettings';
 import { cn } from '@/lib/utils';
 import * as Progress from '@radix-ui/react-progress';
-import { Atom, Check, Cpu, PlayCircle, Trophy } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { Atom, Check, Cpu, PlayCircle, RotateCcw, Trophy } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
 import { ErrorBanner } from '../NavButtons';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
@@ -25,10 +26,63 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
 
   const { dataset, features, configuration, optimization } = workflowData;
   const hasResults = optimization.status === 'completed';
+  const wasStopped =
+    optimization.status === 'interrupted' ||
+    optimization.status === 'cancelled' ||
+    optimization.status === 'failed';
 
   useEffect(() => {
     setFooter({ canContinue: hasResults, nextBusy: isRunning, backDisabled: isRunning });
   }, [hasResults, isRunning, setFooter]);
+
+  // Poll a job to completion, mirroring progress into local state and the
+  // final outcome into workflowData. Shared by fresh starts and resumes.
+  const track = async (id: string) => {
+    setIsRunning(true);
+    setError(null);
+    try {
+      const finalStatus = await pollOptimization(id, (status, trialsData) => {
+        setCurrentTrial(status.current_trial);
+        setProgress(status.total_trials ? (status.current_trial / status.total_trials) * 100 : 0);
+        if (trialsData?.trials) {
+          setLiveTrials(trialsData.trials);
+          if (trialsData.best_trial) setBestValue(trialsData.best_trial.value);
+        }
+      });
+
+      if (finalStatus.status !== 'completed') {
+        setError(finalStatus.error || `Optimization ${finalStatus.status}`);
+        setWorkflowData((prev) => ({
+          ...prev,
+          optimization: { ...prev.optimization, executionId: id, status: finalStatus.status },
+        }));
+        setIsRunning(false);
+        return;
+      }
+
+      const trials = finalStatus.trials ?? [];
+      const bestTrialNumber =
+        trials.length > 0
+          ? trials.reduce((best, t) => (t.value > best.value ? t : best)).trial
+          : null;
+
+      setWorkflowData((prev) => ({
+        ...prev,
+        optimization: {
+          executionId: id,
+          status: 'completed',
+          bestValue: finalStatus.best_value,
+          bestParams: finalStatus.best_params,
+          trials,
+          selectedTrial: prev.optimization.selectedTrial ?? bestTrialNumber,
+        },
+      }));
+      setIsRunning(false);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Optimization failed');
+      setIsRunning(false);
+    }
+  };
 
   const run = async () => {
     if (!dataset) {
@@ -52,49 +106,62 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         selected_features: features.selectedFeatures,
         target_column: features.targetColumn as string,
         study_name: configuration.studyName,
-        database_name: configuration.databaseName,
+        database_name: getDatabaseName(),
         num_trials: configuration.numTrials,
         label_mapping: labelMapping,
       });
 
-      const finalStatus = await pollOptimization(id, (status, trialsData) => {
-        setCurrentTrial(status.current_trial);
-        setProgress(status.total_trials ? (status.current_trial / status.total_trials) * 100 : 0);
-        if (trialsData?.trials) {
-          setLiveTrials(trialsData.trials);
-          if (trialsData.best_trial) setBestValue(trialsData.best_trial.value);
-        }
-      });
-
-      if (finalStatus.status === 'failed') {
-        setError(finalStatus.error || 'Optimization failed');
-        setIsRunning(false);
-        return;
-      }
-
-      const trials = finalStatus.trials ?? [];
-      const bestTrialNumber =
-        trials.length > 0
-          ? trials.reduce((best, t) => (t.value > best.value ? t : best)).trial
-          : null;
-
+      // Persist the execution id immediately so a refresh mid-run can resume.
       setWorkflowData((prev) => ({
         ...prev,
         optimization: {
+          ...prev.optimization,
           executionId: id,
-          status: 'completed',
-          bestValue: finalStatus.best_value,
-          bestParams: finalStatus.best_params,
-          trials,
-          selectedTrial: bestTrialNumber,
+          status: 'running',
+          selectedTrial: null,
         },
       }));
-      setIsRunning(false);
+
+      await track(id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Optimization failed');
       setIsRunning(false);
     }
   };
+
+  // On mount: resume polling for a still-running job (e.g. after a page
+  // refresh), and refetch trials for a rehydrated completed run.
+  const resumed = useRef(false);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount.
+  useEffect(() => {
+    if (resumed.current) return;
+    resumed.current = true;
+    const id = optimization.executionId;
+    if (!id) return;
+    if (optimization.status === 'running' || optimization.status === 'pending') {
+      void track(id);
+    } else if (optimization.status === 'completed' && optimization.trials.length === 0) {
+      fetchOptimizationTrials(id)
+        .then((trialsData) => {
+          const trials = trialsData.trials ?? [];
+          const bestTrialNumber =
+            trials.length > 0
+              ? trials.reduce((best, t) => (t.value > best.value ? t : best)).trial
+              : null;
+          setWorkflowData((prev) => ({
+            ...prev,
+            optimization: {
+              ...prev.optimization,
+              trials,
+              bestValue: trialsData.best_trial?.value ?? prev.optimization.bestValue,
+              bestParams: trialsData.best_trial?.params ?? prev.optimization.bestParams,
+              selectedTrial: prev.optimization.selectedTrial ?? bestTrialNumber,
+            },
+          }));
+        })
+        .catch(() => undefined);
+    }
+  }, []);
 
   const allTrials = hasResults ? optimization.trials : liveTrials;
   const sorted = [...allTrials].sort((a, b) => b.value - a.value);
@@ -121,12 +188,13 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         {!hasResults && !isRunning && (
           <section className="rounded-lg border border-border bg-card p-6 text-center">
             <Button type="button" size="lg" onClick={run}>
-              <PlayCircle className="h-5 w-5" />
-              Start Optimization
+              {wasStopped ? <RotateCcw className="h-5 w-5" /> : <PlayCircle className="h-5 w-5" />}
+              {wasStopped ? 'Restart Optimization' : 'Start Optimization'}
             </Button>
             <p className="mt-3 text-sm text-muted-foreground">
-              Runs {configuration.numTrials} trials across quantum and classical models. This may
-              take several minutes.
+              {wasStopped
+                ? `The previous run was ${optimization.status}. Restarting launches a new run with the same configuration.`
+                : `Runs ${configuration.numTrials} trials across quantum and classical models. This may take several minutes.`}
             </p>
           </section>
         )}

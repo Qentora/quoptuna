@@ -1,5 +1,4 @@
 import logging
-import os
 import time
 from typing import Optional
 
@@ -9,6 +8,7 @@ from sklearn.metrics import accuracy_score, f1_score
 
 from quoptuna.backend.models import create_model
 from quoptuna.backend.utils.data_utils.data import load_data, preprocess_data
+from quoptuna.backend.utils.storage import ensure_db_dir, optuna_db_path
 
 logging.getLogger().setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
@@ -111,9 +111,8 @@ class Optimizer:
         self.test_x = self.data.get("test_x")
         self.train_y = self.data.get("train_y")
         self.test_y = self.data.get("test_y")
-        self.data_path = f"db/{self.db_name}.db"
-        if not os.path.exists("db"):  # noqa: PTH110
-            os.makedirs("db")  # noqa: PTH103
+        ensure_db_dir()
+        self.data_path = str(optuna_db_path(self.db_name))
         self.storage_location = f"sqlite:///{self.data_path}"
         self.study_name = study_name
         self.study = None

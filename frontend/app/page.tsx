@@ -3,9 +3,25 @@
 import { Card, CardContent } from '@/components/ui/card';
 import { Metric } from '@/components/ui/metric';
 import { PageShell } from '@/components/ui/page-shell';
-import { type UCIDataset, getSystemInfo, listUCIDatasets } from '@/lib/api';
+import {
+  type PastRun,
+  type UCIDataset,
+  getSystemInfo,
+  listOptimizations,
+  listUCIDatasets,
+} from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
-import { BarChart3, Brain, Database, Settings, Zap } from 'lucide-react';
+import {
+  BarChart3,
+  Brain,
+  CheckCircle2,
+  Database,
+  History,
+  Loader2,
+  PauseCircle,
+  Settings,
+  Zap,
+} from 'lucide-react';
 import Link from 'next/link';
 
 const MAX_DATASETS = 6;
@@ -19,9 +35,18 @@ export default function HomePage() {
     queryKey: ['uci-datasets'],
     queryFn: () => listUCIDatasets().catch(() => [] as UCIDataset[]),
   });
+  const { data: runs = [] } = useQuery({
+    queryKey: ['optimization-runs'],
+    queryFn: () => listOptimizations().catch(() => [] as PastRun[]),
+  });
   const totalModels = info?.total_models ?? 26;
   const shownDatasets = datasets.slice(0, MAX_DATASETS);
   const remaining = datasets.length - shownDatasets.length;
+  const completedStudies = runs.filter((r) => r.status === 'completed').length;
+  const inProgressStudies = runs.filter(
+    (r) => r.status === 'running' || r.status === 'pending'
+  ).length;
+  const otherStudies = runs.length - completedStudies - inProgressStudies;
 
   return (
     <PageShell title="Dashboard" contentClassName="mx-auto max-w-6xl">
@@ -53,6 +78,42 @@ export default function HomePage() {
           icon={<Database className="h-5 w-5 text-accent-emerald-foreground" />}
           tone="emerald"
         />
+      </div>
+
+      <div className="mb-6">
+        <div className="mb-3 flex items-center justify-between">
+          <h2 className="text-base font-semibold tracking-tight">Studies</h2>
+          <Link
+            href="/runs"
+            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground hover:underline"
+          >
+            <History className="h-4 w-4" />
+            View all runs
+          </Link>
+        </div>
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StatCard
+            title="Completed Studies"
+            value={completedStudies}
+            subtitle="Ready to analyze & replay"
+            icon={<CheckCircle2 className="h-5 w-5 text-accent-emerald-foreground" />}
+            tone="emerald"
+          />
+          <StatCard
+            title="In Progress"
+            value={inProgressStudies}
+            subtitle="Currently optimizing"
+            icon={<Loader2 className="h-5 w-5 text-brand" />}
+            tone="brand"
+          />
+          <StatCard
+            title="Interrupted / Failed"
+            value={otherStudies}
+            subtitle="Can be restarted from Runs"
+            icon={<PauseCircle className="h-5 w-5 text-accent-orange-foreground" />}
+            tone="amber"
+          />
+        </div>
       </div>
 
       <div className="mb-6">
