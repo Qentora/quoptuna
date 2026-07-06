@@ -17,6 +17,8 @@ import numpy as np
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict
 
+from quoptuna.backend.utils.storage import DEFAULT_DB_NAME
+
 # Access optimization results stored by the optimize module.
 from quoptuna.server.api.v1.optimize import (
     OptimizationRequest,
@@ -381,7 +383,7 @@ async def generate_study_plots(request: StudyPlotsRequest):
     import optuna.visualization.matplotlib as ov
     from optuna import load_study
 
-    db_name = opt_result.get("db_name")
+    db_name = str(opt_result.get("db_name") or DEFAULT_DB_NAME)
     study_name = opt_result.get("study_name")
     try:
         # Storage string mirrors workflow_service.build_xai exactly.
