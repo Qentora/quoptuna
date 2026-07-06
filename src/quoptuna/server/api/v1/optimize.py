@@ -60,7 +60,9 @@ class OptimizationStatus(BaseModel):
     error: Optional[str]
 
 
-def build_workflow(job_id: str, request: OptimizationRequest, include_optimize: bool = True) -> Dict:
+def build_workflow(
+    job_id: str, request: OptimizationRequest, include_optimize: bool = True
+) -> Dict:
     """Build the node-graph workflow for a request.
 
     With ``include_optimize=False`` the graph stops after model/optuna config,
@@ -419,9 +421,7 @@ async def cancel_optimization(optimization_id: str):
     if job["status"] in ("running", "pending"):
         job["status"] = "cancelled"
         job["completed_at"] = datetime.now().isoformat()
-        run_store.update_run(
-            optimization_id, status="cancelled", completed_at=job["completed_at"]
-        )
+        run_store.update_run(optimization_id, status="cancelled", completed_at=job["completed_at"])
         return {"message": "Optimization cancelled"}
 
     run_store.delete_run(optimization_id)

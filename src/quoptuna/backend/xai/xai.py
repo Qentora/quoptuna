@@ -532,7 +532,6 @@ class XAI:
         # Newer models return content as a list of blocks; flatten to markdown text.
         if isinstance(content, list):
             content = "".join(
-                part.get("text", "") if isinstance(part, dict) else str(part)
-                for part in content
+                part.get("text", "") if isinstance(part, dict) else str(part) for part in content
             )
         return content

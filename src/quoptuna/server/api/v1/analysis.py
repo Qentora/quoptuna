@@ -110,9 +110,7 @@ def _get_completed_result(optimization_id: str) -> dict:
             result = _rehydrate_result(job)
         except Exception as e:
             logger.exception("Failed to rehydrate result for %s", optimization_id)
-            raise HTTPException(
-                status_code=500, detail=f"Optimization result not found: {e!s}"
-            )
+            raise HTTPException(status_code=500, detail=f"Optimization result not found: {e!s}")
         job["result"] = result  # cache for subsequent analysis calls
     return result
 
