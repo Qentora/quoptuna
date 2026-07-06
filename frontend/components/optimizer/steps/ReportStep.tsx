@@ -46,7 +46,9 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
 
   const { optimization, report } = workflowData;
   const apiKey = provider === 'google' ? keys.google : keys.openai;
-  const hasReport = report.markdown !== null;
+  // Guard against a non-string payload (e.g. structured LLM content blocks) —
+  // ReactMarkdown throws on non-string children and would crash the whole app.
+  const hasReport = typeof report.markdown === 'string' && report.markdown.length > 0;
   const effectiveModel = modelName === '__custom__' ? customModel.trim() : modelName;
 
   useEffect(() => {
@@ -78,7 +80,11 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
         model_name: effectiveModel || PROVIDER_MODELS[provider].models[0],
         dataset_description: datasetDescription || undefined,
       });
-      setWorkflowData((prev) => ({ ...prev, report: { markdown: result.report_markdown } }));
+      const markdown =
+        typeof result.report_markdown === 'string'
+          ? result.report_markdown
+          : JSON.stringify(result.report_markdown);
+      setWorkflowData((prev) => ({ ...prev, report: { markdown } }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Report generation failed');
     } finally {

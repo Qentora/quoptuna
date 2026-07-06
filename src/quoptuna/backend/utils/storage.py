@@ -1,0 +1,45 @@
+"""
+Canonical location and naming for Optuna study databases.
+
+Historically the storage path was built as ``db/{db_name}.db`` without
+normalizing, so a ``db_name`` that already ended in ``.db`` produced files
+like ``results.db.db``. New databases always get a single ``.db`` suffix;
+loading falls back to the legacy double-suffixed file when that is the one
+that exists on disk.
+"""
+
+from pathlib import Path
+
+DB_DIR = Path("db")
+
+DEFAULT_DB_NAME = "results"
+
+
+def ensure_db_dir() -> Path:
+    DB_DIR.mkdir(exist_ok=True)
+    return DB_DIR
+
+
+def normalize_db_name(db_name: str) -> str:
+    """Strip any trailing ``.db`` suffixes from a database name."""
+    name = (db_name or "").strip()
+    while name.lower().endswith(".db"):
+        name = name[:-3]
+    return name or DEFAULT_DB_NAME
+
+
+def optuna_db_path(db_name: str) -> Path:
+    """Path of the Optuna SQLite database for ``db_name``.
+
+    Prefers the canonical single-suffix file, but keeps loading a legacy
+    double-suffixed file (e.g. ``results.db.db``) when only that one exists.
+    """
+    canonical = DB_DIR / f"{normalize_db_name(db_name)}.db"
+    legacy = DB_DIR / f"{db_name}.db"
+    if legacy != canonical and legacy.exists() and not canonical.exists():
+        return legacy
+    return canonical
+
+
+def optuna_storage_url(db_name: str) -> str:
+    return f"sqlite:///{optuna_db_path(db_name)}"

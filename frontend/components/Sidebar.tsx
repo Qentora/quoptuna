@@ -5,7 +5,7 @@ import { ThemeToggle } from '@/components/ui/theme-toggle';
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
 import { useBackendStatus } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
-import { LayoutDashboard, Settings, Zap } from 'lucide-react';
+import { History, LayoutDashboard, Settings, Zap } from 'lucide-react';
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 import { useState } from 'react';
@@ -13,6 +13,7 @@ import { useState } from 'react';
 const navigation = [
   { name: 'Dashboard', href: '/', icon: LayoutDashboard },
   { name: 'Optimizer', href: '/optimizer', icon: Zap },
+  { name: 'Runs', href: '/runs', icon: History },
   { name: 'Settings', href: '/settings', icon: Settings },
 ];
 

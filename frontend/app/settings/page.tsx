@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { PageShell } from '@/components/ui/page-shell';
+import { DEFAULT_DATABASE_NAME, loadAppSettings, saveAppSettings } from '@/lib/appSettings';
 import { type ApiKeys, loadApiKeys, saveApiKeys } from '@/lib/settings';
 import { Eye, EyeOff } from 'lucide-react';
 import { useEffect, useState } from 'react';
@@ -43,6 +44,8 @@ export default function SettingsPage() {
     google: false,
   });
   const [saving, setSaving] = useState(false);
+  const [databaseName, setDatabaseName] = useState(DEFAULT_DATABASE_NAME);
+  const [savedDatabaseName, setSavedDatabaseName] = useState(DEFAULT_DATABASE_NAME);
 
   useEffect(() => {
     loadApiKeys()
@@ -51,15 +54,23 @@ export default function SettingsPage() {
         setSaved(loaded);
       })
       .catch(() => undefined);
+    const appSettings = loadAppSettings();
+    setDatabaseName(appSettings.databaseName);
+    setSavedDatabaseName(appSettings.databaseName);
   }, []);
 
-  const dirty = FIELDS.some((f) => keys[f.key] !== saved[f.key]);
+  const dirty =
+    FIELDS.some((f) => keys[f.key] !== saved[f.key]) || databaseName !== savedDatabaseName;
 
   const handleSave = async () => {
     setSaving(true);
     try {
       await saveApiKeys(keys);
       setSaved(keys);
+      const name = databaseName.trim() || DEFAULT_DATABASE_NAME;
+      saveAppSettings({ databaseName: name });
+      setDatabaseName(name);
+      setSavedDatabaseName(name);
       toast.success('Settings saved');
     } catch {
       toast.error('Could not save settings');
@@ -126,6 +137,32 @@ export default function SettingsPage() {
                 </Field>
               );
             })}
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Optimization Storage</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Field
+              label="Database Name"
+              htmlFor="database-name"
+              helper={
+                <>
+                  Optuna SQLite database used for all optimization runs (stored server-side under{' '}
+                  <code className="font-mono">db/&lt;name&gt;.db</code>).
+                </>
+              }
+            >
+              <Input
+                id="database-name"
+                type="text"
+                placeholder={DEFAULT_DATABASE_NAME}
+                value={databaseName}
+                onChange={(e) => setDatabaseName(e.target.value)}
+              />
+            </Field>
           </CardContent>
         </Card>
 

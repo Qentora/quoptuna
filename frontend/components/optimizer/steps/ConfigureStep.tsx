@@ -5,6 +5,7 @@ import { Input } from '@/components/ui/input';
 import { Metric } from '@/components/ui/metric';
 import { cn } from '@/lib/utils';
 import * as Slider from '@radix-ui/react-slider';
+import Link from 'next/link';
 import { useEffect } from 'react';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
@@ -18,9 +19,11 @@ const PRESETS = [
 export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const { configuration } = workflowData;
 
+  const hasStudyName = configuration.studyName.trim().length > 0;
+
   useEffect(() => {
-    setFooter({ canContinue: true });
-  }, [setFooter]);
+    setFooter({ canContinue: hasStudyName });
+  }, [hasStudyName, setFooter]);
 
   const update = (field: keyof typeof configuration, value: string | number) =>
     setWorkflowData((prev) => ({
@@ -45,7 +48,7 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
           <Field
             label="Study Name"
             htmlFor="study-name"
-            helper="Unique name for this optimization study"
+            helper="Unique name for this optimization study — it identifies the run everywhere (runs list, replay)"
           >
             <Input
               id="study-name"
@@ -117,36 +120,13 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
         </div>
       </section>
 
-      {/* Advanced */}
-      <section className="rounded-lg border border-border bg-card">
-        <details className="group">
-          <summary className="flex cursor-pointer items-center justify-between px-4 py-3 text-sm font-semibold">
-            Advanced
-            <span className="text-xs font-normal text-muted-foreground group-open:hidden">
-              Show
-            </span>
-          </summary>
-          <div className="border-t border-border p-4">
-            <Field
-              label="Database Name"
-              htmlFor="db-name"
-              helper={
-                <>
-                  SQLite database (stored under{' '}
-                  <code className="font-mono">db/&lt;name&gt;.db</code>)
-                </>
-              }
-            >
-              <Input
-                id="db-name"
-                type="text"
-                value={configuration.databaseName}
-                onChange={(e) => update('databaseName', e.target.value)}
-              />
-            </Field>
-          </div>
-        </details>
-      </section>
+      <p className="text-xs text-muted-foreground">
+        Results are stored in the shared Optuna database configured in{' '}
+        <Link href="/settings" className="underline hover:text-foreground">
+          Settings
+        </Link>
+        .
+      </p>
     </div>
   );
 }

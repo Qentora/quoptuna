@@ -3,17 +3,21 @@
 import { Button } from '@/components/ui/button';
 import { PageHeader } from '@/components/ui/page-header';
 import { cn } from '@/lib/utils';
+import { clearWizardState, loadWizardState, saveWizardState } from '@/lib/wizardStorage';
 import {
   BarChart3,
   Database,
   FileText,
+  History,
   type LucideIcon,
   PlayCircle,
+  RotateCcw,
   Settings2,
   SlidersHorizontal,
 } from 'lucide-react';
 import { AnimatePresence, motion } from 'motion/react';
-import { useEffect, useState } from 'react';
+import Link from 'next/link';
+import { useEffect, useRef, useState } from 'react';
 import { ContextStrip } from './ContextStrip';
 import { StepProgress } from './StepProgress';
 import { AnalyzeStep } from './steps/AnalyzeStep';
@@ -53,32 +57,62 @@ export interface StepProps {
 }
 
 export function Wizard() {
-  const [currentStep, setCurrentStep] = useState(1);
-  const [completedSteps, setCompletedSteps] = useState<number[]>([]);
-  const [workflowData, setWorkflowData] = useState<WorkflowData>(initialWorkflowData);
+  // Restore any saved state synchronously on first render (the page is
+  // client-only via ssr:false, so localStorage is available here).
+  const restored = useRef(loadWizardState());
+  const [currentStep, setCurrentStep] = useState(restored.current?.currentStep ?? 1);
+  const [completedSteps, setCompletedSteps] = useState<number[]>(
+    restored.current?.completedSteps ?? []
+  );
+  const [workflowData, setWorkflowData] = useState<WorkflowData>(
+    restored.current
+      ? { ...initialWorkflowData, ...restored.current.workflowData }
+      : initialWorkflowData
+  );
   const [footer, setFooter] = useState<StepFooterState>({ canContinue: false });
 
-  // Reset footer on step change so a stale canContinue can't leak across steps.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: re-run on step change is the intent.
+  // Autosave (debounced) so a refresh or navigation never loses progress.
   useEffect(() => {
+    const timer = setTimeout(
+      () => saveWizardState({ currentStep, completedSteps, workflowData }),
+      300
+    );
+    return () => clearTimeout(timer);
+  }, [currentStep, completedSteps, workflowData]);
+
+  const handleReset = () => {
+    clearWizardState();
     setFooter({ canContinue: false });
-  }, [currentStep]);
+    setCurrentStep(1);
+    setCompletedSteps([]);
+    setWorkflowData(initialWorkflowData);
+  };
+
+  // Reset the footer when navigating so a stale canContinue can't leak across
+  // steps. Done in the handlers (not an effect keyed on currentStep) so it
+  // never runs after the incoming step's own setFooter — an effect-based reset
+  // fires post-mount with restored state (and twice under dev StrictMode),
+  // wrongly greying out Next on steps that are already complete.
+  const goToStep = (stepId: number) => {
+    setFooter({ canContinue: false });
+    setCurrentStep(stepId);
+  };
 
   const handleStepClick = (stepId: number) => {
     if (completedSteps.includes(stepId - 1) || stepId === 1) {
-      setCurrentStep(stepId);
+      goToStep(stepId);
     }
   };
 
   const handleNextStep = () => {
     if (currentStep < steps.length) {
       setCompletedSteps((prev) => Array.from(new Set([...prev, currentStep])));
-      setCurrentStep((s) => s + 1);
+      goToStep(currentStep + 1);
     }
   };
 
   const handlePreviousStep = () => {
-    if (currentStep > 1) setCurrentStep((s) => s - 1);
+    if (currentStep > 1) goToStep(currentStep - 1);
   };
 
   const stepProps: StepProps = {
@@ -100,7 +134,19 @@ export function Wizard() {
       <header className="shrink-0 border-b border-border bg-card px-6 py-4">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <PageHeader title="Optimizer" />
-          <ContextStrip workflowData={workflowData} />
+          <div className="flex items-center gap-2">
+            <ContextStrip workflowData={workflowData} />
+            <Button type="button" variant="outline" size="sm" asChild>
+              <Link href="/runs">
+                <History className="h-4 w-4" />
+                Runs
+              </Link>
+            </Button>
+            <Button type="button" variant="outline" size="sm" onClick={handleReset}>
+              <RotateCcw className="h-4 w-4" />
+              Start new run
+            </Button>
+          </div>
         </div>
         <StepProgress
           steps={steps}

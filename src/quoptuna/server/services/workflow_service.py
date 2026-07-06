@@ -13,6 +13,7 @@ import pandas as pd
 from ucimlrepo import fetch_ucirepo
 
 from quoptuna import XAI, DataPreparation, Optimizer, XAIConfig
+from quoptuna.backend.utils.storage import DEFAULT_DB_NAME
 
 logger = logging.getLogger(__name__)
 
@@ -36,10 +37,11 @@ def build_xai(
 
     from quoptuna import XAI, XAIConfig
     from quoptuna.backend.models import create_model
+    from quoptuna.server.services.storage import optuna_storage_url
 
-    db_name = opt_result.get("db_name")
+    db_name = str(opt_result.get("db_name") or DEFAULT_DB_NAME)
     study_name = opt_result.get("study_name")
-    storage_location = f"sqlite:///db/{db_name}.db"
+    storage_location = optuna_storage_url(db_name)
     study = load_study(storage=storage_location, study_name=study_name)
 
     if trial_number is not None:
@@ -462,11 +464,12 @@ class WorkflowExecutor:
         from optuna import load_study
 
         from quoptuna.backend.models import create_model
+        from quoptuna.server.services.storage import optuna_storage_url
 
         db_name = opt_result.get("db_name")
         study_name = opt_result.get("study_name")
 
-        storage_location = f"sqlite:///db/{db_name}.db"
+        storage_location = optuna_storage_url(db_name)
         study = load_study(storage=storage_location, study_name=study_name)
         best_trial = study.best_trial
 
