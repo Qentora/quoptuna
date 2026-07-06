@@ -21,6 +21,7 @@ from langchain_google_genai import ChatGoogleGenerativeAI
 from langchain_openai import ChatOpenAI
 from shap import Explainer
 from sklearn.metrics import (
+    ConfusionMatrixDisplay,
     average_precision_score,
     classification_report,
     cohen_kappa_score,
@@ -407,8 +408,6 @@ class XAI:
 
     def plot_confusion_matrix(self, plot_config: dict | None = None):
         """Plot confusion matrix with given configuration."""
-        from sklearn.metrics import ConfusionMatrixDisplay
-
         config = {
             "include_values": True,
             "cmap": "viridis",
