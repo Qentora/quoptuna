@@ -30,6 +30,25 @@
       }
     }
   },
+  "overrides": [
+    {
+      "include": ["components/ui/**"],
+      "linter": {
+        "rules": {
+          "security": { "noDangerouslySetInnerHtml": "off" },
+          "suspicious": { "noDoubleEquals": "off" }
+        }
+      }
+    },
+    {
+      "include": ["app/globals.css"],
+      "linter": {
+        "rules": {
+          "correctness": { "noUnknownProperty": "off" }
+        }
+      }
+    }
+  ],
   "javascript": {
     "formatter": {
       "quoteStyle": "single",

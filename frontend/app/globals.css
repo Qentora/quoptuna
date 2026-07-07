@@ -1,170 +1,266 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@import "tw-animate-css";
+@import "shadcn/tailwind.css";
 
-@layer base {
-  :root {
-    --font-sans: "Inter", sans-serif;
-    --font-mono: "JetBrains Mono", monospace;
+@plugin '@tailwindcss/forms' {
+  strategy: "class";
+}
+@plugin '@tailwindcss/typography';
 
-    /* Core theme colors (OpenRAG OSS theme, monochrome zinc) */
-    --background: 0 0% 100%;
-    --foreground: 0 0% 0%;
-    --card: 0 0% 100%;
-    --card-foreground: 0 0% 0%;
-    --popover: 0 0% 100%;
-    --popover-foreground: 0 0% 0%;
-    --primary: 0 0% 0%;
-    --primary-foreground: 0 0% 100%;
-    --primary-hover: 240 4% 16%;
-    --secondary: 0 0% 100%;
-    --secondary-foreground: 240 4% 16%;
-    --secondary-hover: 240 6% 90%;
-    --muted: 240 5% 96%;
-    --muted-foreground: 240 4% 46%;
-    --accent: 240 5% 96%;
-    --accent-foreground: 0 0% 0%;
-    --border: 240 4.8% 95.9%;
-    --input: 240 6% 90%;
-    --ring: 0 0% 0%;
-    --placeholder-foreground: 240 5% 65%;
+@custom-variant dark (&:is(.dark *));
 
-    /* Semantic */
-    --destructive: 0 72% 51%;
-    --destructive-foreground: 0 0% 100%;
-    --warning: 26 90% 37%;
-    --warning-foreground: 0 0% 100%;
-
-    /* Accent families (background / foreground pairs) */
-    --accent-emerald: 149 80% 90%;
-    --accent-emerald-foreground: 161 94% 30%;
-    --accent-amber: 48 96% 89%;
-    --accent-amber-foreground: 26 90% 37%;
-    --accent-red: 0 93% 94%;
-    --accent-red-foreground: 0 72% 51%;
-    --accent-indigo: 226 100% 94%;
-    --accent-indigo-foreground: 243 75% 59%;
-    --accent-purple: 269 100% 95%;
-    --accent-purple-foreground: 271 81% 56%;
-    --accent-orange: 34 100% 92%;
-    --accent-orange-foreground: 21 90% 48%;
-
-    /* Badge pill */
-    --badge: 0 0% 0%;
-    --badge-foreground: 0 0% 100%;
-
-    /* Brand accent (electric violet/indigo) — additive highlight */
-    --brand: 262 83% 58%;
-    --brand-foreground: 0 0% 100%;
-    --brand-glow: 262 83% 58%;
-
-    --radius: 0.5rem;
-  }
-
-  .dark {
-    --background: 240 6% 10%;
-    --foreground: 0 0% 100%;
-    --card: 240 6% 10%;
-    --card-foreground: 0 0% 100%;
-    --popover: 240 6% 10%;
-    --popover-foreground: 0 0% 100%;
-    --primary: 0 0% 100%;
-    --primary-foreground: 0 0% 0%;
-    --primary-hover: 240 6% 90%;
-    --secondary: 0 0% 0%;
-    --secondary-foreground: 240 6% 90%;
-    --secondary-hover: 240 4% 16%;
-    --muted: 240 4% 16%;
-    --muted-foreground: 240 5% 65%;
-    --accent: 240 4% 16%;
-    --accent-foreground: 0 0% 100%;
-    --border: 240 3.7% 15.9%;
-    --input: 240 5% 34%;
-    --ring: 0 0% 100%;
-    --placeholder-foreground: 240 4% 46%;
-
-    --destructive: 0 84% 60%;
-    --destructive-foreground: 0 0% 100%;
-    --warning: 46 97% 65%;
-    --warning-foreground: 0 0% 0%;
-
-    --accent-emerald: 164 86% 16%;
-    --accent-emerald-foreground: 158 64% 52%;
-    --accent-amber: 22 78% 26%;
-    --accent-amber-foreground: 46 97% 65%;
-    --accent-red: 0 63% 31%;
-    --accent-red-foreground: 0 91% 71%;
-    --accent-indigo: 242 47% 34%;
-    --accent-indigo-foreground: 234 89% 74%;
-    --accent-purple: 274 66% 32%;
-    --accent-purple-foreground: 270 95% 75%;
-    --accent-orange: 17 88% 20%;
-    --accent-orange-foreground: 27 96% 61%;
-
-    --badge: 0 0% 25%;
-    --badge-foreground: 0 0% 100%;
-
-    --brand: 255 92% 76%;
-    --brand-foreground: 240 6% 10%;
-    --brand-glow: 255 92% 76%;
-  }
-
-  * {
-    @apply border-border;
-  }
-
-  body {
-    @apply bg-background text-foreground;
-    font-feature-settings: "rlig" 1, "calt" 1;
-    font-family: var(--font-sans);
+@utility container {
+  margin-inline: auto;
+  padding-inline: 1rem;
+  @media (width >= 1400px) {
+    max-width: 1400px;
   }
 }
 
-@layer components {
-  .primary-input {
-    @apply block h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm transition-colors;
-  }
-  .primary-input::placeholder {
-    @apply text-muted-foreground;
-  }
-  .primary-input:hover {
-    @apply border-muted-foreground;
-  }
-  .primary-input:focus {
-    @apply border-foreground outline-none;
-  }
-  .primary-input:focus::placeholder {
-    color: transparent;
-  }
-  .primary-input:disabled {
-    @apply pointer-events-none cursor-not-allowed bg-muted text-muted-foreground;
-  }
+@theme inline {
+  --font-heading: var(--font-sans);
+  --font-sans: var(--font-sans);
+  --font-mono: var(--font-mono);
 
-  /* Status dot — OpenRAG-style connector glow */
-  .status-dot {
-    @apply inline-block h-2 w-2 shrink-0 rounded-full;
-  }
-  .status-dot--online {
-    background-color: hsl(var(--accent-emerald-foreground));
-    box-shadow: 0 0 0 3px hsl(var(--accent-emerald-foreground) / 0.18), 0 0 10px
-      hsl(var(--accent-emerald-foreground) / 0.7);
-    animation: pulseGlow 2s ease-in-out infinite;
-  }
-  .status-dot--offline {
-    background-color: hsl(var(--muted-foreground));
-  }
-  .status-dot--busy {
-    background-color: hsl(var(--accent-amber-foreground));
-    box-shadow: 0 0 0 3px hsl(var(--accent-amber-foreground) / 0.18), 0 0 10px
-      hsl(var(--accent-amber-foreground) / 0.7);
-    animation: pulseGlow 1.2s ease-in-out infinite;
-  }
-  .status-dot--idle {
-    background-color: hsl(var(--muted-foreground) / 0.6);
-  }
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-destructive-foreground: var(--destructive-foreground);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
 
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+
+  /* Project accent families (quantum = purple, classical = orange) */
+  --color-brand: var(--brand);
+  --color-brand-foreground: var(--brand-foreground);
+  --color-accent-emerald: var(--accent-emerald);
+  --color-accent-emerald-foreground: var(--accent-emerald-foreground);
+  --color-accent-amber: var(--accent-amber);
+  --color-accent-amber-foreground: var(--accent-amber-foreground);
+  --color-accent-red: var(--accent-red);
+  --color-accent-red-foreground: var(--accent-red-foreground);
+  --color-accent-indigo: var(--accent-indigo);
+  --color-accent-indigo-foreground: var(--accent-indigo-foreground);
+  --color-accent-purple: var(--accent-purple);
+  --color-accent-purple-foreground: var(--accent-purple-foreground);
+  --color-accent-orange: var(--accent-orange);
+  --color-accent-orange-foreground: var(--accent-orange-foreground);
+
+  --radius-sm: calc(var(--radius) * 0.6);
+  --radius-md: calc(var(--radius) * 0.8);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) * 1.4);
+  --radius-2xl: calc(var(--radius) * 1.8);
+  --radius-3xl: calc(var(--radius) * 2.2);
+  --radius-4xl: calc(var(--radius) * 2.6);
+
+  --shadow-glow-brand: 0 0 0 1px color-mix(in srgb, var(--brand) 25%, transparent), 0 0 14px -2px
+    color-mix(in srgb, var(--brand) 55%, transparent);
+  --shadow-glow-emerald: 0 0 0 1px
+    color-mix(in srgb, var(--accent-emerald-foreground) 25%, transparent), 0 0 14px -2px
+    color-mix(in srgb, var(--accent-emerald-foreground) 55%, transparent);
+  --shadow-glow-amber: 0 0 0 1px color-mix(in srgb, var(--accent-amber-foreground) 25%, transparent),
+    0 0 14px -2px color-mix(in srgb, var(--accent-amber-foreground) 55%, transparent);
+  --shadow-glow-quantum: 0 0 0 1px
+    color-mix(in srgb, var(--accent-purple-foreground) 25%, transparent), 0 0 14px -2px
+    color-mix(in srgb, var(--accent-purple-foreground) 55%, transparent);
+  --shadow-glow-classical: 0 0 0 1px
+    color-mix(in srgb, var(--accent-orange-foreground) 25%, transparent), 0 0 14px -2px
+    color-mix(in srgb, var(--accent-orange-foreground) 55%, transparent);
+}
+
+@theme {
+  --animate-pulseGlow: pulseGlow 2s ease-in-out infinite;
+
+  @keyframes pulseGlow {
+    0%,
+    100% {
+      opacity: 1;
+    }
+    50% {
+      opacity: 0.55;
+    }
+  }
+}
+
+:root {
+  --background: oklch(1 0 0);
+  --foreground: oklch(0.145 0 0);
+  --card: oklch(1 0 0);
+  --card-foreground: oklch(0.145 0 0);
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  --primary: oklch(0.205 0 0);
+  --primary-foreground: oklch(0.985 0 0);
+  --secondary: oklch(0.97 0 0);
+  --secondary-foreground: oklch(0.205 0 0);
+  --muted: oklch(0.97 0 0);
+  --muted-foreground: oklch(0.556 0 0);
+  --accent: oklch(0.97 0 0);
+  --accent-foreground: oklch(0.205 0 0);
+  --destructive: oklch(0.577 0.245 27.325);
+  --destructive-foreground: oklch(1 0 0);
+  --warning: hsl(26 90% 37%);
+  --warning-foreground: hsl(0 0% 100%);
+  --border: oklch(0.922 0 0);
+  --input: oklch(0.922 0 0);
+  --ring: oklch(0.708 0 0);
+  --radius: 0.625rem;
+
+  --sidebar: oklch(0.985 0 0);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.205 0 0);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.97 0 0);
+  --sidebar-accent-foreground: oklch(0.205 0 0);
+  --sidebar-border: oklch(0.922 0 0);
+  --sidebar-ring: oklch(0.708 0 0);
+
+  /* Brand accent (electric violet) — additive highlight */
+  --brand: hsl(262 83% 58%);
+  --brand-foreground: hsl(0 0% 100%);
+
+  /* Accent families (background / foreground pairs) */
+  --accent-emerald: hsl(149 80% 90%);
+  --accent-emerald-foreground: hsl(161 94% 30%);
+  --accent-amber: hsl(48 96% 89%);
+  --accent-amber-foreground: hsl(26 90% 37%);
+  --accent-red: hsl(0 93% 94%);
+  --accent-red-foreground: hsl(0 72% 51%);
+  --accent-indigo: hsl(226 100% 94%);
+  --accent-indigo-foreground: hsl(243 75% 59%);
+  --accent-purple: hsl(269 100% 95%);
+  --accent-purple-foreground: hsl(271 81% 56%);
+  --accent-orange: hsl(34 100% 92%);
+  --accent-orange-foreground: hsl(21 90% 48%);
+
+  /* Charts: 1 = quantum (purple), 2 = classical (orange), then supporting hues */
+  --chart-1: var(--accent-purple-foreground);
+  --chart-2: var(--accent-orange-foreground);
+  --chart-3: var(--accent-emerald-foreground);
+  --chart-4: var(--accent-indigo-foreground);
+  --chart-5: var(--accent-amber-foreground);
+}
+
+.dark {
+  --background: oklch(0.145 0 0);
+  --foreground: oklch(0.985 0 0);
+  --card: oklch(0.205 0 0);
+  --card-foreground: oklch(0.985 0 0);
+  --popover: oklch(0.205 0 0);
+  --popover-foreground: oklch(0.985 0 0);
+  --primary: oklch(0.922 0 0);
+  --primary-foreground: oklch(0.205 0 0);
+  --secondary: oklch(0.269 0 0);
+  --secondary-foreground: oklch(0.985 0 0);
+  --muted: oklch(0.269 0 0);
+  --muted-foreground: oklch(0.708 0 0);
+  --accent: oklch(0.269 0 0);
+  --accent-foreground: oklch(0.985 0 0);
+  --destructive: oklch(0.704 0.191 22.216);
+  --destructive-foreground: oklch(0.145 0 0);
+  --warning: hsl(46 97% 65%);
+  --warning-foreground: hsl(0 0% 0%);
+  --border: oklch(1 0 0 / 10%);
+  --input: oklch(1 0 0 / 15%);
+  --ring: oklch(0.556 0 0);
+
+  --sidebar: oklch(0.205 0 0);
+  --sidebar-foreground: oklch(0.985 0 0);
+  --sidebar-primary: oklch(0.488 0.243 264.376);
+  --sidebar-primary-foreground: oklch(0.985 0 0);
+  --sidebar-accent: oklch(0.269 0 0);
+  --sidebar-accent-foreground: oklch(0.985 0 0);
+  --sidebar-border: oklch(1 0 0 / 10%);
+  --sidebar-ring: oklch(0.556 0 0);
+
+  --brand: hsl(255 92% 76%);
+  --brand-foreground: hsl(240 6% 10%);
+
+  --accent-emerald: hsl(164 86% 16%);
+  --accent-emerald-foreground: hsl(158 64% 52%);
+  --accent-amber: hsl(22 78% 26%);
+  --accent-amber-foreground: hsl(46 97% 65%);
+  --accent-red: hsl(0 63% 31%);
+  --accent-red-foreground: hsl(0 91% 71%);
+  --accent-indigo: hsl(242 47% 34%);
+  --accent-indigo-foreground: hsl(234 89% 74%);
+  --accent-purple: hsl(274 66% 32%);
+  --accent-purple-foreground: hsl(270 95% 75%);
+  --accent-orange: hsl(17 88% 20%);
+  --accent-orange-foreground: hsl(27 96% 61%);
+}
+
+@layer base {
+  * {
+    @apply border-border outline-ring/50;
+  }
+  html {
+    @apply font-sans;
+  }
+  body {
+    @apply bg-background text-foreground;
+    font-feature-settings: "rlig" 1, "calt" 1;
+  }
+}
+
+/* Status dot — connector glow */
+@utility status-dot {
+  @apply inline-block h-2 w-2 shrink-0 rounded-full;
+}
+
+@utility status-dot--online {
+  background-color: var(--accent-emerald-foreground);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-emerald-foreground) 18%, transparent), 0 0
+    10px color-mix(in srgb, var(--accent-emerald-foreground) 70%, transparent);
+  animation: pulseGlow 2s ease-in-out infinite;
+}
+
+@utility status-dot--offline {
+  background-color: var(--muted-foreground);
+}
+
+@utility status-dot--busy {
+  background-color: var(--accent-amber-foreground);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent-amber-foreground) 18%, transparent), 0 0
+    10px color-mix(in srgb, var(--accent-amber-foreground) 70%, transparent);
+  animation: pulseGlow 1.2s ease-in-out infinite;
+}
+
+@utility status-dot--idle {
+  background-color: color-mix(in srgb, var(--muted-foreground) 60%, transparent);
+}
+
+@utility text-glow {
   /* Subtle glow for key numbers */
-  .text-glow {
-    text-shadow: 0 0 14px currentColor;
-  }
+  text-shadow: 0 0 14px currentColor;
 }

@@ -84,6 +84,23 @@ def test_optimization_configuration_full_pipeline(
     assert job["trials"]
     assert any(t["value"] > 0 for t in job["trials"])
 
+    # Regression (classical models vanishing on completion): the stored trials
+    # must be the real per-trial history serialized from the Optuna study, not
+    # rows synthesized from best_params — real rows carry state/user_attrs and
+    # unique trial numbers, and each keeps its own model_type.
+    assert all("state" in t for t in job["trials"])
+    trial_numbers = [t["trial"] for t in job["trials"]]
+    assert len(trial_numbers) == len(set(trial_numbers))
+    tried_models = {t["params"].get("model_type") for t in job["trials"]}
+    study_models = {
+        t.params.get("model_type")
+        for t in load_study(
+            storage=f"sqlite:///db/{DATABASE_NAME}.db", study_name=STUDY_NAME
+        ).trials
+        if t.state == TrialState.COMPLETE
+    }
+    assert study_models <= tried_models
+
     # The Optuna study must have been persisted to db/<database_name>.db.
     study = load_study(
         storage=f"sqlite:///db/{DATABASE_NAME}.db",

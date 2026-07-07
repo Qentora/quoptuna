@@ -151,6 +151,27 @@ def build_workflow(
     return {"id": job_id, "name": request.study_name, "nodes": nodes, "edges": edges}
 
 
+def serialize_study_trials(db_name: str, study_name: str) -> list:
+    """Serialize finished trials from the Optuna study; [] if the study can't be loaded."""
+    try:
+        from optuna import load_study
+
+        study = load_study(storage=optuna_storage_url(db_name), study_name=study_name, sampler=None)
+        return [
+            {
+                "trial": trial.number,
+                "value": trial.value,
+                "params": trial.params,
+                "state": trial.state.name,
+                "user_attrs": trial.user_attrs,
+            }
+            for trial in study.trials
+            if trial.state.is_finished()
+        ]
+    except Exception:
+        return []
+
+
 def run_optimization_background(job_id: str, request: OptimizationRequest):
     """Background task to run optimization"""
     try:
@@ -166,21 +187,13 @@ def run_optimization_background(job_id: str, request: OptimizationRequest):
         # Extract optimization results
         opt_result = result["node_results"]["optimize"]
 
-        # Get trial history (if available from Optuna study)
-        trials = []
-        if "trials" in opt_result:
-            trials = opt_result["trials"]
-        else:
-            # Create basic trial info
-            trials = [
-                {
-                    "trial": i,
-                    "value": opt_result["best_value"]
-                    - (0.1 * (request.num_trials - i) / request.num_trials),
-                    "params": opt_result["best_params"],
-                }
-                for i in range(min(10, request.num_trials))
-            ]
+        # Trial history: prefer what the workflow returned, otherwise read the
+        # real per-trial history back from the Optuna study. Never synthesize
+        # trials from best_params — that stamps every row with the winning
+        # model and makes the other family's trials vanish on completion.
+        trials = opt_result.get("trials") or serialize_study_trials(
+            request.database_name, request.study_name
+        )
 
         completed_at = datetime.now().isoformat()
         optimization_jobs[job_id].update(

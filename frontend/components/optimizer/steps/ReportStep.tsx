@@ -1,9 +1,16 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import { Field } from '@/components/ui/field';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Textarea } from '@/components/ui/textarea';
 import { generateReport } from '@/lib/api';
@@ -120,48 +127,102 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
   };
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
-      <div className="shrink-0 space-y-4">
-        <StepHeader
-          step={6}
-          title="AI Report"
-          subtitle="Generate a written summary of the run using your configured LLM provider"
-        />
+    <div className="space-y-4">
+      <StepHeader
+        step={6}
+        title="AI Report"
+        subtitle="Generate a written summary of the run using your configured LLM provider"
+      />
 
-        <ErrorBanner message={error} />
+      <ErrorBanner message={error} />
 
-        {/* Generation config */}
-        <section className="rounded-lg border border-border bg-card">
-          <div className="flex items-center justify-between gap-3 border-b border-border bg-muted px-4 py-3">
-            <h4 className="text-sm font-semibold">Report settings</h4>
-            <StatusDot
-              status={apiKey ? 'online' : 'offline'}
-              label={apiKey ? `${provider} key ready` : 'No API key'}
-            />
-          </div>
-          <div className="grid grid-cols-1 gap-4 p-4 md:grid-cols-2">
-            <Field label="Provider">
-              <Select value={provider} onChange={(e) => handleProvider(e.target.value as Provider)}>
-                {(Object.keys(PROVIDER_MODELS) as Provider[]).map((p) => (
-                  <option key={p} value={p}>
-                    {PROVIDER_MODELS[p].label}
-                  </option>
-                ))}
+      {/* Two-column layout: report flows with page scroll; controls live in a sticky rail. */}
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_320px]">
+        {/* Report column */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Generated report</CardTitle>
+            {hasReport && (
+              <CardAction className="flex items-center gap-2">
+                <Button type="button" variant="ghost" size="sm" onClick={copy}>
+                  {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
+                  {copied ? 'Copied' : 'Copy'}
+                </Button>
+                <Button type="button" variant="secondary" size="sm" onClick={download}>
+                  <Download className="h-4 w-4" /> Download .md
+                </Button>
+              </CardAction>
+            )}
+          </CardHeader>
+          <CardContent>
+            {hasReport && report.markdown ? (
+              <div className="prose prose-sm max-w-none dark:prose-invert">
+                <ReactMarkdown>{report.markdown}</ReactMarkdown>
+              </div>
+            ) : isGenerating ? (
+              <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
+                <Loader2 className="h-5 w-5 animate-spin" /> Writing report…
+              </div>
+            ) : (
+              <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
+                <FileText className="h-8 w-8 text-muted-foreground" />
+                <p className="text-sm text-muted-foreground">
+                  Generate a report to see an AI-written summary of the best trial, metrics and SHAP
+                  findings.
+                </p>
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Controls rail */}
+        <Card className="self-start lg:sticky lg:top-4">
+          <CardHeader>
+            <CardTitle>Report settings</CardTitle>
+            <CardAction>
+              <StatusDot
+                status={apiKey ? 'online' : 'offline'}
+                label={apiKey ? `${provider} key ready` : 'No API key'}
+              />
+            </CardAction>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Field>
+              <FieldLabel htmlFor="report-provider">Provider</FieldLabel>
+              <Select value={provider} onValueChange={(v) => handleProvider(v as Provider)}>
+                <SelectTrigger id="report-provider" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {(Object.keys(PROVIDER_MODELS) as Provider[]).map((p) => (
+                    <SelectItem key={p} value={p}>
+                      {PROVIDER_MODELS[p].label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
               </Select>
             </Field>
-            <Field label="Model">
-              <Select value={modelName} onChange={(e) => setModelName(e.target.value)}>
-                {PROVIDER_MODELS[provider].models.map((m) => (
-                  <option key={m} value={m}>
-                    {m}
-                  </option>
-                ))}
-                <option value="__custom__">Custom…</option>
+            <Field>
+              <FieldLabel htmlFor="report-model">Model</FieldLabel>
+              <Select value={modelName} onValueChange={setModelName}>
+                <SelectTrigger id="report-model" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {PROVIDER_MODELS[provider].models.map((m) => (
+                    <SelectItem key={m} value={m}>
+                      {m}
+                    </SelectItem>
+                  ))}
+                  <SelectItem value="__custom__">Custom…</SelectItem>
+                </SelectContent>
               </Select>
             </Field>
             {modelName === '__custom__' && (
-              <Field label="Custom model name" className="md:col-span-2">
+              <Field>
+                <FieldLabel htmlFor="report-custom-model">Custom model name</FieldLabel>
                 <Input
+                  id="report-custom-model"
                   type="text"
                   value={customModel}
                   onChange={(e) => setCustomModel(e.target.value)}
@@ -169,78 +230,51 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
                 />
               </Field>
             )}
-            <Field label="Dataset description (optional)" className="md:col-span-2">
+            <Field>
+              <FieldLabel htmlFor="report-dataset-description">
+                Dataset description (optional)
+              </FieldLabel>
               <Textarea
+                id="report-dataset-description"
                 value={datasetDescription}
                 onChange={(e) => setDatasetDescription(e.target.value)}
                 rows={2}
                 placeholder="Briefly describe the dataset and prediction goal…"
               />
             </Field>
-          </div>
 
-          <div className="flex flex-wrap items-center gap-3 border-t border-border p-4">
-            <Button type="button" variant="brand" onClick={run} disabled={isGenerating || !apiKey}>
-              {isGenerating ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <FileText className="h-4 w-4" />
+            <div className="space-y-3 border-t border-border pt-4">
+              <Button
+                type="button"
+                variant="brand"
+                className="w-full"
+                onClick={run}
+                disabled={isGenerating || !apiKey}
+              >
+                {isGenerating ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <FileText className="h-4 w-4" />
+                )}
+                {hasReport ? 'Regenerate report' : 'Generate report'}
+              </Button>
+              {!apiKey && (
+                <p className="text-sm text-muted-foreground">
+                  No {provider} key found.{' '}
+                  <Link href="/settings" className="font-medium text-brand hover:underline">
+                    Add one in Settings
+                  </Link>
+                  .
+                </p>
               )}
-              {hasReport ? 'Regenerate report' : 'Generate report'}
-            </Button>
-            {!apiKey && (
-              <span className="text-sm text-muted-foreground">
-                No {provider} key found.{' '}
-                <Link href="/settings" className="font-medium text-brand hover:underline">
-                  Add one in Settings
-                </Link>
-                .
-              </span>
-            )}
-            {isGenerating && (
-              <span className="text-sm text-muted-foreground">
-                Sending metrics &amp; plots to the model — this can take a minute.
-              </span>
-            )}
-          </div>
-        </section>
-      </div>
-
-      {/* Report output fills remaining height */}
-      <div className="flex min-h-0 flex-1 flex-col rounded-lg border border-border bg-card">
-        <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-muted px-4 py-3">
-          <h4 className="text-sm font-semibold">Generated report</h4>
-          {hasReport && (
-            <div className="flex items-center gap-2">
-              <Button type="button" variant="ghost" size="sm" onClick={copy}>
-                {copied ? <Check className="h-4 w-4" /> : <Copy className="h-4 w-4" />}
-                {copied ? 'Copied' : 'Copy'}
-              </Button>
-              <Button type="button" variant="secondary" size="sm" onClick={download}>
-                <Download className="h-4 w-4" /> Download .md
-              </Button>
+              {isGenerating && (
+                <p className="text-sm text-muted-foreground">
+                  Sending metrics &amp; plots to the model — this can take a minute.
+                </p>
+              )}
             </div>
-          )}
-        </div>
-        {hasReport && report.markdown ? (
-          <div className="min-h-0 flex-1 overflow-y-auto p-6">
-            <div className="prose prose-sm max-w-none dark:prose-invert">
-              <ReactMarkdown>{report.markdown}</ReactMarkdown>
-            </div>
-          </div>
-        ) : isGenerating ? (
-          <div className="flex min-h-0 flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
-            <Loader2 className="h-5 w-5 animate-spin" /> Writing report…
-          </div>
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center gap-2 p-8 text-center">
-            <FileText className="h-8 w-8 text-muted-foreground" />
-            <p className="text-sm text-muted-foreground">
-              Generate a report to see an AI-written summary of the best trial, metrics and SHAP
-              findings.
-            </p>
-          </div>
-        )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

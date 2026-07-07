@@ -1,48 +1,51 @@
+'use client';
+
+import type * as React from 'react';
+
 import { cn } from '@/lib/utils';
-import * as React from 'react';
 
-const StickyHeaderContext = React.createContext(false);
-
-export function TableContainer({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+function Table({ className, ...props }: React.ComponentProps<'table'>) {
   return (
-    <div className={cn('overflow-hidden rounded-lg border border-border', className)} {...props} />
-  );
-}
-
-interface TableProps extends React.HTMLAttributes<HTMLTableElement> {
-  /**
-   * When set, the table uses border-separate so each `<th>` can carry a sticky,
-   * opaque background that stays pinned (and visible) while the body scrolls.
-   * Wrap the table in a scroll container with `overflow-y-auto`.
-   */
-  stickyHeader?: boolean;
-}
-
-export const Table = React.forwardRef<HTMLTableElement, TableProps>(
-  ({ className, stickyHeader = false, ...props }, ref) => (
-    <StickyHeaderContext.Provider value={stickyHeader}>
+    <div data-slot="table-container" className="relative w-full overflow-x-auto">
       <table
-        ref={ref}
-        className={cn(
-          'w-full text-sm',
-          stickyHeader && 'border-separate border-spacing-0',
-          className
-        )}
+        data-slot="table"
+        className={cn('w-full caption-bottom text-xs', className)}
         {...props}
       />
-    </StickyHeaderContext.Provider>
-  )
-);
-Table.displayName = 'Table';
+    </div>
+  );
+}
 
-export function TableHead({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
-  const stickyHeader = React.useContext(StickyHeaderContext);
+function TableHeader({ className, ...props }: React.ComponentProps<'thead'>) {
+  return <thead data-slot="table-header" className={cn('[&_tr]:border-b', className)} {...props} />;
+}
+
+function TableBody({ className, ...props }: React.ComponentProps<'tbody'>) {
   return (
-    <thead
+    <tbody
+      data-slot="table-body"
+      className={cn('[&_tr:last-child]:border-0', className)}
+      {...props}
+    />
+  );
+}
+
+function TableFooter({ className, ...props }: React.ComponentProps<'tfoot'>) {
+  return (
+    <tfoot
+      data-slot="table-footer"
+      className={cn('border-t bg-muted/50 font-medium [&>tr]:last:border-b-0', className)}
+      {...props}
+    />
+  );
+}
+
+function TableRow({ className, ...props }: React.ComponentProps<'tr'>) {
+  return (
+    <tr
+      data-slot="table-row"
       className={cn(
-        'text-muted-foreground',
-        // With sticky headers the border + bg live on the <th> cells instead.
-        !stickyHeader && 'border-b border-border bg-muted',
+        'border-b transition-colors hover:bg-muted/50 has-aria-expanded:bg-muted/50 data-[state=selected]:bg-muted',
         className
       )}
       {...props}
@@ -50,17 +53,12 @@ export function TableHead({ className, ...props }: React.HTMLAttributes<HTMLTabl
   );
 }
 
-export function TableBody({ className, ...props }: React.HTMLAttributes<HTMLTableSectionElement>) {
-  return <tbody className={cn('divide-y divide-border', className)} {...props} />;
-}
-
-export function Th({ className, ...props }: React.ThHTMLAttributes<HTMLTableCellElement>) {
-  const stickyHeader = React.useContext(StickyHeaderContext);
+function TableHead({ className, ...props }: React.ComponentProps<'th'>) {
   return (
     <th
+      data-slot="table-head"
       className={cn(
-        'px-3 py-2 text-left font-medium',
-        stickyHeader && 'sticky top-0 z-10 border-b border-border bg-muted',
+        'h-10 px-2 text-left align-middle font-medium whitespace-nowrap text-foreground [&:has([role=checkbox])]:pr-0',
         className
       )}
       {...props}
@@ -68,6 +66,24 @@ export function Th({ className, ...props }: React.ThHTMLAttributes<HTMLTableCell
   );
 }
 
-export function Td({ className, ...props }: React.TdHTMLAttributes<HTMLTableCellElement>) {
-  return <td className={cn('px-3 py-2 text-foreground', className)} {...props} />;
+function TableCell({ className, ...props }: React.ComponentProps<'td'>) {
+  return (
+    <td
+      data-slot="table-cell"
+      className={cn('p-2 align-middle whitespace-nowrap [&:has([role=checkbox])]:pr-0', className)}
+      {...props}
+    />
+  );
 }
+
+function TableCaption({ className, ...props }: React.ComponentProps<'caption'>) {
+  return (
+    <caption
+      data-slot="table-caption"
+      className={cn('mt-4 text-xs text-muted-foreground', className)}
+      {...props}
+    />
+  );
+}
+
+export { Table, TableHeader, TableBody, TableFooter, TableHead, TableRow, TableCell, TableCaption };

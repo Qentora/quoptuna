@@ -8,7 +8,14 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Metric } from '@/components/ui/metric';
 import { PageShell } from '@/components/ui/page-shell';
 import { StatusDot } from '@/components/ui/status-dot';
-import { Table, TableBody, TableContainer, TableHead, Td, Th } from '@/components/ui/table';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   type PastRun,
   type RunStatus,
@@ -25,7 +32,9 @@ import toast from 'react-hot-toast';
 
 const ACTIVE_STATUSES: RunStatus[] = ['running', 'pending'];
 
-const STATUS_BADGE: Record<RunStatus, { label: string; variant: string }> = {
+type BadgeVariant = React.ComponentProps<typeof Badge>['variant'];
+
+const STATUS_BADGE: Record<RunStatus, { label: string; variant: BadgeVariant }> = {
   completed: { label: 'Completed', variant: 'emerald' },
   running: { label: 'Running', variant: 'quantum' },
   pending: { label: 'Pending', variant: 'secondary' },
@@ -185,7 +194,7 @@ export default function RunsPage() {
                       <StatusDot status="busy" />
                       <p className="truncate font-medium">{run.study_name ?? run.id}</p>
                     </div>
-                    <Badge variant={STATUS_BADGE[run.status].variant as any}>
+                    <Badge variant={STATUS_BADGE[run.status].variant}>
                       {STATUS_BADGE[run.status].label}
                     </Badge>
                   </div>
@@ -234,67 +243,69 @@ export default function RunsPage() {
             </CardContent>
           </Card>
         ) : (
-          <TableContainer>
-            <Table>
-              <TableHead>
-                <tr>
-                  <Th>Study</Th>
-                  <Th>Dataset</Th>
-                  <Th>Status</Th>
-                  <Th className="text-right">Best F1</Th>
-                  <Th className="text-right">Trials</Th>
-                  <Th>Started</Th>
-                  <Th>Completed</Th>
-                  <Th className="w-32 text-right">Actions</Th>
-                </tr>
-              </TableHead>
-              <TableBody>
-                {pastRuns.map((run) => (
-                  <tr key={run.id} className="transition-colors hover:bg-muted">
-                    <Td className="font-medium">{run.study_name ?? run.id}</Td>
-                    <Td className="text-xs text-muted-foreground">{run.dataset_name ?? '—'}</Td>
-                    <Td>
-                      <Badge variant={STATUS_BADGE[run.status].variant as any}>
-                        {STATUS_BADGE[run.status].label}
-                      </Badge>
-                    </Td>
-                    <Td className="text-right font-semibold tabular-nums">
-                      {run.best_value != null ? run.best_value.toFixed(4) : '—'}
-                    </Td>
-                    <Td className="text-right text-xs text-muted-foreground tabular-nums">
-                      {run.current_trial ?? 0}/{run.total_trials ?? '—'}
-                    </Td>
-                    <Td className="text-xs text-muted-foreground">{formatDate(run.started_at)}</Td>
-                    <Td className="text-xs text-muted-foreground">
-                      {formatDate(run.completed_at)}
-                    </Td>
-                    <Td className="text-right">
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="secondary"
-                          onClick={() => void openRun(run)}
-                          disabled={openingId === run.id}
-                        >
-                          {openingId === run.id ? 'Opening…' : 'Open'}
-                        </Button>
-                        <Button
-                          type="button"
-                          size="sm"
-                          variant="ghost"
-                          aria-label="Delete run"
-                          onClick={() => void removeRun(run)}
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
-                      </div>
-                    </Td>
-                  </tr>
-                ))}
-              </TableBody>
-            </Table>
-          </TableContainer>
+          <Table>
+            <TableHeader>
+              <TableRow>
+                <TableHead>Study</TableHead>
+                <TableHead>Dataset</TableHead>
+                <TableHead>Status</TableHead>
+                <TableHead className="text-right">Best F1</TableHead>
+                <TableHead className="text-right">Trials</TableHead>
+                <TableHead>Started</TableHead>
+                <TableHead>Completed</TableHead>
+                <TableHead className="w-32 text-right">Actions</TableHead>
+              </TableRow>
+            </TableHeader>
+            <TableBody>
+              {pastRuns.map((run) => (
+                <TableRow key={run.id}>
+                  <TableCell className="font-medium">{run.study_name ?? run.id}</TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {run.dataset_name ?? '—'}
+                  </TableCell>
+                  <TableCell>
+                    <Badge variant={STATUS_BADGE[run.status].variant}>
+                      {STATUS_BADGE[run.status].label}
+                    </Badge>
+                  </TableCell>
+                  <TableCell className="text-right font-semibold tabular-nums">
+                    {run.best_value != null ? run.best_value.toFixed(4) : '—'}
+                  </TableCell>
+                  <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
+                    {run.current_trial ?? 0}/{run.total_trials ?? '—'}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {formatDate(run.started_at)}
+                  </TableCell>
+                  <TableCell className="text-xs text-muted-foreground">
+                    {formatDate(run.completed_at)}
+                  </TableCell>
+                  <TableCell className="text-right">
+                    <div className="flex items-center justify-end gap-1">
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="secondary"
+                        onClick={() => void openRun(run)}
+                        disabled={openingId === run.id}
+                      >
+                        {openingId === run.id ? 'Opening…' : 'Open'}
+                      </Button>
+                      <Button
+                        type="button"
+                        size="sm"
+                        variant="ghost"
+                        aria-label="Delete run"
+                        onClick={() => void removeRun(run)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </div>
+                  </TableCell>
+                </TableRow>
+              ))}
+            </TableBody>
+          </Table>
         )}
       </section>
     </PageShell>

@@ -337,6 +337,82 @@ export async function getCurves(
   });
 }
 
+export interface MetricsRequest {
+  optimization_id: string;
+  trial_number?: number;
+  use_proba?: boolean;
+  subset_size?: number;
+}
+
+export interface CurvesData {
+  roc: { fpr: number[]; tpr: number[]; auc: number } | null;
+  pr: { precision: number[]; recall: number[]; average_precision: number } | null;
+}
+
+export async function getCurvesData(body: MetricsRequest): Promise<CurvesData> {
+  return request<CurvesData>('/api/v1/analysis/curves/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export interface ConfusionMatrixData {
+  labels: string[];
+  matrix: number[][];
+  normalized: number[][];
+}
+
+export async function getConfusionMatrixData(body: MetricsRequest): Promise<ConfusionMatrixData> {
+  return request<ConfusionMatrixData>('/api/v1/analysis/confusion-matrix/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export interface FeatureImportanceData {
+  features: string[];
+  importances: number[];
+}
+
+export async function getFeatureImportanceData(
+  body: MetricsRequest
+): Promise<FeatureImportanceData> {
+  return request<FeatureImportanceData>('/api/v1/analysis/feature-importance/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export interface ShapDataRequest {
+  optimization_id: string;
+  trial_number?: number;
+  subset_size?: number;
+  sample_index?: number;
+}
+
+export interface ShapData {
+  optimization_id: string;
+  feature_names: string[];
+  /** samples × features SHAP values */
+  values: number[][];
+  /** raw feature values, row-aligned with `values` */
+  data: number[][];
+  base_value: number;
+  n_samples: number;
+  status: string;
+}
+
+export async function getShapData(body: ShapDataRequest): Promise<ShapData> {
+  return request<ShapData>('/api/v1/analysis/shap/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 export interface PlotlyFigureJSON {
   data: Array<Record<string, any>>;
   layout: Record<string, any>;

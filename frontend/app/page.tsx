@@ -1,7 +1,9 @@
 'use client';
 
+import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { Metric } from '@/components/ui/metric';
+import { SectionHeader } from '@/components/ui/page-header';
 import { PageShell } from '@/components/ui/page-shell';
 import {
   type PastRun,
@@ -69,7 +71,7 @@ export default function HomePage() {
           value={info?.classical_models ?? 8}
           subtitle="Baselines"
           icon={<BarChart3 className="h-5 w-5 text-accent-orange-foreground" />}
-          tone="amber"
+          tone="orange"
         />
         <StatCard
           title="UCI Datasets"
@@ -81,16 +83,19 @@ export default function HomePage() {
       </div>
 
       <div className="mb-6">
-        <div className="mb-3 flex items-center justify-between">
-          <h2 className="text-base font-semibold tracking-tight">Studies</h2>
-          <Link
-            href="/runs"
-            className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground hover:underline"
-          >
-            <History className="h-4 w-4" />
-            View all runs
-          </Link>
-        </div>
+        <SectionHeader
+          className="mb-3"
+          title="Studies"
+          actions={
+            <Link
+              href="/runs"
+              className="flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground hover:underline"
+            >
+              <History className="h-4 w-4" />
+              View all runs
+            </Link>
+          }
+        />
         <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
           <StatCard
             title="Completed Studies"
@@ -111,41 +116,43 @@ export default function HomePage() {
             value={otherStudies}
             subtitle="Can be restarted from Runs"
             icon={<PauseCircle className="h-5 w-5 text-accent-orange-foreground" />}
-            tone="amber"
+            tone="orange"
           />
         </div>
       </div>
 
       <div className="mb-6">
-        <h2 className="mb-3 text-base font-semibold tracking-tight">Get Started</h2>
+        <SectionHeader className="mb-3" title="Get Started" />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-          <Link
-            href="/optimizer"
-            className="group rounded-lg bg-gradient-to-br from-brand to-brand/70 p-5 text-brand-foreground transition-shadow hover:shadow-glow-brand"
-          >
-            <Zap className="mb-2 h-7 w-7" />
-            <h3 className="mb-1 text-base font-semibold">Open the Optimizer</h3>
-            <p className="text-sm opacity-90">
-              Load data, run hyperparameter optimization, explore SHAP analysis and generate an AI
-              report.
-            </p>
+          <Link href="/optimizer" className="group">
+            <Card className="h-full border-transparent bg-linear-to-br from-brand to-brand/70 text-brand-foreground transition-shadow hover:shadow-glow-brand">
+              <CardContent className="p-5">
+                <Zap className="mb-2 h-7 w-7" />
+                <h3 className="mb-1 text-base font-semibold">Open the Optimizer</h3>
+                <p className="text-sm opacity-90">
+                  Load data, run hyperparameter optimization, explore SHAP analysis and generate an
+                  AI report.
+                </p>
+              </CardContent>
+            </Card>
           </Link>
-          <Link
-            href="/settings"
-            className="group rounded-lg border border-border bg-card p-5 transition-colors hover:bg-accent"
-          >
-            <Settings className="mb-2 h-7 w-7" />
-            <h3 className="mb-1 text-base font-semibold">Configure API Keys</h3>
-            <p className="text-sm text-muted-foreground">
-              Add your OpenAI, Anthropic or Google keys to enable AI-generated reports. Stored
-              encrypted in your browser.
-            </p>
+          <Link href="/settings" className="group">
+            <Card className="h-full transition-colors hover:bg-accent">
+              <CardContent className="p-5">
+                <Settings className="mb-2 h-7 w-7" />
+                <h3 className="mb-1 text-base font-semibold">Configure API Keys</h3>
+                <p className="text-sm text-muted-foreground">
+                  Add your OpenAI, Anthropic or Google keys to enable AI-generated reports. Stored
+                  encrypted in your browser.
+                </p>
+              </CardContent>
+            </Card>
           </Link>
         </div>
       </div>
 
       <div>
-        <h2 className="mb-3 text-base font-semibold tracking-tight">Available UCI Datasets</h2>
+        <SectionHeader className="mb-3" title="Available UCI Datasets" />
         {datasets.length === 0 ? (
           <Card className="border-dashed">
             <CardContent className="p-6 text-center">
@@ -163,10 +170,14 @@ export default function HomePage() {
                 <Card key={d.id} className="transition-colors hover:border-foreground/30">
                   <CardContent className="p-3">
                     <p className="truncate font-medium">{d.name}</p>
-                    <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
-                      <span>UCI ID: {d.id}</span>
-                      {typeof d.num_instances === 'number' && <span>{d.num_instances} rows</span>}
-                      {typeof d.num_features === 'number' && <span>{d.num_features} features</span>}
+                    <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                      <Badge variant="secondary">UCI ID {d.id}</Badge>
+                      {typeof d.num_instances === 'number' && (
+                        <Badge variant="outline">{d.num_instances} rows</Badge>
+                      )}
+                      {typeof d.num_features === 'number' && (
+                        <Badge variant="outline">{d.num_features} features</Badge>
+                      )}
                     </div>
                   </CardContent>
                 </Card>
@@ -198,7 +209,7 @@ function StatCard({
   value: number;
   subtitle: string;
   icon: React.ReactNode;
-  tone?: 'default' | 'emerald' | 'brand' | 'amber';
+  tone?: 'default' | 'emerald' | 'brand' | 'amber' | 'orange';
 }) {
   return (
     <Card className="transition-colors hover:border-foreground/30">

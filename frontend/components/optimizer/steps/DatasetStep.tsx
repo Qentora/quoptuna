@@ -1,8 +1,18 @@
 'use client';
 
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { Table, TableBody, TableContainer, TableHead, Td, Th } from '@/components/ui/table';
+import { Skeleton } from '@/components/ui/skeleton';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import {
   useDatasetPreview,
   useLoadUCIDataset,
@@ -15,6 +25,8 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { ErrorBanner } from '../NavButtons';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
+
+const PREVIEW_ROWS = 15;
 
 export function DatasetStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const [customId, setCustomId] = useState('');
@@ -110,173 +122,203 @@ export function DatasetStep({ workflowData, setWorkflowData, setFooter }: StepPr
   }, [selected, isLoading, setFooter]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-6">
-      <div className="shrink-0 space-y-6">
-        <StepHeader
-          step={1}
-          title="Dataset Selection"
-          subtitle="Upload your own dataset or select from the UCI ML Repository"
-        />
+    <div className="space-y-4">
+      <StepHeader
+        step={1}
+        title="Dataset Selection"
+        subtitle="Upload your own dataset or select from the UCI ML Repository"
+      />
 
-        <ErrorBanner message={error} />
-      </div>
+      <ErrorBanner message={error} />
 
-      {/* Dataset sources: compact upload bar + full-width UCI repository.
-          The whole area is a drop target for CSV files. */}
-      <div
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragOver(true);
-        }}
-        onDragLeave={() => setDragOver(false)}
-        onDrop={handleDrop}
-        className={cn(
-          'flex shrink-0 flex-col gap-3 rounded-lg transition-shadow',
-          dragOver && 'ring-2 ring-brand/50'
-        )}
-      >
-        {/* Top bar: compact upload button + hint */}
-        <div className="flex flex-wrap items-center gap-3">
-          <Button
-            type="button"
-            variant="secondary"
-            disabled={isLoading}
-            onClick={() => fileInputRef.current?.click()}
-          >
-            {isLoading ? (
-              <Loader2 className="h-4 w-4 animate-spin" />
-            ) : (
-              <Upload className="h-4 w-4" />
-            )}
-            Upload CSV
-          </Button>
-          <p className="text-sm text-muted-foreground">
-            {dragOver
-              ? 'Drop the CSV to upload'
-              : 'Upload your own CSV or pick from the UCI repository below — drag & drop anywhere here.'}
-          </p>
-          <input
-            ref={fileInputRef}
-            type="file"
-            accept=".csv"
-            onChange={handleFileUpload}
-            className="hidden"
-          />
-        </div>
-
-        {/* Full-width UCI repository with a 2–3 column list */}
-        <div className="flex h-64 flex-col rounded-lg border border-border bg-card">
-          <div className="flex items-center justify-between gap-3 border-b border-border bg-muted px-4 py-3">
-            <h4 className="text-sm font-semibold">UCI ML Repository</h4>
-            <div className="relative w-56">
-              <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-              <Input
-                value={search}
-                onChange={(e) => setSearch(e.target.value)}
-                placeholder="Search datasets"
-                className="pl-8"
-              />
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[minmax(280px,1fr)_2fr]">
+        {/* Left panel: dataset selection (upload + UCI list). Whole card is a drop target. */}
+        <Card
+          size="sm"
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragOver(true);
+          }}
+          onDragLeave={() => setDragOver(false)}
+          onDrop={handleDrop}
+          className={cn('transition-shadow', dragOver && 'ring-2 ring-brand/50')}
+        >
+          <CardHeader className="border-b pb-3">
+            <CardTitle>Choose a dataset</CardTitle>
+            <CardAction>
+              <Button
+                type="button"
+                variant="secondary"
+                size="sm"
+                disabled={isLoading}
+                onClick={() => fileInputRef.current?.click()}
+              >
+                {isLoading ? (
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                ) : (
+                  <Upload className="h-4 w-4" />
+                )}
+                Upload CSV
+              </Button>
+            </CardAction>
+            <p className="text-xs text-muted-foreground">
+              {dragOver ? 'Drop the CSV to upload' : 'Drag & drop a CSV anywhere on this panel.'}
+            </p>
+            <input
+              ref={fileInputRef}
+              type="file"
+              accept=".csv"
+              onChange={handleFileUpload}
+              className="hidden"
+            />
+          </CardHeader>
+          <CardContent className="space-y-2">
+            <div className="flex items-center justify-between gap-2">
+              <h4 className="text-xs font-semibold">UCI ML Repository</h4>
+              <div className="relative w-44">
+                <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  value={search}
+                  onChange={(e) => setSearch(e.target.value)}
+                  placeholder="Search datasets"
+                  className="h-8 pl-8 text-xs"
+                />
+              </div>
             </div>
-          </div>
-          <div className="grid min-h-0 flex-1 grid-cols-1 gap-2 overflow-y-auto p-3 sm:grid-cols-2 xl:grid-cols-3">
+
             {uciDatasets.isLoading && (
-              <div className="col-span-full flex items-center gap-2 px-1 py-2 text-sm text-muted-foreground">
-                <Loader2 className="h-4 w-4 animate-spin" /> Loading datasets…
+              <div className="space-y-2">
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
+                <Skeleton className="h-12 w-full" />
               </div>
             )}
             {!uciDatasets.isLoading && filteredDatasets.length === 0 && (
-              <p className="col-span-full px-1 py-2 text-sm text-muted-foreground">
-                No matching datasets.
-              </p>
+              <p className="py-2 text-xs text-muted-foreground">No matching datasets.</p>
             )}
-            {filteredDatasets.map((dataset) => (
-              <button
-                key={dataset.id}
-                type="button"
-                onClick={() => handleUCISelect(dataset.id)}
-                disabled={isLoading}
-                className="rounded-lg border border-border p-3 text-left transition-colors hover:border-foreground hover:bg-accent disabled:opacity-50"
-              >
-                <div className="flex items-center justify-between gap-2">
-                  <h4 className="truncate font-semibold">{dataset.name}</h4>
-                  <span className="shrink-0 text-xs text-muted-foreground">ID: {dataset.id}</span>
-                </div>
-                {dataset.description && (
-                  <p className="mt-1 line-clamp-2 text-sm text-muted-foreground">
-                    {dataset.description}
-                  </p>
-                )}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2 border-t border-border bg-muted p-3">
-            <Input
-              type="number"
-              value={customId}
-              onChange={(e) => setCustomId(e.target.value)}
-              placeholder="Enter a UCI dataset ID"
-            />
-            <Button
-              type="button"
-              disabled={!customId || isLoading}
-              onClick={() => handleUCISelect(Number(customId))}
-            >
-              {isLoading ? 'Loading…' : 'Load by ID'}
-            </Button>
-          </div>
-        </div>
-      </div>
 
-      {/* Preview region fills the remaining frame height */}
-      <div className="flex min-h-0 flex-1 flex-col">
-        {selected ? (
-          <TableContainer className="flex min-h-0 flex-1 flex-col">
-            <div className="flex shrink-0 items-center justify-between border-b border-border bg-muted px-4 py-2">
-              <h4 className="text-sm font-semibold text-foreground">
-                Data Preview · {selected.name}
-              </h4>
+            <div className="space-y-1.5">
+              {filteredDatasets.map((dataset) => {
+                const isSelected = selected?.source === 'uci' && selected.name === dataset.name;
+                return (
+                  <button
+                    key={dataset.id}
+                    type="button"
+                    onClick={() => handleUCISelect(dataset.id)}
+                    disabled={isLoading}
+                    className={cn(
+                      'w-full rounded-md border border-border px-2.5 py-2 text-left transition-colors hover:border-foreground hover:bg-accent disabled:opacity-50',
+                      isSelected && 'border-brand bg-accent'
+                    )}
+                  >
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="truncate text-xs font-semibold">{dataset.name}</span>
+                      <span className="shrink-0 text-[10px] text-muted-foreground">
+                        ID: {dataset.id}
+                      </span>
+                    </div>
+                    {dataset.description && (
+                      <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">
+                        {dataset.description}
+                      </p>
+                    )}
+                  </button>
+                );
+              })}
+            </div>
+
+            <div className="flex items-center gap-2 border-t pt-3">
+              <Input
+                type="number"
+                value={customId}
+                onChange={(e) => setCustomId(e.target.value)}
+                placeholder="UCI dataset ID"
+                className="h-8 text-xs"
+              />
+              <Button
+                type="button"
+                size="sm"
+                disabled={!customId || isLoading}
+                onClick={() => handleUCISelect(Number(customId))}
+              >
+                {isLoading ? 'Loading…' : 'Load by ID'}
+              </Button>
+            </div>
+          </CardContent>
+        </Card>
+
+        {/* Right panel: live preview + quick facts */}
+        <Card size="sm">
+          <CardHeader className="border-b pb-3">
+            <CardTitle className="truncate">
+              {selected ? `Data Preview · ${selected.name}` : 'Data Preview'}
+            </CardTitle>
+            <CardAction className="flex items-center gap-2">
               {preview.isFetching && (
                 <Loader2 className="h-4 w-4 animate-spin text-muted-foreground" />
               )}
-            </div>
-            {preview.isError && (
-              <p className="px-4 py-3 text-sm text-destructive">Could not load preview.</p>
+              {selected && (
+                <>
+                  <Badge variant="outline">{selected.rows.toLocaleString()} rows</Badge>
+                  <Badge variant="outline">{selected.columns.length} cols</Badge>
+                  <Badge variant={selected.source === 'uci' ? 'secondary' : 'brand'}>
+                    {selected.source === 'uci' ? 'UCI' : 'Upload'}
+                  </Badge>
+                </>
+              )}
+            </CardAction>
+            {selected && (
+              <p className="text-xs text-muted-foreground">
+                First {PREVIEW_ROWS} rows with column dtypes.
+              </p>
             )}
-            {preview.data && (
-              <div className="min-h-0 flex-1 overflow-auto">
-                <Table stickyHeader>
-                  <TableHead>
-                    <tr>
-                      {preview.data.columns.map((col) => (
-                        <Th key={col}>
-                          {col}
-                          <span className="block text-[10px] font-normal text-muted-foreground">
-                            {preview.data?.dtypes[col]}
-                          </span>
-                        </Th>
-                      ))}
-                    </tr>
-                  </TableHead>
-                  <TableBody>
-                    {preview.data.head.map((row, i) => (
-                      <tr key={i} className="even:bg-muted/40">
-                        {preview.data?.columns.map((col) => (
-                          <Td key={col} className="whitespace-nowrap text-muted-foreground">
-                            {String(row[col])}
-                          </Td>
-                        ))}
-                      </tr>
-                    ))}
-                  </TableBody>
-                </Table>
+          </CardHeader>
+          <CardContent>
+            {!selected && (
+              <div className="flex items-center justify-center rounded-md border border-dashed border-border py-12 text-xs text-muted-foreground">
+                Select or upload a dataset to preview its rows.
               </div>
             )}
-          </TableContainer>
-        ) : (
-          <div className="flex min-h-0 flex-1 flex-col items-center justify-center rounded-lg border border-dashed border-border text-sm text-muted-foreground">
-            Select or upload a dataset to preview its rows.
-          </div>
-        )}
+            {selected && preview.isError && (
+              <p className="py-2 text-xs text-destructive">Could not load preview.</p>
+            )}
+            {selected && preview.isLoading && (
+              <div className="space-y-2">
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+                <Skeleton className="h-8 w-full" />
+              </div>
+            )}
+            {selected && preview.data && (
+              <Table>
+                <TableHeader>
+                  <TableRow className="hover:bg-transparent">
+                    {preview.data.columns.map((col) => (
+                      <TableHead key={col} className="h-auto py-1.5">
+                        {col}
+                        <span className="block text-[10px] font-normal text-muted-foreground">
+                          {preview.data?.dtypes[col]}
+                        </span>
+                      </TableHead>
+                    ))}
+                  </TableRow>
+                </TableHeader>
+                <TableBody>
+                  {preview.data.head.slice(0, PREVIEW_ROWS).map((row, i) => (
+                    <TableRow key={i} className="even:bg-muted/40">
+                      {preview.data?.columns.map((col) => (
+                        <TableCell key={col} className="py-1.5 text-muted-foreground">
+                          {String(row[col])}
+                        </TableCell>
+                      ))}
+                    </TableRow>
+                  ))}
+                </TableBody>
+              </Table>
+            )}
+          </CardContent>
+        </Card>
       </div>
     </div>
   );
