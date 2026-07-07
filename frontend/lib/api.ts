@@ -107,6 +107,7 @@ export interface OptimizationRequest {
   num_trials: number;
   model_name?: string;
   label_mapping?: LabelMapping;
+  sensitive_feature?: string;
 }
 
 export type RunStatus =
@@ -331,10 +332,16 @@ export async function getCurves(
   });
 }
 
+export interface PlotlyFigureJSON {
+  data: Array<Record<string, any>>;
+  layout: Record<string, any>;
+}
+
 export interface StudyPlotsResponse {
   optimization_id: string;
-  optimization_history_plot: string | null;
-  param_importances_plot: string | null;
+  // Plotly figure JSON keyed by plot name: optimization_history,
+  // param_importances, parallel_coordinate, slice, timeline.
+  plots: Record<string, PlotlyFigureJSON | null>;
   status: string;
 }
 
@@ -346,13 +353,49 @@ export async function getStudyPlots(optimizationId: string): Promise<StudyPlotsR
   });
 }
 
+export interface FairnessMetrics {
+  by_group: Record<string, Record<string, number>>;
+  overall: Record<string, number>;
+  disparities: Record<string, number>;
+}
+
+export interface FairnessResponse {
+  optimization_id: string;
+  status: string;
+  sensitive_feature: string;
+  metrics: FairnessMetrics;
+  plots: Record<string, string>;
+  mitigation: {
+    constraint: string;
+    before: FairnessMetrics;
+    after: FairnessMetrics;
+    comparison_plot: string;
+  } | null;
+}
+
+export async function generateFairness(body: {
+  optimization_id: string;
+  sensitive_feature?: string;
+  trial_number?: number;
+  mitigate?: boolean;
+  constraint?: string;
+}): Promise<FairnessResponse> {
+  return request<FairnessResponse>('/api/v1/analysis/fairness', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 export interface ReportRequest {
   optimization_id: string;
   trial_number?: number;
-  llm_provider: 'google' | 'openai';
+  llm_provider: 'google' | 'openai' | 'anthropic';
   api_key: string;
   model_name: string;
   dataset_description?: string;
+  sensitive_feature?: string;
+  include_fairness?: boolean;
 }
 
 export interface ReportResponse {

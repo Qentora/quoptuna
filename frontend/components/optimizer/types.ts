@@ -1,3 +1,26 @@
+export interface PlotlyFigureJSON {
+  data: Array<Record<string, any>>;
+  layout: Record<string, any>;
+}
+
+export interface FairnessMetrics {
+  by_group: Record<string, Record<string, number>>;
+  overall: Record<string, number>;
+  disparities: Record<string, number>;
+}
+
+export interface FairnessResult {
+  sensitive_feature: string;
+  metrics: FairnessMetrics;
+  plots: Record<string, string>;
+  mitigation: {
+    constraint: string;
+    before: FairnessMetrics;
+    after: FairnessMetrics;
+    comparison_plot: string;
+  } | null;
+}
+
 export interface WorkflowData {
   dataset: {
     id: string;
@@ -10,6 +33,9 @@ export interface WorkflowData {
     selectedFeatures: string[];
     targetColumn: string | null;
     labelMapping: { neg: string | number | null; pos: string | number | null };
+    // Protected attribute used for fairness auditing (may be a column that is
+    // not among the selected model features).
+    sensitiveFeature: string | null;
   };
   configuration: {
     studyName: string;
@@ -25,12 +51,15 @@ export interface WorkflowData {
   };
   analysis: {
     featureImportance: Array<{ feature: string; importance: number }> | null;
-    // SHAP plots plus reserved keys: rocCurve, prCurve, optimizationHistory, paramImportances.
+    // SHAP plots plus reserved keys: rocCurve, prCurve.
     plots: Record<string, string>;
+    // Interactive Optuna study figures as Plotly JSON, keyed by plot name.
+    studyPlots: Record<string, PlotlyFigureJSON | null> | null;
     metrics: Record<string, any> | null;
     confusionMatrixPlot: string | null;
     rocAuc: number | null;
     averagePrecision: number | null;
+    fairness: FairnessResult | null;
   };
   report: {
     markdown: string | null;
@@ -39,7 +68,12 @@ export interface WorkflowData {
 
 export const initialWorkflowData: WorkflowData = {
   dataset: null,
-  features: { selectedFeatures: [], targetColumn: null, labelMapping: { neg: null, pos: null } },
+  features: {
+    selectedFeatures: [],
+    targetColumn: null,
+    labelMapping: { neg: null, pos: null },
+    sensitiveFeature: null,
+  },
   configuration: {
     studyName: 'my-optimization-study',
     numTrials: 50,
@@ -55,10 +89,12 @@ export const initialWorkflowData: WorkflowData = {
   analysis: {
     featureImportance: null,
     plots: {},
+    studyPlots: null,
     metrics: null,
     confusionMatrixPlot: null,
     rocAuc: null,
     averagePrecision: null,
+    fairness: null,
   },
   report: { markdown: null },
 };

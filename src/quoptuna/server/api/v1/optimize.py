@@ -42,6 +42,9 @@ class OptimizationRequest(BaseModel):
     num_trials: int
     model_name: str = "DataReuploading"
     label_mapping: Optional[LabelMapping] = None
+    # Protected attribute column (may be outside selected_features) used for
+    # fairness auditing; rows are aligned to the split via positional indices.
+    sensitive_feature: Optional[str] = None
     # Optional overrides to shrink Optuna's search (defaults use the full space).
     model_types: Optional[List[str]] = None
     search_space: Optional[Dict[str, List[Any]]] = None

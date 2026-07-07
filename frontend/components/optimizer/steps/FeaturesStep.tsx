@@ -16,7 +16,7 @@ const isNumericDtype = (dtype: string | undefined) =>
 
 export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const preview = useDatasetPreview(workflowData.dataset?.id ?? null);
-  const { selectedFeatures, targetColumn, labelMapping } = workflowData.features;
+  const { selectedFeatures, targetColumn, labelMapping, sensitiveFeature } = workflowData.features;
   const [search, setSearch] = useState('');
 
   const columns = workflowData.dataset?.columns ?? [];
@@ -47,6 +47,13 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
         selectedFeatures: prev.features.selectedFeatures.filter((f) => f !== column),
         labelMapping: { neg: null, pos: null },
       },
+    }));
+  };
+
+  const setSensitiveFeature = (value: string) => {
+    setWorkflowData((prev) => ({
+      ...prev,
+      features: { ...prev.features, sensitiveFeature: value || null },
     }));
   };
 
@@ -278,6 +285,32 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+          {/* Protected attribute for fairness auditing */}
+          <div className="flex flex-col rounded-lg border border-border bg-card">
+            <div className="shrink-0 border-b border-border bg-muted px-4 py-3">
+              <h4 className="text-sm font-semibold">Protected attribute (optional)</h4>
+            </div>
+            <div className="space-y-2 p-3">
+              <p className="text-xs text-muted-foreground">
+                A categorical column (e.g. sex, race, age group) used to audit fairness across
+                groups. It does not need to be a model feature and is never used for training.
+              </p>
+              <Select
+                aria-label="Protected attribute"
+                value={sensitiveFeature ?? ''}
+                onChange={(e) => setSensitiveFeature(e.target.value)}
+              >
+                <option value="">None — skip fairness audit</option>
+                {columns
+                  .filter((c) => c !== targetColumn)
+                  .map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+              </Select>
             </div>
           </div>
         </div>

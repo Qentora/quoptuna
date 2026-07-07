@@ -112,6 +112,7 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         database_name: getDatabaseName(),
         num_trials: configuration.numTrials,
         label_mapping: labelMapping,
+        sensitive_feature: features.sensitiveFeature ?? undefined,
       });
 
       // Persist the execution id immediately so a refresh mid-run can resume.

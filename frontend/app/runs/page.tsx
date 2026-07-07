@@ -89,6 +89,7 @@ export default function RunsPage() {
             neg: req.label_mapping?.neg ?? null,
             pos: req.label_mapping?.pos ?? null,
           },
+          sensitiveFeature: req.sensitive_feature ?? null,
         },
         configuration: {
           studyName: req.study_name ?? run.study_name ?? 'my-optimization-study',

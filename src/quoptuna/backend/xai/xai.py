@@ -11,14 +11,6 @@ from typing import TYPE_CHECKING, Literal
 import matplotlib.pyplot as plt
 import pandas as pd
 import shap
-from langchain_core.messages import HumanMessage, SystemMessage
-from langchain_core.prompts import (
-    ChatPromptTemplate,
-    HumanMessagePromptTemplate,
-    MessagesPlaceholder,
-)
-from langchain_google_genai import ChatGoogleGenerativeAI
-from langchain_openai import ChatOpenAI
 from shap import Explainer
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
@@ -436,6 +428,49 @@ class XAI:
     def __str__(self):
         return str(self.get_report())
 
+    async def generate_report_with_llm(
+        self,
+        api_key: str,
+        model_name: str = "gpt-4o",
+        provider: str = "google",
+        num_waterfall_plots: int = 5,
+        fairness: dict | None = None,
+    ) -> str:
+        """Generate a markdown report via the OpenAI Agents SDK pipeline.
+
+        ``fairness`` is the payload produced by the fairness audit (metrics,
+        group plots, optional mitigation); its plots and numbers are passed to
+        the LLM alongside the SHAP/metric evidence.
+        """
+        # Imported lazily: pulls in litellm/openai, which the sklearn-only
+        # XAI paths (tests, SHAP endpoints) should not pay for.
+        from quoptuna.backend.xai import report_agent  # noqa: PLC0415
+
+        report = self.get_report()
+        images = self._generate_report_images(num_waterfall_plots)
+
+        if fairness:
+            report["fairness_metrics"] = fairness.get("metrics")
+            for name, url in (fairness.get("plots") or {}).items():
+                images[f"fairness_{name}"] = url
+            mitigation = fairness.get("mitigation")
+            if mitigation:
+                report["fairness_mitigation"] = {
+                    "constraint": mitigation.get("constraint"),
+                    "before": mitigation.get("before"),
+                    "after": mitigation.get("after"),
+                }
+                if mitigation.get("comparison_plot"):
+                    images["fairness_mitigation_comparison"] = mitigation["comparison_plot"]
+
+        return await report_agent.generate_report(
+            report=report,
+            images=images,
+            api_key=api_key,
+            model_name=model_name,
+            provider=provider,
+        )
+
     def generate_report_with_langchain(
         self,
         api_key: str,
@@ -443,24 +478,19 @@ class XAI:
         provider: str = "google",
         num_waterfall_plots: int = 5,
     ):
-        """Generate comprehensive report using LangChain and multimodal LLM."""
-        chat = self._initialize_chat(api_key, model_name, provider)
+        """Deprecated sync shim kept for the legacy Streamlit UI; delegates to
+        the Agents SDK pipeline.
+        """
+        import asyncio  # noqa: PLC0415
 
-        report = self.get_report()
-        images = self._generate_report_images(num_waterfall_plots)
-
-        # Resolve the prompt next to this module so it works regardless of CWD.
-        prompt_path = Path(__file__).parent / "prompt.txt"
-        prompt2 = prompt_path.read_text()
-        return self._generate_final_report(chat, report, images, prompt2)
-
-    def _initialize_chat(self, api_key: str, model_name: str, provider: str):
-        if provider == "google":
-            return ChatGoogleGenerativeAI(google_api_key=api_key, model=model_name)
-        if provider == "openai":
-            return ChatOpenAI(openai_api_key=api_key, model_name=model_name)
-        msg = "Invalid provider"
-        raise ValueError(msg)
+        return asyncio.run(
+            self.generate_report_with_llm(
+                api_key=api_key,
+                model_name=model_name,
+                provider=provider,
+                num_waterfall_plots=num_waterfall_plots,
+            )
+        )
 
     def _generate_report_images(self, num_waterfall_plots: int):
         images: dict[str, str] = {}  # Change type hint to allow string keys
@@ -499,38 +529,3 @@ class XAI:
 
         return images
 
-    def _generate_final_report(self, chat, report, images, prompt2):
-        prompt_template = ChatPromptTemplate(
-            messages=[
-                SystemMessage(content=prompt2),
-                # Use a prompt template (not a raw HumanMessage) so {report} is
-                # actually substituted with the model evaluation report.
-                HumanMessagePromptTemplate.from_template(
-                    "Model Evaluation Report:\n```\n{report}\n```"
-                ),
-                MessagesPlaceholder(variable_name="images"),
-            ]
-        )
-        image_messages = []
-        for plot_type, image_url in images.items():
-            image_messages.append(
-                HumanMessage(
-                    content=[
-                        {"type": "text", "text": f"Here is a {plot_type.replace('_', ' ')} plot:"},
-                        {"type": "image_url", "image_url": {"url": image_url, "detail": "auto"}},
-                    ]
-                )
-            )
-
-        final_prompt = prompt_template.format_messages(report=str(report), images=image_messages)
-
-        # LangChain chat models are Runnables; the legacy ``chat(messages)`` call
-        # was removed — use ``.invoke``.
-        response = chat.invoke(final_prompt)
-        content = response.content
-        # Newer models return content as a list of blocks; flatten to markdown text.
-        if isinstance(content, list):
-            content = "".join(
-                part.get("text", "") if isinstance(part, dict) else str(part) for part in content
-            )
-        return content

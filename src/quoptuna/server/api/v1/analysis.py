@@ -61,10 +61,23 @@ class ReportRequest(BaseModel):
     api_key: str
     model_name: str = "gpt-4o"
     dataset_description: Optional[str] = None
+    # Include a fairness audit in the report when a protected attribute is
+    # available (stored with the run or given here).
+    sensitive_feature: Optional[str] = None
+    include_fairness: bool = True
 
 
 class StudyPlotsRequest(BaseModel):
     optimization_id: str
+
+
+class FairnessRequest(BaseModel):
+    optimization_id: str
+    # Falls back to the sensitive_feature persisted with the optimization request.
+    sensitive_feature: Optional[str] = None
+    trial_number: Optional[int] = None
+    mitigate: bool = False
+    constraint: str = "equalized_odds"
 
 
 def _rehydrate_result(job: dict) -> dict:
@@ -373,14 +386,16 @@ async def generate_curves(request: MetricsRequest):
 
 @router.post("/study-plots")
 async def generate_study_plots(request: StudyPlotsRequest):
-    """Optuna study-level plots: optimization history and parameter importances.
+    """Interactive Optuna study plots as Plotly figure JSON.
 
-    Each plot is independently fault-tolerant (param importances needs >= 2
-    trials and >= 2 distinct params) and yields ``null`` on failure.
+    Each plot is independently fault-tolerant (e.g. param importances needs
+    >= 2 trials and >= 2 distinct params) and yields ``null`` on failure.
     """
     opt_result = _get_completed_result(request.optimization_id)
 
-    import optuna.visualization.matplotlib as ov
+    import json
+
+    import optuna.visualization as ov
     from optuna import load_study
 
     db_name = str(opt_result.get("db_name") or DEFAULT_DB_NAME)
@@ -391,27 +406,146 @@ async def generate_study_plots(request: StudyPlotsRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to load study: {e!s}")
 
-    history_plot = None
-    importances_plot = None
+    plot_funcs = {
+        "optimization_history": ov.plot_optimization_history,
+        "param_importances": ov.plot_param_importances,
+        "parallel_coordinate": ov.plot_parallel_coordinate,
+        "slice": ov.plot_slice,
+        "timeline": ov.plot_timeline,
+    }
 
-    try:
-        ax = ov.plot_optimization_history(study)
-        history_plot = _figure_to_data_url(ax.figure)
-    except Exception as exc:
-        logger.warning("optimization_history plot failed: %s", exc)
-
-    try:
-        ax = ov.plot_param_importances(study)
-        importances_plot = _figure_to_data_url(ax.figure)
-    except Exception as exc:
-        logger.warning("param_importances plot failed: %s", exc)
+    plots: dict[str, Any] = {}
+    for name, func in plot_funcs.items():
+        try:
+            fig = func(study)
+            plots[name] = json.loads(fig.to_json())
+        except Exception as exc:
+            logger.warning("%s plot failed: %s", name, exc)
+            plots[name] = None
 
     return {
         "optimization_id": request.optimization_id,
-        "optimization_history_plot": history_plot,
-        "param_importances_plot": importances_plot,
+        "plots": plots,
         "status": "completed",
     }
+
+
+MAX_SENSITIVE_GROUPS = 20
+
+
+def _resolve_sensitive_series(optimization_id: str, sensitive_feature: Optional[str], xai):
+    """Load the raw dataset column and align it to the train/test split.
+
+    ``DataPreparation.preprocess`` resets the feature index to a RangeIndex
+    before its seeded ``train_test_split``, so split indices are positional
+    row numbers into the raw dataframe (post feature-selection, which only
+    selects columns).
+    """
+    from quoptuna.server.services import dataset_registry
+
+    job = get_job(optimization_id)
+    request = OptimizationRequest(**job["request"])
+    column = sensitive_feature or request.sensitive_feature
+    if not column:
+        raise HTTPException(
+            status_code=400,
+            detail="No sensitive_feature provided or stored with this optimization",
+        )
+
+    record = dataset_registry.get(request.dataset_id)
+    if not record or not record.get("file_path"):
+        raise HTTPException(status_code=400, detail="Dataset file not found in registry")
+
+    import pandas as pd
+
+    raw_df = pd.read_csv(record["file_path"]).reset_index(drop=True)
+    if column not in raw_df.columns:
+        raise HTTPException(status_code=400, detail=f"Column '{column}' not in dataset")
+
+    x_train = xai.data.get("x_train")
+    n_split = len(x_train) + len(xai.x_test)
+    if len(raw_df) != n_split:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Dataset rows ({len(raw_df)}) do not match the optimization split "
+                f"({n_split}); the dataset file may have changed since the run"
+            ),
+        )
+
+    series = raw_df[column]
+    if series.nunique() > MAX_SENSITIVE_GROUPS:
+        raise HTTPException(
+            status_code=400,
+            detail=(
+                f"Column '{column}' has {series.nunique()} unique values "
+                f"(max {MAX_SENSITIVE_GROUPS}); pick a categorical column"
+            ),
+        )
+    return column, series.iloc[x_train.index], series.iloc[xai.x_test.index]
+
+
+def _compute_fairness_payload(
+    optimization_id: str,
+    sensitive_feature: Optional[str],
+    xai,
+    *,
+    mitigate: bool = False,
+    constraint: str = "equalized_odds",
+) -> dict:
+    from quoptuna.backend.xai import fairness as fairness_mod
+
+    column, sens_train, sens_test = _resolve_sensitive_series(
+        optimization_id, sensitive_feature, xai
+    )
+
+    metrics = fairness_mod.compute_fairness(xai.y_test, xai.predictions, sens_test)
+    plots = fairness_mod.plot_group_metrics(metrics)
+
+    mitigation = None
+    if mitigate:
+        mitigation = fairness_mod.mitigate_with_threshold_optimizer(
+            xai.model,
+            xai.data.get("x_train"),
+            xai.data.get("y_train"),
+            sens_train,
+            xai.x_test,
+            xai.y_test,
+            sens_test,
+            constraint=constraint,
+        )
+
+    return {
+        "sensitive_feature": column,
+        "metrics": metrics,
+        "plots": plots,
+        "mitigation": mitigation,
+    }
+
+
+@router.post("/fairness")
+async def generate_fairness(request: FairnessRequest):
+    """Fairness audit (fairlearn) for a chosen trial, grouped by a protected attribute."""
+    opt_result = _get_completed_result(request.optimization_id)
+
+    try:
+        xai = build_xai(opt_result, trial_number=request.trial_number)
+        payload = _compute_fairness_payload(
+            request.optimization_id,
+            request.sensitive_feature,
+            xai,
+            mitigate=request.mitigate,
+            constraint=request.constraint,
+        )
+        return {
+            "optimization_id": request.optimization_id,
+            "status": "completed",
+            **payload,
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compute fairness: {e!s}")
 
 
 @router.post("/report")
@@ -425,10 +559,25 @@ async def generate_ai_report(request: ReportRequest):
     try:
         xai = build_xai(opt_result, trial_number=request.trial_number)
 
-        markdown = xai.generate_report_with_langchain(
+        fairness = None
+        if request.include_fairness:
+            try:
+                fairness = _compute_fairness_payload(
+                    request.optimization_id,
+                    request.sensitive_feature,
+                    xai,
+                    mitigate=True,
+                )
+            except HTTPException as exc:
+                # No sensitive feature configured (or unusable column) — the
+                # report simply proceeds without a fairness section.
+                logger.info("Report fairness section skipped: %s", exc.detail)
+
+        markdown = await xai.generate_report_with_llm(
             api_key=request.api_key,
             model_name=request.model_name,
             provider=request.llm_provider,
+            fairness=fairness,
         )
 
         if request.dataset_description:

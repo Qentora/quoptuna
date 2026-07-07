@@ -53,6 +53,7 @@ export function DatasetStep({ workflowData, setWorkflowData, setFooter }: StepPr
         selectedFeatures: [],
         targetColumn: null,
         labelMapping: { neg: null, pos: null },
+        sensitiveFeature: null,
       },
     }));
   };
