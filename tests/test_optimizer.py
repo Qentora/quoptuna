@@ -117,7 +117,10 @@ def test_objective_scores_and_logs(tiny_data, fake_create_model, model_type, qua
         assert "Classical_accuracy" in attrs
 
 
-def test_objective_returns_zero_on_error(tiny_data, monkeypatch):
+def test_objective_reraises_on_error(tiny_data, monkeypatch):
+    """Errors propagate (study.optimize's `catch` marks the trial FAILED) and
+    the reason is recorded, instead of silently scoring 0.0."""
+
     def _boom(*_args, **_kwargs):
         msg = "model construction failed"
         raise RuntimeError(msg)
@@ -130,7 +133,9 @@ def test_objective_returns_zero_on_error(tiny_data, monkeypatch):
         search_space=TINY_SEARCH_SPACE,
     )
     trial = FixedTrial({"C": 1.0, "model_type": "SVC"})
-    assert opt.objective(trial) == 0
+    with pytest.raises(RuntimeError, match="model construction failed"):
+        opt.objective(trial)
+    assert "model construction failed" in trial.user_attrs["error"]
 
 
 def test_optimize_then_load_study(tiny_data, fake_create_model):

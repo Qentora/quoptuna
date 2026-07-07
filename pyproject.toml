@@ -1,6 +1,6 @@
 [project]
 name = "quoptuna"
-version = "0.0.8"
+version = "0.0.9"
 description = "quoptuna is a proposed open-source project that combines quantum computing with Optuna's hyperparameter optimization framework."
 authors = [
     {name = "Edwin Jose", email = "edwinjose900@gmail.com"},
@@ -24,7 +24,7 @@ dependencies = [
     "python-fasthtml==0.6.9",
     "streamlit-elements==0.1.0",
     "plotly==5.24.1",
-    "pydantic==2.9.2",
+    "pydantic>=2.10,<3",
     "shap==0.46.0",
     "pytest>=8.3.4,<9.0.0",
     "pytest-cov>=6.0.0,<7.0.0",
@@ -53,6 +53,8 @@ dependencies = [
     "python-multipart>=0.0.9",
     "langchain-core>=0.3.0",
     "langchain-anthropic>=0.2.0",
+    "fairlearn>=0.11.0",
+    "openai-agents[litellm]>=0.0.16",
 ]
 readme = "README.md"
 classifiers = [

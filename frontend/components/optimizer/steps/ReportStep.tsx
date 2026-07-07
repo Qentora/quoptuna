@@ -16,9 +16,9 @@ import { ErrorBanner } from '../NavButtons';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
 
-type Provider = 'google' | 'openai';
+type Provider = 'google' | 'openai' | 'anthropic';
 
-// Current GA model IDs (verified June 2026). The backend passes model_name straight to LangChain,
+// Current GA model IDs (verified June 2026). The backend passes model_name straight to LiteLLM,
 // so any valid provider ID works; "Custom…" lets users enter newer ones.
 const PROVIDER_MODELS: Record<Provider, { label: string; models: string[] }> = {
   google: {
@@ -26,6 +26,10 @@ const PROVIDER_MODELS: Record<Provider, { label: string; models: string[] }> = {
     models: ['gemini-3.5-flash', 'gemini-2.5-pro', 'gemini-2.5-flash', 'gemini-2.5-flash-lite'],
   },
   openai: { label: 'OpenAI', models: ['gpt-5.5', 'gpt-5.4', 'gpt-5.4-mini'] },
+  anthropic: {
+    label: 'Anthropic (Claude)',
+    models: ['claude-fable-5', 'claude-opus-4-8', 'claude-sonnet-5', 'claude-haiku-4-5-20251001'],
+  },
 };
 
 export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
@@ -45,7 +49,7 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
   }, []);
 
   const { optimization, report } = workflowData;
-  const apiKey = provider === 'google' ? keys.google : keys.openai;
+  const apiKey = keys[provider];
   // Guard against a non-string payload (e.g. structured LLM content blocks) —
   // ReactMarkdown throws on non-string children and would crash the whole app.
   const hasReport = typeof report.markdown === 'string' && report.markdown.length > 0;

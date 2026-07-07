@@ -18,6 +18,12 @@
                 •	Identify potential risks such as overfitting, bias, or data drift based on observed metrics and feature contributions.
                 •	Highlight any indications of unfair bias in feature importance, especially if certain features dominate the model’s decisions disproportionately.
                 •	Recommend further fairness audits where necessary.
+                3b.	Fairness Audit (only when "fairness_metrics" and fairness plots are provided):
+                •	Write a dedicated "Fairness Audit" section grounded EXCLUSIVELY in the provided fairness_metrics (by_group, overall, disparities) and the fairness_* group plots — never invent groups, metrics, or values that are not present.
+                •	Quantify the disparities numerically: state the demographic parity difference and ratio and the equalized odds difference, and explain in plain language what each gap means for the affected groups.
+                •	Compare per-group accuracy, selection rate, false positive rate, and false negative rate; call out the most disadvantaged group(s) with the exact numbers.
+                •	If "fairness_mitigation" data is provided (ThresholdOptimizer before/after), report the before-vs-after disparity changes numerically, state which constraint was used, and note any accuracy trade-off; recommend whether the mitigation is worth adopting based on those numbers.
+                •	If a metric or plot is absent, omit it silently instead of speculating.
                 4.	Governance and Compliance Recommendations:
                 •	Provide actionable recommendations for improving model robustness, fairness, and explainability.
                 •	Suggest best practices for validation, monitoring, and accountability, aligned with regulatory standards.

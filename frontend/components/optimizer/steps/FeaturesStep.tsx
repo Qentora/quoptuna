@@ -14,13 +14,35 @@ import type { StepProps } from '../Wizard';
 const isNumericDtype = (dtype: string | undefined) =>
   !!dtype && /int|float|double|number/i.test(dtype);
 
+// Mirror the backend caps in prepare.py.
+const MAX_ONEHOT_CATEGORIES = 10;
+const MAX_ORDINAL_CATEGORIES = 100;
+
 export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const preview = useDatasetPreview(workflowData.dataset?.id ?? null);
-  const { selectedFeatures, targetColumn, labelMapping } = workflowData.features;
+  const { selectedFeatures, targetColumn, labelMapping, sensitiveFeature, categoricalEncoding } =
+    workflowData.features;
   const [search, setSearch] = useState('');
 
   const columns = workflowData.dataset?.columns ?? [];
   const dtypes = preview.data?.dtypes ?? {};
+  const missingCounts = preview.data?.missing ?? {};
+  const uniqueCounts = preview.data?.unique_counts ?? {};
+
+  // Categorical columns get auto-encoded by the backend; block ones whose
+  // cardinality exceeds the cap of the chosen encoding method.
+  const isCategorical = (column: string) => !isNumericDtype(dtypes[column]);
+  const encodingCap =
+    categoricalEncoding === 'onehot' ? MAX_ONEHOT_CATEGORIES : MAX_ORDINAL_CATEGORIES;
+  const tooManyCategories = (column: string) =>
+    isCategorical(column) && (uniqueCounts[column] ?? 0) > encodingCap;
+  const hasCategoricalSelected = selectedFeatures.some(isCategorical);
+
+  const setEncoding = (value: 'ordinal' | 'onehot') =>
+    setWorkflowData((prev) => ({
+      ...prev,
+      features: { ...prev.features, categoricalEncoding: value },
+    }));
 
   const filteredColumns = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -28,7 +50,7 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
   }, [columns, search]);
 
   const toggleFeature = (column: string) => {
-    if (column === targetColumn) return;
+    if (column === targetColumn || tooManyCategories(column)) return;
     setWorkflowData((prev) => {
       const current = prev.features.selectedFeatures;
       const next = current.includes(column)
@@ -47,6 +69,13 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
         selectedFeatures: prev.features.selectedFeatures.filter((f) => f !== column),
         labelMapping: { neg: null, pos: null },
       },
+    }));
+  };
+
+  const setSensitiveFeature = (value: string) => {
+    setWorkflowData((prev) => ({
+      ...prev,
+      features: { ...prev.features, sensitiveFeature: value || null },
     }));
   };
 
@@ -142,6 +171,32 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
                     {dtypes[column] && (
                       <Badge variant="outline" className="shrink-0">
                         {dtypes[column]}
+                      </Badge>
+                    )}
+                    {tooManyCategories(column) ? (
+                      <Badge
+                        variant="destructive"
+                        className="shrink-0"
+                        title={`${uniqueCounts[column]} categories exceed the ${categoricalEncoding} limit of ${encodingCap}`}
+                      >
+                        too many categories
+                      </Badge>
+                    ) : isCategorical(column) && isFeature ? (
+                      <Badge
+                        variant="amber"
+                        className="shrink-0"
+                        title={`Categorical column — will be ${categoricalEncoding === 'onehot' ? 'one-hot' : 'ordinal'} encoded automatically`}
+                      >
+                        {categoricalEncoding === 'onehot' ? 'one-hot' : 'ordinal'}
+                      </Badge>
+                    ) : null}
+                    {(missingCounts[column] ?? 0) > 0 && (
+                      <Badge
+                        variant="secondary"
+                        className="shrink-0"
+                        title={`${missingCounts[column]} missing values — imputed automatically`}
+                      >
+                        {missingCounts[column]} NA
                       </Badge>
                     )}
                   </div>
@@ -278,6 +333,56 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
                   </div>
                 </div>
               )}
+            </div>
+          </div>
+          {/* Categorical encoding method */}
+          {hasCategoricalSelected && (
+            <div className="flex flex-col rounded-lg border border-border bg-card">
+              <div className="shrink-0 border-b border-border bg-muted px-4 py-3">
+                <h4 className="text-sm font-semibold">Categorical encoding</h4>
+              </div>
+              <div className="space-y-2 p-3">
+                <p className="text-xs text-muted-foreground">
+                  How selected categorical columns are converted to numbers. Ordinal keeps one
+                  column per feature (faster for quantum models); one-hot adds a column per
+                  category.
+                </p>
+                <Select
+                  aria-label="Categorical encoding"
+                  value={categoricalEncoding}
+                  onChange={(e) => setEncoding(e.target.value as 'ordinal' | 'onehot')}
+                >
+                  <option value="ordinal">Ordinal — 1 column per feature (recommended)</option>
+                  <option value="onehot">One-hot — 1 column per category (slower)</option>
+                </Select>
+              </div>
+            </div>
+          )}
+
+          {/* Protected attribute for fairness auditing */}
+          <div className="flex flex-col rounded-lg border border-border bg-card">
+            <div className="shrink-0 border-b border-border bg-muted px-4 py-3">
+              <h4 className="text-sm font-semibold">Protected attribute (optional)</h4>
+            </div>
+            <div className="space-y-2 p-3">
+              <p className="text-xs text-muted-foreground">
+                A categorical column (e.g. sex, race, age group) used to audit fairness across
+                groups. It does not need to be a model feature and is never used for training.
+              </p>
+              <Select
+                aria-label="Protected attribute"
+                value={sensitiveFeature ?? ''}
+                onChange={(e) => setSensitiveFeature(e.target.value)}
+              >
+                <option value="">None — skip fairness audit</option>
+                {columns
+                  .filter((c) => c !== targetColumn)
+                  .map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+              </Select>
             </div>
           </div>
         </div>

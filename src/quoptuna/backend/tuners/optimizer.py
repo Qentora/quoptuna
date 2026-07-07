@@ -149,9 +149,13 @@ class Optimizer:
             )
 
             return f_score_  # noqa: TRY300
-        except Exception:
-            logger.exception("An error occurred")
-            return 0
+        except Exception as e:
+            # Record why and re-raise so Optuna marks the trial FAILED (the
+            # `catch` in study.optimize keeps the study going). Returning 0
+            # here would make broken configurations look like real F1=0 runs.
+            logger.exception("Trial %s failed", trial.number)
+            trial.set_user_attr("error", f"{type(e).__name__}: {e}")
+            raise
 
     def log_user_attributes(self, model_type, eval_scores, trial):
         if model_type in ["SVC", "SVClinear", "MLPClassifier", "Perceptron"]:
@@ -227,5 +231,7 @@ class Optimizer:
 
         study = self._create_or_load_study()
         self.study = study
-        study.optimize(self.objective, n_trials=n_trials)
+        # `catch` turns objective exceptions into FAILED trials (with the error
+        # recorded as a user attr) instead of aborting the whole study.
+        study.optimize(self.objective, n_trials=n_trials, catch=(Exception,))
         return study, study.best_trials

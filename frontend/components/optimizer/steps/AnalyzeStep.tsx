@@ -5,14 +5,24 @@ import { Button } from '@/components/ui/button';
 import { Field } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { Metric } from '@/components/ui/metric';
-import { generateSHAP, getCurves, getMetrics, getStudyPlots } from '@/lib/api';
+import { generateFairness, generateSHAP, getCurves, getMetrics, getStudyPlots } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import * as Tabs from '@radix-ui/react-tabs';
-import { BarChart3, Download, Loader2 } from 'lucide-react';
+import { BarChart3, Download, Loader2, Scale } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import { ErrorBanner } from '../NavButtons';
+import { PlotSkeleton, PlotlyFigure } from '../PlotlyFigure';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
+import type { FairnessMetrics } from '../types';
+
+const STUDY_PLOTS: Array<{ id: string; label: string }> = [
+  { id: 'optimization_history', label: 'Optimization history' },
+  { id: 'param_importances', label: 'Parameter importances' },
+  { id: 'parallel_coordinate', label: 'Parallel coordinates' },
+  { id: 'slice', label: 'Slice' },
+  { id: 'timeline', label: 'Timeline' },
+];
 
 const SHAP_TABS: Array<{ id: string; label: string }> = [
   { id: 'bar', label: 'Bar' },
@@ -41,7 +51,12 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
   const [subsetSize, setSubsetSize] = useState(50);
   const [sampleIndex, setSampleIndex] = useState(0);
 
-  const { optimization, analysis } = workflowData;
+  const { optimization, analysis, features } = workflowData;
+  const [isMitigating, setIsMitigating] = useState(false);
+  const [fairnessError, setFairnessError] = useState<string | null>(null);
+  // Plots may be absent even when metrics exist: the localStorage autosave
+  // strips them when the payload exceeds the quota. Re-fetch in that case.
+  const hasPlots = Object.keys(analysis.plots).length > 0;
   const hasSHAP = analysis.featureImportance !== null;
   const autoRan = useRef(false);
 
@@ -58,8 +73,9 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
     const trial = optimization.selectedTrial ?? undefined;
     setIsGenerating(true);
     setError(null);
+    setFairnessError(null);
     try {
-      const [shap, metrics, curves, study] = await Promise.all([
+      const [shap, metrics, curves, study, fairness] = await Promise.all([
         generateSHAP({
           optimization_id: id,
           trial_number: trial,
@@ -70,6 +86,16 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
         getMetrics(id, trial).catch(() => null),
         getCurves(id, trial, useProba, subsetSize).catch(() => null),
         getStudyPlots(id).catch(() => null),
+        // Runs only when a protected attribute was stored with the run or is
+        // set in this session; the endpoint 400s harmlessly otherwise.
+        generateFairness({
+          optimization_id: id,
+          trial_number: trial,
+          sensitive_feature: features.sensitiveFeature ?? undefined,
+        }).catch((err) => {
+          setFairnessError(err instanceof Error ? err.message : 'Fairness audit failed');
+          return null;
+        }),
       ]);
 
       setWorkflowData((prev) => ({
@@ -80,17 +106,13 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
             ...shap.plots,
             ...(curves?.roc_curve_plot ? { rocCurve: curves.roc_curve_plot } : {}),
             ...(curves?.pr_curve_plot ? { prCurve: curves.pr_curve_plot } : {}),
-            ...(study?.optimization_history_plot
-              ? { optimizationHistory: study.optimization_history_plot }
-              : {}),
-            ...(study?.param_importances_plot
-              ? { paramImportances: study.param_importances_plot }
-              : {}),
           },
+          studyPlots: study?.plots ?? null,
           metrics: metrics?.metrics ?? null,
           confusionMatrixPlot: metrics?.confusion_matrix_plot ?? null,
           rocAuc: curves?.roc_auc ?? null,
           averagePrecision: curves?.average_precision ?? null,
+          fairness,
         },
       }));
     } catch (err) {
@@ -103,11 +125,54 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
   // Auto-run once on entering the step when results exist and none yet.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount.
   useEffect(() => {
-    if (!autoRan.current && optimization.executionId && !hasSHAP) {
+    if (!autoRan.current && optimization.executionId && (!hasSHAP || !hasPlots)) {
       autoRan.current = true;
       void runAnalysis();
     }
   }, []);
+
+  const runFairness = async () => {
+    if (!optimization.executionId) return;
+    setIsMitigating(true);
+    setFairnessError(null);
+    try {
+      const result = await generateFairness({
+        optimization_id: optimization.executionId,
+        trial_number: optimization.selectedTrial ?? undefined,
+        sensitive_feature: features.sensitiveFeature ?? undefined,
+      });
+      setWorkflowData((prev) => ({
+        ...prev,
+        analysis: { ...prev.analysis, fairness: result },
+      }));
+    } catch (err) {
+      setFairnessError(err instanceof Error ? err.message : 'Fairness audit failed');
+    } finally {
+      setIsMitigating(false);
+    }
+  };
+
+  const runMitigation = async () => {
+    if (!optimization.executionId || !analysis.fairness) return;
+    setIsMitigating(true);
+    setError(null);
+    try {
+      const result = await generateFairness({
+        optimization_id: optimization.executionId,
+        trial_number: optimization.selectedTrial ?? undefined,
+        sensitive_feature: analysis.fairness.sensitive_feature,
+        mitigate: true,
+      });
+      setWorkflowData((prev) => ({
+        ...prev,
+        analysis: { ...prev.analysis, fairness: result },
+      }));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Mitigation failed');
+    } finally {
+      setIsMitigating(false);
+    }
+  };
 
   const metrics = analysis.metrics ?? {};
   const shapTabs = SHAP_TABS.filter((t) => analysis.plots[t.id]);
@@ -207,6 +272,7 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
               { id: 'shap', label: 'SHAP' },
               { id: 'curves', label: 'Curves' },
               { id: 'study', label: 'Study' },
+              { id: 'fairness', label: 'Fairness' },
               { id: 'importance', label: 'Feature importance' },
             ].map((t) => (
               <Tabs.Trigger
@@ -322,26 +388,120 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
 
             {/* Study */}
             <Tabs.Content value="study">
-              <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-                {analysis.plots.optimizationHistory ? (
-                  <PlotCard
-                    title="Optimization history"
-                    image={analysis.plots.optimizationHistory}
-                    filename="optimization-history.png"
+              {analysis.studyPlots ? (
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                  {STUDY_PLOTS.map(({ id, label }) => {
+                    const figure = analysis.studyPlots?.[id];
+                    return figure ? (
+                      <PlotlyFigure key={id} title={label} figure={figure} />
+                    ) : (
+                      <EmptyState key={id} message={`${label} not available for this study.`} />
+                    );
+                  })}
+                </div>
+              ) : isGenerating ? (
+                <div className="grid grid-cols-1 gap-4 xl:grid-cols-2">
+                  {STUDY_PLOTS.map(({ id, label }) => (
+                    <PlotSkeleton key={id} title={label} />
+                  ))}
+                </div>
+              ) : (
+                <EmptyState message="Study plots not available." />
+              )}
+            </Tabs.Content>
+
+            {/* Fairness */}
+            <Tabs.Content value="fairness" className="space-y-4">
+              {analysis.fairness ? (
+                <>
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <p className="text-sm text-muted-foreground">
+                      Audit grouped by{' '}
+                      <span className="font-medium text-brand">
+                        {analysis.fairness.sensitive_feature}
+                      </span>{' '}
+                      (fairlearn)
+                    </p>
+                    {!analysis.fairness.mitigation && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={runMitigation}
+                        disabled={isMitigating}
+                      >
+                        {isMitigating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Scale className="h-4 w-4" />
+                        )}
+                        Run mitigation (ThresholdOptimizer)
+                      </Button>
+                    )}
+                  </div>
+
+                  <DisparitySummary disparities={analysis.fairness.metrics.disparities} />
+                  <GroupMetricsTable metrics={analysis.fairness.metrics} />
+
+                  <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                    {Object.entries(analysis.fairness.plots).map(([name, image]) => (
+                      <PlotCard
+                        key={name}
+                        title={`${name.replace(/_/g, ' ')} by group`}
+                        image={image}
+                        filename={`fairness-${name}.png`}
+                      />
+                    ))}
+                  </div>
+
+                  {analysis.fairness.mitigation && (
+                    <div className="space-y-4 rounded-lg border border-border bg-card p-4">
+                      <h4 className="text-sm font-semibold">
+                        Mitigation — ThresholdOptimizer (
+                        {analysis.fairness.mitigation.constraint.replace(/_/g, ' ')})
+                      </h4>
+                      <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                        <MitigationDisparities
+                          title="Before"
+                          disparities={analysis.fairness.mitigation.before.disparities}
+                        />
+                        <MitigationDisparities
+                          title="After"
+                          disparities={analysis.fairness.mitigation.after.disparities}
+                        />
+                      </div>
+                      <PlotCard
+                        title="Disparity before vs after"
+                        image={analysis.fairness.mitigation.comparison_plot}
+                        filename="fairness-mitigation.png"
+                      />
+                    </div>
+                  )}
+                </>
+              ) : (
+                <div className="space-y-3">
+                  <EmptyState
+                    message={
+                      fairnessError
+                        ? `Fairness audit failed: ${fairnessError}`
+                        : features.sensitiveFeature
+                          ? `Protected attribute "${features.sensitiveFeature}" selected — run the audit below.`
+                          : 'No fairness audit available. Select a protected attribute in the Features step, then run the audit.'
+                    }
                   />
-                ) : (
-                  <EmptyState message="Optimization history not available." />
-                )}
-                {analysis.plots.paramImportances ? (
-                  <PlotCard
-                    title="Parameter importances"
-                    image={analysis.plots.paramImportances}
-                    filename="param-importances.png"
-                  />
-                ) : (
-                  <EmptyState message="Parameter importances need ≥2 trials and ≥2 params." />
-                )}
-              </div>
+                  {features.sensitiveFeature && (
+                    <div className="text-center">
+                      <Button type="button" size="sm" onClick={runFairness} disabled={isMitigating}>
+                        {isMitigating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Scale className="h-4 w-4" />
+                        )}
+                        Run fairness audit
+                      </Button>
+                    </div>
+                  )}
+                </div>
+              )}
             </Tabs.Content>
 
             {/* Feature importance */}
@@ -460,6 +620,100 @@ function PlotCard({
           </Button>
         </div>
       </div>
+    </div>
+  );
+}
+
+const DISPARITY_LABELS: Record<string, string> = {
+  demographic_parity_difference: 'Demographic parity diff',
+  demographic_parity_ratio: 'Demographic parity ratio',
+  equalized_odds_difference: 'Equalized odds diff',
+};
+
+function DisparitySummary({ disparities }: { disparities: Record<string, number> }) {
+  return (
+    <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
+      {Object.entries(disparities).map(([key, value]) => {
+        // Ratio: 1 is ideal (≥0.8 commonly acceptable); differences: 0 is ideal.
+        const isRatio = key.endsWith('_ratio');
+        const concerning = isRatio ? value < 0.8 : value > 0.1;
+        return (
+          <div key={key} className="rounded-lg border border-border bg-card p-3">
+            <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+              {DISPARITY_LABELS[key] ?? key}
+            </p>
+            <Metric
+              value={value.toFixed(3)}
+              tone={concerning ? 'amber' : 'emerald'}
+              className="mt-1 block text-2xl"
+            />
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+function GroupMetricsTable({ metrics }: { metrics: FairnessMetrics }) {
+  const metricNames = Object.keys(metrics.by_group);
+  const groups = metricNames.length > 0 ? Object.keys(metrics.by_group[metricNames[0]]) : [];
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border bg-card">
+      <div className="border-b border-border bg-muted px-4 py-3">
+        <h4 className="text-sm font-semibold">Metrics by group</h4>
+      </div>
+      <table className="w-full text-sm">
+        <thead>
+          <tr className="border-b border-border text-left text-xs text-muted-foreground">
+            <th className="px-4 py-2 font-medium">Metric</th>
+            {groups.map((g) => (
+              <th key={g} className="px-4 py-2 font-medium">
+                {g}
+              </th>
+            ))}
+            <th className="px-4 py-2 font-medium">Overall</th>
+          </tr>
+        </thead>
+        <tbody>
+          {metricNames.map((name) => (
+            <tr key={name} className="border-b border-border last:border-0">
+              <td className="px-4 py-2 font-medium">{name.replace(/_/g, ' ')}</td>
+              {groups.map((g) => (
+                <td key={g} className="px-4 py-2 tabular-nums">
+                  {name === 'count'
+                    ? metrics.by_group[name][g]
+                    : metrics.by_group[name][g]?.toFixed(3)}
+                </td>
+              ))}
+              <td className="px-4 py-2 tabular-nums text-muted-foreground">
+                {name === 'count' ? metrics.overall[name] : metrics.overall[name]?.toFixed(3)}
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+function MitigationDisparities({
+  title,
+  disparities,
+}: {
+  title: string;
+  disparities: Record<string, number>;
+}) {
+  return (
+    <div className="rounded-lg border border-border bg-muted/40 p-3">
+      <p className="text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</p>
+      <dl className="mt-2 space-y-1 text-sm">
+        {Object.entries(disparities).map(([key, value]) => (
+          <div key={key} className="flex items-center justify-between gap-2">
+            <dt className="text-muted-foreground">{DISPARITY_LABELS[key] ?? key}</dt>
+            <dd className="font-medium tabular-nums">{value.toFixed(3)}</dd>
+          </div>
+        ))}
+      </dl>
     </div>
   );
 }

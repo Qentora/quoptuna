@@ -233,12 +233,32 @@ class WorkflowExecutor:
         if not x_columns or not y_column:
             raise WorkflowExecutionError("Must specify x_columns and y_column")
 
+        # Categorical features would otherwise reach StandardScaler / the models
+        # as strings and fail every trial; encode them (and impute NaN) here so
+        # the whole downstream pipeline only ever sees numeric columns.
+        from quoptuna.backend.utils.data_utils.prepare import (
+            encode_features,
+            encoded_passthrough_columns,
+        )
+
+        method = config.get("categorical_encoding", "ordinal")
+        try:
+            x_encoded, encoding = encode_features(df[x_columns], method=method)
+        except ValueError as e:
+            raise WorkflowExecutionError(str(e)) from e
+        encoded_cols = {c: m["kind"] for c, m in encoding.items() if m["kind"] != "numeric"}
+        if encoded_cols:
+            logger.info(f"Encoded categorical features ({method}): {encoded_cols}")
+
         return {
             "type": "selected_data",
-            "x": df[x_columns],
+            "x": x_encoded,
             "y": df[y_column],
-            "x_columns": x_columns,
+            "x_columns": list(x_encoded.columns),
             "y_column": y_column,
+            "encoding": encoding,
+            # Already in [0, 1] — must bypass StandardScaler at the split step.
+            "passthrough_columns": encoded_passthrough_columns(encoding),
         }
 
     def _execute_train_test_split(self, config: Dict, inputs: Dict) -> Dict:
@@ -250,11 +270,26 @@ class WorkflowExecutor:
         x = data["x"]
         y = data["y"]
 
+        # Apply an explicit user label mapping on the ORIGINAL values, before
+        # DataPreparation encodes anything. Doing it downstream (label-encoding
+        # node) is too late: the split already re-encoded y to {-1, 1}, so a
+        # string comparison against the original values maps every row to -1.
+        label_mapping = config.get("label_mapping")
+        if label_mapping:
+            import numpy as np
+
+            pos = str(label_mapping.get("pos"))
+            logger.info(
+                f"Applying label mapping at split: {label_mapping.get('neg')} -> -1, {pos} -> 1"
+            )
+            y = pd.Series(np.where(y.astype(str) == pos, 1, -1), name=data["y_column"])
+
         # Use DataPreparation class
         data_prep = DataPreparation(
             dataset={"x": x, "y": y},
             x_cols=list(x.columns),
             y_col=data["y_column"] if isinstance(data["y_column"], str) else data["y_column"][0],
+            passthrough_columns=data.get("passthrough_columns"),
         )
 
         return {
@@ -288,8 +323,16 @@ class WorkflowExecutor:
         y_train = result["y_train"]
         y_test = result["y_test"]
 
-        # Explicit user-provided mapping takes precedence (values map to -1/1).
+        def _already_encoded(series) -> bool:
+            values = series.values.ravel() if hasattr(series, "values") else np.ravel(series)
+            return set(np.unique(values).tolist()) <= {-1, 1}
+
+        # Explicit user-provided mapping takes precedence (values map to -1/1) —
+        # but it was already applied at the split node on the original values;
+        # re-applying it to {-1, 1}-encoded labels would map every row to -1.
         label_mapping = config.get("label_mapping")
+        if label_mapping and _already_encoded(y_train) and _already_encoded(y_test):
+            return result
         if label_mapping:
             neg = str(label_mapping.get("neg"))
             pos = str(label_mapping.get("pos"))
@@ -428,6 +471,16 @@ class WorkflowExecutor:
         # Get best trial
         if optimizer.study is None:
             raise RuntimeError("Optimization did not produce a study with a best trial")
+
+        from optuna.trial import TrialState
+
+        completed = [t for t in optimizer.study.trials if t.state == TrialState.COMPLETE]
+        if not completed:
+            failed = [t for t in optimizer.study.trials if t.state == TrialState.FAIL]
+            reason = failed[-1].user_attrs.get("error") if failed else "unknown error"
+            raise WorkflowExecutionError(
+                f"All {len(optimizer.study.trials)} trials failed. Last error: {reason}"
+            )
         best_trial = optimizer.study.best_trial
 
         return {
