@@ -40,14 +40,14 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
         subtitle="Set up the hyperparameter optimization study"
       />
 
-      <div className="grid items-start gap-4 lg:grid-cols-2">
+      <div className="flex flex-col gap-4">
         {/* Study name */}
         <Card>
           <CardHeader>
             <CardTitle>Study</CardTitle>
           </CardHeader>
           <CardContent>
-            <Field>
+            <Field className="max-w-xl">
               <FieldLabel htmlFor="study-name">Study Name</FieldLabel>
               <Input
                 id="study-name"
@@ -69,7 +69,7 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
             <CardTitle>Trial budget</CardTitle>
             <Metric value={configuration.numTrials} tone="brand" className="text-sm" />
           </CardHeader>
-          <CardContent className="space-y-4">
+          <CardContent className="grid items-start gap-x-6 gap-y-4 lg:grid-cols-2">
             <div className="grid grid-cols-3 gap-3">
               {PRESETS.map((preset) => {
                 const active = configuration.numTrials === preset.trials;
@@ -95,7 +95,7 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
               })}
             </div>
 
-            <Field>
+            <Field className="lg:pt-1">
               <FieldLabel htmlFor="trials">Fine-tune</FieldLabel>
               <Slider
                 id="trials"

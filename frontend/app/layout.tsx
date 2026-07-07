@@ -1,4 +1,5 @@
 import { Sidebar } from '@/components/Sidebar';
+import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
@@ -27,12 +28,14 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body>
         <Providers>
-          <div className="flex h-screen overflow-hidden">
+          <SidebarProvider>
             <Sidebar />
-            <div data-app-scroll-container className="flex-1 overflow-auto">
-              {children}
-            </div>
-          </div>
+            <SidebarInset className="h-svh min-w-0">
+              <div data-app-scroll-container className="flex-1 overflow-auto">
+                {children}
+              </div>
+            </SidebarInset>
+          </SidebarProvider>
         </Providers>
       </body>
     </html>

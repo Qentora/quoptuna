@@ -13,7 +13,6 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
 import { useDatasetPreview } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import { Check, Search, Sparkles } from 'lucide-react';
@@ -132,6 +131,32 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
     ? (preview.data?.target_values_by_column[targetColumn] ?? [])
     : [];
   const needsMapping = targetValues.length === 2;
+
+  // Default the binary label mapping so the step is immediately valid: the
+  // lower value maps to -1 and the higher to 1 (numeric when both parse as
+  // numbers, lexicographic otherwise — a deterministic order either way).
+  // The user can still change both selects afterwards.
+  useEffect(() => {
+    if (!needsMapping || labelMapping.neg !== null || labelMapping.pos !== null) return;
+    const [a, b] = targetValues;
+    const na = Number(a);
+    const nb = Number(b);
+    const bothNumeric = !Number.isNaN(na) && !Number.isNaN(nb);
+    const [low, high] = bothNumeric
+      ? na <= nb
+        ? [a, b]
+        : [b, a]
+      : String(a) <= String(b)
+        ? [a, b]
+        : [b, a];
+    setWorkflowData((prev) => ({
+      ...prev,
+      features: {
+        ...prev.features,
+        labelMapping: { neg: low, pos: high },
+      },
+    }));
+  }, [needsMapping, targetValues, labelMapping.neg, labelMapping.pos, setWorkflowData]);
   const mappingComplete =
     !needsMapping ||
     (labelMapping.neg !== null &&
@@ -157,8 +182,8 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
         subtitle="Select input features, the target column, and map labels for binary classification"
       />
 
-      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_320px]">
-        {/* Left: feature checkbox grid */}
+      <div className="flex flex-col gap-4">
+        {/* Top: feature checkbox grid */}
         <Card size="sm">
           <CardHeader className="border-b">
             <CardTitle className="flex items-center justify-between gap-3">
@@ -253,78 +278,78 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
           </CardContent>
         </Card>
 
-        {/* Right rail */}
-        <Card size="sm" className="lg:sticky lg:top-4 lg:self-start">
+        {/* Bottom: configuration, fields laid out horizontally */}
+        <Card size="sm">
           <CardHeader className="border-b">
             <CardTitle>Configuration</CardTitle>
           </CardHeader>
-          <CardContent className="space-y-4">
-            <Field>
-              <FieldLabel htmlFor="target-column">Target column</FieldLabel>
-              <Select value={targetColumn ?? NONE_VALUE} onValueChange={setTarget}>
-                <SelectTrigger id="target-column" className="w-full">
-                  <SelectValue placeholder="Select target…" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE_VALUE}>None — choose a target</SelectItem>
-                  {columns.map((c) => (
-                    <SelectItem key={c} value={c}>
-                      {c}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <FieldDescription>The column the model learns to predict.</FieldDescription>
-            </Field>
+          <CardContent className="grid grid-cols-1 items-start gap-x-6 gap-y-4 md:grid-cols-2 xl:grid-cols-4">
+            <div className="space-y-4">
+              <Field>
+                <FieldLabel htmlFor="target-column">Target column</FieldLabel>
+                <Select value={targetColumn ?? NONE_VALUE} onValueChange={setTarget}>
+                  <SelectTrigger id="target-column" className="w-full">
+                    <SelectValue placeholder="Select target…" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_VALUE}>None — choose a target</SelectItem>
+                    {columns.map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+                <FieldDescription>The column the model learns to predict.</FieldDescription>
+              </Field>
 
-            {targetColumn && needsMapping && (
-              <div className="rounded-md border border-border bg-muted p-3">
-                <p className="text-xs font-medium">Label mapping (binary)</p>
-                <p className="mt-1 text-xs text-muted-foreground">
-                  Quantum models require labels encoded as -1 / 1.
-                </p>
-                <div className="mt-3 grid grid-cols-2 gap-3">
-                  <Field>
-                    <FieldLabel htmlFor="map-neg">Maps to -1</FieldLabel>
-                    <Select
-                      value={labelMapping.neg === null ? '' : String(labelMapping.neg)}
-                      onValueChange={(v) => setMapping('neg', v)}
-                    >
-                      <SelectTrigger id="map-neg" className="w-full">
-                        <SelectValue placeholder="Select…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {targetValues.map((v) => (
-                          <SelectItem key={String(v)} value={String(v)}>
-                            {String(v)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
-                  <Field>
-                    <FieldLabel htmlFor="map-pos">Maps to 1</FieldLabel>
-                    <Select
-                      value={labelMapping.pos === null ? '' : String(labelMapping.pos)}
-                      onValueChange={(v) => setMapping('pos', v)}
-                    >
-                      <SelectTrigger id="map-pos" className="w-full">
-                        <SelectValue placeholder="Select…" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {targetValues.map((v) => (
-                          <SelectItem key={String(v)} value={String(v)}>
-                            {String(v)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </Field>
+              {targetColumn && needsMapping && (
+                <div className="rounded-md border border-border bg-muted p-3">
+                  <p className="text-xs font-medium">Label mapping (binary)</p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Quantum models require labels encoded as -1 / 1.
+                  </p>
+                  <div className="mt-3 grid grid-cols-2 gap-3">
+                    <Field>
+                      <FieldLabel htmlFor="map-neg">Maps to -1</FieldLabel>
+                      <Select
+                        value={labelMapping.neg === null ? '' : String(labelMapping.neg)}
+                        onValueChange={(v) => setMapping('neg', v)}
+                      >
+                        <SelectTrigger id="map-neg" className="w-full">
+                          <SelectValue placeholder="Select…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {targetValues.map((v) => (
+                            <SelectItem key={String(v)} value={String(v)}>
+                              {String(v)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                    <Field>
+                      <FieldLabel htmlFor="map-pos">Maps to 1</FieldLabel>
+                      <Select
+                        value={labelMapping.pos === null ? '' : String(labelMapping.pos)}
+                        onValueChange={(v) => setMapping('pos', v)}
+                      >
+                        <SelectTrigger id="map-pos" className="w-full">
+                          <SelectValue placeholder="Select…" />
+                        </SelectTrigger>
+                        <SelectContent>
+                          {targetValues.map((v) => (
+                            <SelectItem key={String(v)} value={String(v)}>
+                              {String(v)}
+                            </SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </Field>
+                  </div>
                 </div>
-              </div>
-            )}
-
-            <Separator />
+              )}
+            </div>
 
             <Field>
               <FieldLabel htmlFor="categorical-encoding">Categorical encoding</FieldLabel>
@@ -346,8 +371,6 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
                 {!hasCategoricalSelected && ' No categorical features are currently selected.'}
               </FieldDescription>
             </Field>
-
-            <Separator />
 
             <Field>
               <FieldLabel htmlFor="protected-attribute">Protected attribute (optional)</FieldLabel>
@@ -372,10 +395,8 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
               </FieldDescription>
             </Field>
 
-            <Separator />
-
             {/* Selection summary */}
-            <div className="space-y-1.5 text-xs">
+            <div className="space-y-1.5 rounded-md border border-border bg-muted/50 p-3 text-xs">
               <div className="flex items-center justify-between">
                 <span className="text-muted-foreground">Selected features</span>
                 <Badge variant={selectedFeatures.length > 0 ? 'brand' : 'outline'}>

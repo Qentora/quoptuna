@@ -26,7 +26,7 @@ import { getDatabaseName } from '@/lib/appSettings';
 import { cn } from '@/lib/utils';
 import { Atom, Check, Cpu, PlayCircle, RotateCcw, Trophy } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
-import { CartesianGrid, Scatter, ScatterChart, XAxis, YAxis } from 'recharts';
+import { CartesianGrid, Line, LineChart, XAxis, YAxis } from 'recharts';
 import { ErrorBanner } from '../NavButtons';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
@@ -308,117 +308,121 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         </div>
       )}
 
-      <OptimizationHistoryCard trials={allTrials} />
+      <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
+        <OptimizationHistoryCard trials={allTrials} />
 
-      {allTrials.length > 0 && (
-        <Card size="sm" className="gap-0 py-0">
-          <div className="flex items-center justify-between gap-3 border-b border-border bg-muted px-3 py-2">
-            <h4 className="text-xs font-semibold text-foreground">All trials ({sorted.length})</h4>
-            {hasResults && (
-              <span className="text-xs text-muted-foreground">
-                {optimization.selectedTrial !== null ? (
-                  <>
-                    Analyzing{' '}
-                    <span className="font-medium text-brand">#{optimization.selectedTrial}</span> —
-                    click any row to change
-                  </>
-                ) : (
-                  'Click a row to choose a trial to analyze'
-                )}
-              </span>
-            )}
-          </div>
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead className="w-10" />
-                <TableHead className="w-12 text-right">Rank</TableHead>
-                <TableHead className="text-right">F1 score</TableHead>
-                <TableHead>Model</TableHead>
-                <TableHead>Type</TableHead>
-                <TableHead className="text-right">Trial</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {sorted.map((trial, index) => {
-                const failed = trial.value === null || trial.state === 'FAIL';
-                const selectable = hasResults && !failed;
-                const selected = optimization.selectedTrial === trial.trial;
-                const classical = isClassicalModel(trial.params?.model_type);
-                const isBest = index === 0 && !failed;
-                return (
-                  <TableRow
-                    key={trial.trial}
-                    onClick={selectable ? () => selectTrial(trial.trial) : undefined}
-                    onKeyDown={
-                      selectable
-                        ? (e) => {
-                            if (e.key === 'Enter' || e.key === ' ') {
-                              e.preventDefault();
-                              selectTrial(trial.trial);
+        {allTrials.length > 0 && (
+          <Card size="sm" className="gap-0 py-0">
+            <div className="flex items-center justify-between gap-3 border-b border-border bg-muted px-3 py-2">
+              <h4 className="text-xs font-semibold text-foreground">
+                All trials ({sorted.length})
+              </h4>
+              {hasResults && (
+                <span className="text-xs text-muted-foreground">
+                  {optimization.selectedTrial !== null ? (
+                    <>
+                      Analyzing{' '}
+                      <span className="font-medium text-brand">#{optimization.selectedTrial}</span>{' '}
+                      — click any row to change
+                    </>
+                  ) : (
+                    'Click a row to choose a trial to analyze'
+                  )}
+                </span>
+              )}
+            </div>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead className="w-10" />
+                  <TableHead className="w-12 text-right">Rank</TableHead>
+                  <TableHead className="text-right">F1 score</TableHead>
+                  <TableHead>Model</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead className="text-right">Trial</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {sorted.map((trial, index) => {
+                  const failed = trial.value === null || trial.state === 'FAIL';
+                  const selectable = hasResults && !failed;
+                  const selected = optimization.selectedTrial === trial.trial;
+                  const classical = isClassicalModel(trial.params?.model_type);
+                  const isBest = index === 0 && !failed;
+                  return (
+                    <TableRow
+                      key={trial.trial}
+                      onClick={selectable ? () => selectTrial(trial.trial) : undefined}
+                      onKeyDown={
+                        selectable
+                          ? (e) => {
+                              if (e.key === 'Enter' || e.key === ' ') {
+                                e.preventDefault();
+                                selectTrial(trial.trial);
+                              }
                             }
-                          }
-                        : undefined
-                    }
-                    tabIndex={selectable ? 0 : undefined}
-                    aria-selected={selected}
-                    className={cn(
-                      'focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand',
-                      selectable && 'cursor-pointer',
-                      failed && 'opacity-60',
-                      selected && 'bg-brand/10 ring-1 ring-inset ring-brand/40 hover:bg-brand/10'
-                    )}
-                  >
-                    <TableCell className="text-center">
-                      {selected ? (
-                        <Check size={16} className="mx-auto text-brand" />
-                      ) : isBest ? (
-                        <Trophy size={14} className="mx-auto text-accent-amber-foreground" />
-                      ) : null}
-                    </TableCell>
-                    <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
-                      {index + 1}
-                    </TableCell>
-                    <TableCell
+                          : undefined
+                      }
+                      tabIndex={selectable ? 0 : undefined}
+                      aria-selected={selected}
                       className={cn(
-                        'text-right font-semibold tabular-nums',
-                        selected && 'text-brand'
+                        'focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand',
+                        selectable && 'cursor-pointer',
+                        failed && 'opacity-60',
+                        selected && 'bg-brand/10 ring-1 ring-inset ring-brand/40 hover:bg-brand/10'
                       )}
                     >
-                      {failed ? (
-                        <span
-                          className="font-medium text-destructive"
-                          title={String(trial.user_attrs?.error ?? 'Trial failed')}
-                        >
-                          failed
-                        </span>
-                      ) : (
-                        trial.value?.toFixed(4)
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs text-muted-foreground">
-                      {trial.params?.model_type ?? 'N/A'}
-                      {failed && trial.user_attrs?.error != null && (
-                        <span className="block max-w-[280px] truncate text-[11px] text-destructive/80">
-                          {String(trial.user_attrs.error)}
-                        </span>
-                      )}
-                    </TableCell>
-                    <TableCell className="text-xs">
-                      <Badge variant={classical ? 'classical' : 'quantum'}>
-                        {classical ? 'Classical' : 'Quantum'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
-                      #{trial.trial}
-                    </TableCell>
-                  </TableRow>
-                );
-              })}
-            </TableBody>
-          </Table>
-        </Card>
-      )}
+                      <TableCell className="text-center">
+                        {selected ? (
+                          <Check size={16} className="mx-auto text-brand" />
+                        ) : isBest ? (
+                          <Trophy size={14} className="mx-auto text-accent-amber-foreground" />
+                        ) : null}
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
+                        {index + 1}
+                      </TableCell>
+                      <TableCell
+                        className={cn(
+                          'text-right font-semibold tabular-nums',
+                          selected && 'text-brand'
+                        )}
+                      >
+                        {failed ? (
+                          <span
+                            className="font-medium text-destructive"
+                            title={String(trial.user_attrs?.error ?? 'Trial failed')}
+                          >
+                            failed
+                          </span>
+                        ) : (
+                          trial.value?.toFixed(4)
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs text-muted-foreground">
+                        {trial.params?.model_type ?? 'N/A'}
+                        {failed && trial.user_attrs?.error != null && (
+                          <span className="block max-w-[280px] truncate text-[11px] text-destructive/80">
+                            {String(trial.user_attrs.error)}
+                          </span>
+                        )}
+                      </TableCell>
+                      <TableCell className="text-xs">
+                        <Badge variant={classical ? 'classical' : 'quantum'}>
+                          {classical ? 'Classical' : 'Quantum'}
+                        </Badge>
+                      </TableCell>
+                      <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
+                        #{trial.trial}
+                      </TableCell>
+                    </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }
@@ -439,8 +443,14 @@ function OptimizationHistoryCard({ trials }: { trials: HistoryTrial[] }) {
       model: (t.params?.model_type as string | undefined) ?? 'N/A',
     }));
   if (valid.length === 0) return null;
-  const quantum = valid.filter((t) => !isClassicalModel(t.model));
-  const classical = valid.filter((t) => isClassicalModel(t.model));
+  // One row per trial with the value under its family's key so each family
+  // renders as its own connected line with dot markers.
+  const chartData = valid.map((t) => ({
+    trial: t.trial,
+    model: t.model,
+    quantum: isClassicalModel(t.model) ? null : t.value,
+    classical: isClassicalModel(t.model) ? t.value : null,
+  }));
   return (
     <Card size="sm">
       <CardHeader>
@@ -455,9 +465,9 @@ function OptimizationHistoryCard({ trials }: { trials: HistoryTrial[] }) {
             quantum: { label: 'Quantum', color: 'var(--chart-1)' },
             classical: { label: 'Classical', color: 'var(--chart-2)' },
           }}
-          className="aspect-[3/1] min-h-36 w-full"
+          className="aspect-[16/10] min-h-64 w-full"
         >
-          <ScatterChart margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+          <LineChart data={chartData} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="trial"
@@ -470,7 +480,6 @@ function OptimizationHistoryCard({ trials }: { trials: HistoryTrial[] }) {
               tick={{ fontSize: 12 }}
             />
             <YAxis
-              dataKey="value"
               type="number"
               name="F1"
               domain={[0, 1]}
@@ -490,10 +499,26 @@ function OptimizationHistoryCard({ trials }: { trials: HistoryTrial[] }) {
                 />
               }
             />
-            <Scatter name="quantum" data={quantum} fill="var(--color-quantum)" />
-            <Scatter name="classical" data={classical} fill="var(--color-classical)" />
+            <Line
+              dataKey="quantum"
+              type="monotone"
+              stroke="var(--color-quantum)"
+              strokeWidth={2}
+              connectNulls
+              dot={{ r: 4, fill: 'var(--color-quantum)', strokeWidth: 0 }}
+              activeDot={{ r: 6 }}
+            />
+            <Line
+              dataKey="classical"
+              type="monotone"
+              stroke="var(--color-classical)"
+              strokeWidth={2}
+              connectNulls
+              dot={{ r: 4, fill: 'var(--color-classical)', strokeWidth: 0 }}
+              activeDot={{ r: 6 }}
+            />
             <ChartLegend content={<ChartLegendContent />} />
-          </ScatterChart>
+          </LineChart>
         </ChartContainer>
       </CardContent>
     </Card>
