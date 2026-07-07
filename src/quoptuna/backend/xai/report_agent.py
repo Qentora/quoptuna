@@ -86,7 +86,7 @@ async def generate_report(
         instructions=load_system_prompt(),
         model=model,
     )
-    draft = await Runner.run(analyst, cast(Any, _analyst_input(report_text, images)))
+    draft = await Runner.run(analyst, cast("Any", _analyst_input(report_text, images)))
 
     reviewer = Agent(
         name="Reviewer",
@@ -96,7 +96,7 @@ async def generate_report(
     reviewed = await Runner.run(
         reviewer,
         cast(
-            Any,
+            "Any",
             [
                 {
                     "role": "user",
