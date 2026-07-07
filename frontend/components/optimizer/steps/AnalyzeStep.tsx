@@ -10,7 +10,13 @@ import {
   CardHeader,
   CardTitle,
 } from '@/components/ui/card';
-import { ChartContainer, ChartTooltip, ChartTooltipContent } from '@/components/ui/chart';
+import {
+  ChartContainer,
+  ChartLegend,
+  ChartLegendContent,
+  ChartTooltip,
+  ChartTooltipContent,
+} from '@/components/ui/chart';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Metric } from '@/components/ui/metric';
@@ -19,6 +25,7 @@ import {
   type ConfusionMatrixData,
   type CurvesData,
   type FeatureImportanceData,
+  type ShapData,
   generateFairness,
   generateSHAP,
   getConfusionMatrixData,
@@ -26,6 +33,7 @@ import {
   getCurvesData,
   getFeatureImportanceData,
   getMetrics,
+  getShapData,
   getStudyPlots,
 } from '@/lib/api';
 import { cn } from '@/lib/utils';
@@ -35,9 +43,12 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Line,
   LineChart,
   ReferenceLine,
+  Scatter,
+  ScatterChart,
   XAxis,
   YAxis,
 } from 'recharts';
@@ -53,14 +64,6 @@ const STUDY_PLOTS: Array<{ id: string; label: string; wide?: boolean }> = [
   { id: 'parallel_coordinate', label: 'Parallel coordinates', wide: true },
   { id: 'slice', label: 'Slice', wide: true },
   { id: 'timeline', label: 'Timeline' },
-];
-
-const SHAP_TABS: Array<{ id: string; label: string }> = [
-  { id: 'bar', label: 'Bar' },
-  { id: 'beeswarm', label: 'Beeswarm' },
-  { id: 'violin', label: 'Violin' },
-  { id: 'heatmap', label: 'Heatmap' },
-  { id: 'waterfall', label: 'Waterfall' },
 ];
 
 function downloadDataUrl(dataUrl: string, filename: string) {
@@ -95,6 +98,7 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
   const [curvesData, setCurvesData] = useState<CurvesData | null>(null);
   const [confusionData, setConfusionData] = useState<ConfusionMatrixData | null>(null);
   const [importanceData, setImportanceData] = useState<FeatureImportanceData | null>(null);
+  const [shapData, setShapData] = useState<ShapData | null>(null);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: useProba/subsetSize are read at fetch time only.
   useEffect(() => {
@@ -106,11 +110,13 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
       getCurvesData({ ...body, use_proba: useProba, subset_size: subsetSize }).catch(() => null),
       getConfusionMatrixData(body).catch(() => null),
       getFeatureImportanceData(body).catch(() => null),
-    ]).then(([curves, cm, fi]) => {
+      getShapData({ ...body, subset_size: subsetSize }).catch(() => null),
+    ]).then(([curves, cm, fi, shap]) => {
       if (cancelled) return;
       setCurvesData(curves);
       setConfusionData(cm);
       setImportanceData(fi);
+      setShapData(shap);
     });
     return () => {
       cancelled = true;
@@ -232,7 +238,6 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
   };
 
   const metrics = analysis.metrics ?? {};
-  const shapTabs = SHAP_TABS.filter((t) => analysis.plots[t.id]);
   const hasCurves =
     !!curvesData?.roc || !!curvesData?.pr || !!analysis.plots.rocCurve || !!analysis.plots.prCurve;
 
@@ -296,16 +301,6 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
               onChange={(e) => setSubsetSize(Number(e.target.value))}
             />
           </div>
-          <div className="space-y-2">
-            <Label htmlFor="analyze-sample-index">Waterfall sample index</Label>
-            <Input
-              id="analyze-sample-index"
-              type="number"
-              min={0}
-              value={sampleIndex}
-              onChange={(e) => setSampleIndex(Number(e.target.value))}
-            />
-          </div>
         </div>
       </details>
 
@@ -328,7 +323,7 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
         <Tabs defaultValue="overview" className="gap-4">
           <TabsList
             variant="line"
-            className="w-full justify-start overflow-x-auto border-b border-border"
+            className="h-auto w-full flex-wrap justify-start border-b border-border"
           >
             {[
               { id: 'overview', label: 'Overview' },
@@ -390,31 +385,63 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
 
           {/* SHAP */}
           <TabsContent value="shap">
-            {shapTabs.length > 0 ? (
-              <Tabs defaultValue={shapTabs[0].id} className="gap-4">
-                <TabsList
-                  variant="line"
-                  className="w-full justify-start overflow-x-auto border-b border-border"
-                >
-                  {shapTabs.map((t) => (
-                    <TabsTrigger key={t.id} value={t.id} className="flex-none px-3 py-2 text-sm">
-                      {t.label}
-                    </TabsTrigger>
-                  ))}
-                </TabsList>
-                {shapTabs.map((t) => (
-                  <TabsContent key={t.id} value={t.id}>
-                    <div className="grid gap-4">
-                      <PlotCard
-                        title={`SHAP ${t.label}`}
-                        image={analysis.plots[t.id]}
-                        filename={`shap-${t.id}.png`}
-                        className="mx-auto w-full max-w-4xl"
-                      />
-                    </div>
-                  </TabsContent>
-                ))}
-              </Tabs>
+            {shapData || Object.keys(analysis.plots).length > 0 ? (
+              <div className="grid gap-4 md:grid-cols-2">
+                {shapData ? (
+                  <BeeswarmCard shap={shapData} />
+                ) : (
+                  analysis.plots.beeswarm && (
+                    <PlotCard
+                      title="SHAP beeswarm"
+                      image={analysis.plots.beeswarm}
+                      filename="shap-beeswarm.png"
+                      className="md:col-span-2"
+                    />
+                  )
+                )}
+                {importanceData && importanceData.features.length > 0 ? (
+                  <FeatureImportanceCard data={importanceData} />
+                ) : shapData ? (
+                  <FeatureImportanceCard data={importanceFromShap(shapData)} />
+                ) : (
+                  analysis.plots.bar && (
+                    <PlotCard title="SHAP bar" image={analysis.plots.bar} filename="shap-bar.png" />
+                  )
+                )}
+                {shapData ? (
+                  <HeatmapCard shap={shapData} />
+                ) : (
+                  analysis.plots.heatmap && (
+                    <PlotCard
+                      title="SHAP heatmap"
+                      image={analysis.plots.heatmap}
+                      filename="shap-heatmap.png"
+                    />
+                  )
+                )}
+                {shapData ? (
+                  <WaterfallCard
+                    shap={shapData}
+                    sampleIndex={sampleIndex}
+                    onSampleIndexChange={setSampleIndex}
+                  />
+                ) : (
+                  analysis.plots.waterfall && (
+                    <PlotCard
+                      title="SHAP waterfall"
+                      image={analysis.plots.waterfall}
+                      filename="shap-waterfall.png"
+                    />
+                  )
+                )}
+                {analysis.plots.violin && (
+                  <PlotCard
+                    title="SHAP violin"
+                    image={analysis.plots.violin}
+                    filename="shap-violin.png"
+                  />
+                )}
+              </div>
             ) : (
               <EmptyState message="No SHAP plots available." />
             )}
@@ -518,16 +545,20 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
                 <DisparitySummary disparities={analysis.fairness.metrics.disparities} />
                 <GroupMetricsTable metrics={analysis.fairness.metrics} />
 
-                <div className="grid gap-4 md:grid-cols-2">
-                  {Object.entries(analysis.fairness.plots).map(([name, image]) => (
-                    <PlotCard
-                      key={name}
-                      title={`${name.replace(/_/g, ' ')} by group`}
-                      image={image}
-                      filename={`fairness-${name}.png`}
-                    />
-                  ))}
-                </div>
+                {Object.keys(analysis.fairness.metrics.by_group).length > 0 ? (
+                  <GroupMetricsChart metrics={analysis.fairness.metrics} />
+                ) : (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {Object.entries(analysis.fairness.plots).map(([name, image]) => (
+                      <PlotCard
+                        key={name}
+                        title={`${name.replace(/_/g, ' ')} by group`}
+                        image={image}
+                        filename={`fairness-${name}.png`}
+                      />
+                    ))}
+                  </div>
+                )}
 
                 {analysis.fairness.mitigation && (
                   <Card>
@@ -548,11 +579,18 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
                           disparities={analysis.fairness.mitigation.after.disparities}
                         />
                       </div>
-                      <PlotCard
-                        title="Disparity before vs after"
-                        image={analysis.fairness.mitigation.comparison_plot}
-                        filename="fairness-mitigation.png"
-                      />
+                      {Object.keys(analysis.fairness.mitigation.before.disparities).length > 0 ? (
+                        <MitigationComparisonChart
+                          before={analysis.fairness.mitigation.before.disparities}
+                          after={analysis.fairness.mitigation.after.disparities}
+                        />
+                      ) : (
+                        <PlotCard
+                          title="Disparity before vs after"
+                          image={analysis.fairness.mitigation.comparison_plot}
+                          filename="fairness-mitigation.png"
+                        />
+                      )}
                     </CardContent>
                   </Card>
                 )}
@@ -839,6 +877,13 @@ function PrCurveCard({ pr }: { pr: NonNullable<CurvesData['pr']> }) {
 
 function ConfusionMatrixCard({ data }: { data: ConfusionMatrixData }) {
   const n = data.labels.length;
+  const colSums = data.labels.map((_, j) => data.matrix.reduce((s, row) => s + (row[j] ?? 0), 0));
+  const rowSums = data.matrix.map((row) => row.reduce((s, c) => s + c, 0));
+  const perClass = data.labels.map((label, i) => ({
+    label,
+    precision: colSums[i] > 0 ? (data.matrix[i]?.[i] ?? 0) / colSums[i] : null,
+    recall: rowSums[i] > 0 ? (data.matrix[i]?.[i] ?? 0) / rowSums[i] : null,
+  }));
   return (
     <Card>
       <CardHeader>
@@ -846,40 +891,77 @@ function ConfusionMatrixCard({ data }: { data: ConfusionMatrixData }) {
         <CardDescription>Rows: actual · columns: predicted</CardDescription>
       </CardHeader>
       <CardContent>
-        <div
-          className="grid gap-1 text-xs"
-          style={{ gridTemplateColumns: `auto repeat(${n}, minmax(0, 1fr))` }}
-        >
-          <div />
-          {data.labels.map((label) => (
+        <div className="flex items-stretch gap-1">
+          <div className="flex w-5 items-center justify-center">
+            <span className="-rotate-90 whitespace-nowrap text-xs font-medium text-muted-foreground">
+              Actual
+            </span>
+          </div>
+          <div
+            className="grid flex-1 gap-1 text-xs"
+            style={{ gridTemplateColumns: `auto repeat(${n}, minmax(0, 1fr))` }}
+          >
+            <div />
             <div
-              key={label}
-              className="truncate px-1 pb-1 text-center font-medium text-muted-foreground"
+              className="pb-0.5 text-center font-medium text-muted-foreground"
+              style={{ gridColumn: `span ${n}` }}
             >
-              {label}
+              Predicted
             </div>
-          ))}
-          {data.matrix.map((row, i) => (
-            <Fragment key={data.labels[i]}>
-              <div className="flex items-center justify-end pr-2 font-medium text-muted-foreground">
-                {data.labels[i]}
+            <div />
+            {data.labels.map((label) => (
+              <div
+                key={label}
+                className="truncate px-1 pb-1 text-center font-medium text-muted-foreground"
+                title={label}
+              >
+                {label}
               </div>
-              {row.map((count, j) => {
-                const norm = data.normalized[i]?.[j] ?? 0;
-                return (
-                  <div
-                    key={data.labels[j]}
-                    className="flex aspect-square max-h-28 items-center justify-center rounded-md border border-border/50 text-sm font-semibold tabular-nums"
-                    style={{
-                      backgroundColor: `color-mix(in oklab, var(--chart-1) ${Math.round(norm * 70)}%, var(--card))`,
-                    }}
-                    title={`Actual ${data.labels[i]} · predicted ${data.labels[j]}: ${count} (${(norm * 100).toFixed(1)}%)`}
-                  >
-                    {count}
-                  </div>
-                );
-              })}
-            </Fragment>
+            ))}
+            {data.matrix.map((row, i) => (
+              <Fragment key={data.labels[i]}>
+                <div className="flex items-center justify-end pr-2 font-medium text-muted-foreground">
+                  {data.labels[i]}
+                </div>
+                {row.map((count, j) => {
+                  const norm = data.normalized[i]?.[j] ?? 0;
+                  return (
+                    <div
+                      key={data.labels[j]}
+                      className={cn(
+                        'flex aspect-square max-h-28 flex-col items-center justify-center rounded-md border border-border/50 tabular-nums',
+                        norm > 0.5 && 'text-white'
+                      )}
+                      style={{
+                        backgroundColor: `color-mix(in oklab, var(--chart-1) ${Math.round(norm * 70)}%, var(--card))`,
+                      }}
+                      title={`Actual ${data.labels[i]} · predicted ${data.labels[j]}: ${count} (${(norm * 100).toFixed(1)}%)`}
+                    >
+                      <span className="text-sm font-semibold">{count}</span>
+                      <span
+                        className={cn(
+                          'text-[10px]',
+                          norm > 0.5 ? 'text-white/80' : 'text-muted-foreground'
+                        )}
+                      >
+                        {(norm * 100).toFixed(1)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </Fragment>
+            ))}
+          </div>
+        </div>
+        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
+          {perClass.map(({ label, precision, recall }) => (
+            <span key={label} className="tabular-nums">
+              <span className="font-medium text-foreground">{label}</span>
+              {' · P '}
+              {precision === null ? '—' : precision.toFixed(3)}
+              {' · R '}
+              {recall === null ? '—' : recall.toFixed(3)}
+            </span>
           ))}
         </div>
       </CardContent>
@@ -921,6 +1003,409 @@ function FeatureImportanceCard({ data }: { data: FeatureImportanceData }) {
               radius={4}
               isAnimationActive={false}
             />
+          </BarChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+/** Mean |SHAP| per feature, shaped like the feature-importance endpoint payload. */
+function importanceFromShap(shap: ShapData): FeatureImportanceData {
+  const importances = shap.feature_names.map(
+    (_, j) =>
+      shap.values.reduce((sum, row) => sum + Math.abs(row[j] ?? 0), 0) /
+      Math.max(1, shap.values.length)
+  );
+  return { features: shap.feature_names, importances };
+}
+
+/** Indices of the top-n features by mean |SHAP|, descending. */
+function topFeatureIndices(shap: ShapData, n: number): number[] {
+  const { importances } = importanceFromShap(shap);
+  return importances
+    .map((importance, index) => ({ importance, index }))
+    .sort((a, b) => b.importance - a.importance)
+    .slice(0, n)
+    .map((r) => r.index);
+}
+
+const shapFmt = (v: number) => (Math.abs(v) >= 100 ? v.toFixed(1) : v.toFixed(3));
+
+interface BeePoint {
+  x: number;
+  y: number;
+  feature: string;
+  featureValue: number;
+  fill: string;
+}
+
+function BeeswarmCard({ shap }: { shap: ShapData }) {
+  const top = topFeatureIndices(shap, 10);
+  const names = top.map((fi) => shap.feature_names[fi]);
+  const points: BeePoint[] = [];
+  top.forEach((fi, row) => {
+    const shapVals = shap.values.map((r) => r[fi] ?? 0);
+    const rawVals = shap.data.map((r) => r[fi] ?? 0);
+    const min = Math.min(...shapVals);
+    const max = Math.max(...shapVals);
+    const binSize = Math.max((max - min) * 0.05, 1e-9);
+    const rawMin = Math.min(...rawVals);
+    const rawMax = Math.max(...rawVals);
+    const rawRange = rawMax - rawMin;
+    // Deterministic beeswarm jitter: bin SHAP values, then stack points within
+    // a bin at alternating ± offsets from the feature's band center.
+    const binCounts = new Map<number, number>();
+    shapVals.forEach((x, s) => {
+      const bin = Math.round(x / binSize);
+      const k = binCounts.get(bin) ?? 0;
+      binCounts.set(bin, k + 1);
+      const offset = Math.min(Math.ceil(k / 2) * 0.09, 0.38) * (k % 2 === 1 ? 1 : -1);
+      const raw = rawVals[s];
+      const norm = rawRange > 0 ? (raw - rawMin) / rawRange : 0.5;
+      points.push({
+        x,
+        y: row + offset,
+        feature: shap.feature_names[fi],
+        featureValue: raw,
+        fill: `color-mix(in oklab, var(--chart-1) ${Math.round(norm * 100)}%, var(--chart-2))`,
+      });
+    });
+  });
+  return (
+    <Card className="md:col-span-2">
+      <CardHeader>
+        <CardTitle>SHAP beeswarm</CardTitle>
+        <CardDescription>
+          Per-sample SHAP values for the top {top.length} features · color: feature value (low →
+          high)
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer
+          config={{}}
+          className="aspect-auto w-full"
+          style={{ height: Math.max(160, top.length * 30 + 40) }}
+        >
+          <ScatterChart margin={{ top: 8, right: 12, left: 8, bottom: 0 }}>
+            <CartesianGrid vertical={false} />
+            <XAxis
+              type="number"
+              dataKey="x"
+              tickLine={false}
+              axisLine={false}
+              tick={axisTick}
+              tickFormatter={(v: number) => v.toFixed(2)}
+            />
+            <YAxis
+              type="number"
+              dataKey="y"
+              domain={[-0.5, top.length - 0.5]}
+              ticks={names.map((_, i) => i)}
+              tickFormatter={(v: number) => names[Math.round(v)] ?? ''}
+              width={130}
+              tickLine={false}
+              axisLine={false}
+              tick={axisTick}
+              reversed
+            />
+            <ReferenceLine x={0} strokeDasharray="4 4" />
+            <ChartTooltip
+              cursor={false}
+              content={({ active, payload }) => {
+                const p = payload?.[0]?.payload as BeePoint | undefined;
+                if (!active || !p) return null;
+                return (
+                  <div className="grid min-w-32 gap-1 rounded-lg border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
+                    <span className="font-medium">{p.feature}</span>
+                    <span className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">SHAP</span>
+                      <span className="font-mono tabular-nums">{shapFmt(p.x)}</span>
+                    </span>
+                    <span className="flex justify-between gap-3">
+                      <span className="text-muted-foreground">Value</span>
+                      <span className="font-mono tabular-nums">{shapFmt(p.featureValue)}</span>
+                    </span>
+                  </div>
+                );
+              }}
+            />
+            <Scatter data={points} isAnimationActive={false}>
+              {points.map((p, i) => (
+                <Cell key={`${p.feature}-${i}`} fill={p.fill} />
+              ))}
+            </Scatter>
+          </ScatterChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+const HEATMAP_MAX_ROWS = 60;
+
+function HeatmapCard({ shap }: { shap: ShapData }) {
+  const top = topFeatureIndices(shap, 10);
+  const rows = shap.values.slice(0, HEATMAP_MAX_ROWS);
+  const maxAbs = Math.max(1e-9, ...rows.flatMap((row) => top.map((fi) => Math.abs(row[fi] ?? 0))));
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>SHAP heatmap</CardTitle>
+        <CardDescription>
+          Samples × top {top.length} features · negative vs positive SHAP
+          {shap.values.length > rows.length ? ` · first ${rows.length} samples` : ''}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div
+          className="grid gap-px"
+          style={{ gridTemplateColumns: `repeat(${top.length}, minmax(0, 1fr))` }}
+        >
+          {top.map((fi) => (
+            <div
+              key={fi}
+              className="truncate pb-1 text-center text-[10px] font-medium text-muted-foreground"
+              title={shap.feature_names[fi]}
+            >
+              {shap.feature_names[fi]}
+            </div>
+          ))}
+          {rows.map((row, s) =>
+            top.map((fi) => {
+              const v = row[fi] ?? 0;
+              const intensity = Math.round((Math.abs(v) / maxAbs) * 85);
+              const hue = v >= 0 ? 'var(--chart-1)' : 'var(--chart-2)';
+              return (
+                <div
+                  key={`${s}-${fi}`}
+                  className="h-2.5 rounded-[2px]"
+                  style={{
+                    backgroundColor: `color-mix(in oklab, ${hue} ${intensity}%, var(--card))`,
+                  }}
+                  title={`Sample ${s} · ${shap.feature_names[fi]}: ${shapFmt(v)}`}
+                />
+              );
+            })
+          )}
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
+
+function WaterfallCard({
+  shap,
+  sampleIndex,
+  onSampleIndexChange,
+}: {
+  shap: ShapData;
+  sampleIndex: number;
+  onSampleIndexChange: (index: number) => void;
+}) {
+  const idx = Math.min(Math.max(0, sampleIndex), Math.max(0, shap.values.length - 1));
+  const row = shap.values[idx] ?? [];
+  const raw = shap.data[idx] ?? [];
+  const contributions = shap.feature_names
+    .map((feature, j) => ({ feature, value: row[j] ?? 0, raw: raw[j] }))
+    .sort((a, b) => Math.abs(b.value) - Math.abs(a.value));
+  const top = contributions.slice(0, 10);
+  const rest = contributions.slice(10);
+  const steps = [
+    ...top.map((c) => ({
+      name: `${c.feature} = ${typeof c.raw === 'number' ? shapFmt(c.raw) : '—'}`,
+      value: c.value,
+    })),
+    ...(rest.length > 0
+      ? [
+          {
+            name: `other (${rest.length} features)`,
+            value: rest.reduce((s, c) => s + c.value, 0),
+          },
+        ]
+      : []),
+  ];
+  let cursor = shap.base_value;
+  const bars = steps.map((s) => {
+    const start = cursor;
+    cursor += s.value;
+    return {
+      name: s.name,
+      range: [start, cursor] as [number, number],
+      delta: s.value,
+      fill: s.value >= 0 ? 'var(--chart-1)' : 'var(--chart-2)',
+    };
+  });
+  const prediction = cursor;
+  bars.push({
+    name: `f(x) = ${shapFmt(prediction)}`,
+    range: [shap.base_value, prediction],
+    delta: prediction - shap.base_value,
+    fill: prediction - shap.base_value >= 0 ? 'var(--chart-1)' : 'var(--chart-2)',
+  });
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>SHAP waterfall</CardTitle>
+        <CardDescription>
+          Sample {idx} · base value E[f(X)] = {shapFmt(shap.base_value)}
+        </CardDescription>
+        <CardAction className="flex items-center gap-2">
+          <Label htmlFor="analyze-sample-index" className="text-xs text-muted-foreground">
+            Sample
+          </Label>
+          <Input
+            id="analyze-sample-index"
+            type="number"
+            min={0}
+            max={Math.max(0, shap.values.length - 1)}
+            value={sampleIndex}
+            onChange={(e) => onSampleIndexChange(Number(e.target.value))}
+            className="h-8 w-20"
+          />
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer
+          config={{ range: { label: 'Contribution', color: 'var(--chart-1)' } }}
+          className="aspect-auto w-full"
+          style={{ height: Math.max(200, bars.length * 30 + 40) }}
+        >
+          <BarChart data={bars} layout="vertical" margin={{ top: 4, right: 12, left: 8 }}>
+            <CartesianGrid horizontal={false} />
+            <XAxis
+              type="number"
+              domain={['auto', 'auto']}
+              tickLine={false}
+              axisLine={false}
+              tick={axisTick}
+              tickFormatter={(v: number) => v.toFixed(2)}
+            />
+            <YAxis
+              type="category"
+              dataKey="name"
+              width={150}
+              tickLine={false}
+              axisLine={false}
+              tick={axisTick}
+            />
+            <ReferenceLine x={shap.base_value} strokeDasharray="4 4" />
+            <ChartTooltip
+              cursor={false}
+              content={
+                <ChartTooltipContent
+                  hideIndicator
+                  formatter={(_, __, item) => {
+                    const p = item.payload as (typeof bars)[number];
+                    return (
+                      <div className="flex w-full justify-between gap-3">
+                        <span className="text-muted-foreground">contribution</span>
+                        <span className="font-mono font-medium tabular-nums">
+                          {p.delta >= 0 ? '+' : ''}
+                          {shapFmt(p.delta)}
+                        </span>
+                      </div>
+                    );
+                  }}
+                />
+              }
+            />
+            <Bar dataKey="range" radius={4} isAnimationActive={false}>
+              {bars.map((b) => (
+                <Cell key={b.name} fill={b.fill} />
+              ))}
+            </Bar>
+          </BarChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+const GROUP_COLORS = [
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+];
+
+function GroupMetricsChart({ metrics }: { metrics: FairnessMetrics }) {
+  const metricNames = Object.keys(metrics.by_group).filter((name) => name !== 'count');
+  const groups = metricNames.length > 0 ? Object.keys(metrics.by_group[metricNames[0]]) : [];
+  if (metricNames.length === 0 || groups.length === 0) return null;
+  const data = metricNames.map((name) => ({
+    metric: name.replace(/_/g, ' '),
+    ...Object.fromEntries(groups.map((g) => [g, metrics.by_group[name][g] ?? 0])),
+  }));
+  const config = Object.fromEntries(
+    groups.map((g, i) => [g, { label: g, color: GROUP_COLORS[i % GROUP_COLORS.length] }])
+  );
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Metric comparison by group</CardTitle>
+        <CardDescription>One bar per group for each fairness metric</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer config={config} className="aspect-auto w-full" style={{ height: 300 }}>
+          <BarChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey="metric" tickLine={false} axisLine={false} tick={axisTick} />
+            <YAxis width={40} tickLine={false} axisLine={false} tick={axisTick} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <ChartLegend content={<ChartLegendContent />} />
+            {groups.map((g) => (
+              <Bar
+                key={g}
+                dataKey={g}
+                fill={`var(--color-${g})`}
+                radius={4}
+                isAnimationActive={false}
+              />
+            ))}
+          </BarChart>
+        </ChartContainer>
+      </CardContent>
+    </Card>
+  );
+}
+
+function MitigationComparisonChart({
+  before,
+  after,
+}: {
+  before: Record<string, number>;
+  after: Record<string, number>;
+}) {
+  const data = Object.keys(before).map((key) => ({
+    metric: DISPARITY_LABELS[key] ?? key.replace(/_/g, ' '),
+    before: before[key] ?? 0,
+    after: after[key] ?? 0,
+  }));
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Disparity before vs after</CardTitle>
+        <CardDescription>ThresholdOptimizer effect on disparity metrics</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <ChartContainer
+          config={{
+            before: { label: 'Before', color: 'var(--chart-2)' },
+            after: { label: 'After', color: 'var(--chart-1)' },
+          }}
+          className="aspect-auto w-full"
+          style={{ height: 280 }}
+        >
+          <BarChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+            <CartesianGrid vertical={false} />
+            <XAxis dataKey="metric" tickLine={false} axisLine={false} tick={axisTick} />
+            <YAxis width={40} tickLine={false} axisLine={false} tick={axisTick} />
+            <ChartTooltip content={<ChartTooltipContent />} />
+            <ChartLegend content={<ChartLegendContent />} />
+            <Bar dataKey="before" fill="var(--color-before)" radius={4} isAnimationActive={false} />
+            <Bar dataKey="after" fill="var(--color-after)" radius={4} isAnimationActive={false} />
           </BarChart>
         </ChartContainer>
       </CardContent>

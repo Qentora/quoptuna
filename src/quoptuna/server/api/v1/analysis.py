@@ -254,6 +254,94 @@ def _feature_importance_from_xai(xai) -> list[dict[str, Any]]:
     return importance
 
 
+MAX_SHAP_SAMPLES = 200
+
+
+def _shap_data_payload(shap_values, class_idx: int, max_samples: int = MAX_SHAP_SAMPLES) -> dict[str, Any]:
+    """JSON-safe raw SHAP data from a shap.Explanation-like object.
+
+    Slices a trailing per-class axis (values ``(samples, features, classes)``
+    -> ``[:, :, class_idx]``, matching the plotting slice), evenly subsamples
+    rows to ``max_samples`` (values and data kept row-aligned), and converts
+    everything to plain Python floats with NaN/inf mapped to ``None``.
+    """
+    values = np.asarray(shap_values.values, dtype=float)
+    if values.ndim > 2:
+        idx = class_idx if class_idx >= 0 else 0
+        values = values[:, :, idx]
+
+    data = getattr(shap_values, "data", None)
+    data = np.asarray(data, dtype=float) if data is not None else None
+
+    n = values.shape[0]
+    row_idx = _downsample_indices(n, max_samples)
+    values = values[row_idx]
+    if data is not None:
+        data = data[row_idx]
+
+    base_values = getattr(shap_values, "base_values", None)
+    base_value = None
+    if base_values is not None:
+        bv = np.asarray(base_values, dtype=float)
+        if bv.ndim == 0:
+            base_value = float(bv)
+        else:
+            bv = bv[row_idx[0]] if bv.shape[0] == n else bv
+            bv = np.asarray(bv, dtype=float)
+            if bv.ndim >= 1:  # per-class base values -> same class slice
+                bv = bv.flat[class_idx if class_idx >= 0 else 0]
+            base_value = float(bv)
+        if base_value is not None and not np.isfinite(base_value):
+            base_value = None
+
+    def _safe_rows(arr) -> list[list[Optional[float]]]:
+        return [
+            [float(v) if np.isfinite(v) else None for v in row]
+            for row in np.asarray(arr, dtype=float)
+        ]
+
+    feature_names = list(getattr(shap_values, "feature_names", None) or []) or [
+        f"feature_{i}" for i in range(values.shape[1])
+    ]
+
+    return {
+        "feature_names": [str(f) for f in feature_names],
+        "values": _safe_rows(values),
+        "data": _safe_rows(data) if data is not None else [],
+        "base_value": base_value,
+        "n_samples": int(values.shape[0]),
+    }
+
+
+@router.post("/shap/data")
+async def generate_shap_data(request: SHAPRequest):
+    """Raw SHAP values/data as JSON (for frontend charting).
+
+    Same computation path as ``/shap`` (identical model loading, test split
+    and class slicing); rows are evenly subsampled to at most 200.
+    """
+    opt_result = _get_completed_result(request.optimization_id)
+
+    try:
+        xai = build_xai(
+            opt_result,
+            trial_number=request.trial_number,
+            use_proba=request.use_proba,
+            subset_size=request.subset_size,
+        )
+        class_index = _plot_class_index(xai)
+        payload = _shap_data_payload(xai.shap_values, class_index)
+        return {
+            "optimization_id": request.optimization_id,
+            **payload,
+            "status": "completed",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compute SHAP data: {e!s}")
+
+
 @router.post("/shap")
 async def generate_shap_analysis(request: SHAPRequest):
     """Generate SHAP plots and real feature importance for a chosen trial."""

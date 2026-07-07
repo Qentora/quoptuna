@@ -386,6 +386,33 @@ export async function getFeatureImportanceData(
   });
 }
 
+export interface ShapDataRequest {
+  optimization_id: string;
+  trial_number?: number;
+  subset_size?: number;
+  sample_index?: number;
+}
+
+export interface ShapData {
+  optimization_id: string;
+  feature_names: string[];
+  /** samples × features SHAP values */
+  values: number[][];
+  /** raw feature values, row-aligned with `values` */
+  data: number[][];
+  base_value: number;
+  n_samples: number;
+  status: string;
+}
+
+export async function getShapData(body: ShapDataRequest): Promise<ShapData> {
+  return request<ShapData>('/api/v1/analysis/shap/data', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
 export interface PlotlyFigureJSON {
   data: Array<Record<string, any>>;
   layout: Record<string, any>;

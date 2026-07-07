@@ -1,13 +1,14 @@
 import { cn } from '@/lib/utils';
 import type * as React from 'react';
 
-type MetricTone = 'default' | 'emerald' | 'brand' | 'amber';
+type MetricTone = 'default' | 'emerald' | 'brand' | 'amber' | 'orange';
 
 const toneClasses: Record<MetricTone, string> = {
   default: 'text-foreground',
   emerald: 'text-accent-emerald-foreground',
   brand: 'text-brand',
   amber: 'text-accent-amber-foreground',
+  orange: 'text-accent-orange-foreground',
 };
 
 export interface MetricProps extends React.HTMLAttributes<HTMLSpanElement> {

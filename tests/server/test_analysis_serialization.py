@@ -12,12 +12,24 @@ import pytest
 
 from quoptuna.server.api.v1.analysis import (
     MAX_CURVE_POINTS,
+    MAX_SHAP_SAMPLES,
     _confusion_matrix_payload,
     _downsample_indices,
     _positive_proba,
     _pr_payload,
     _roc_payload,
+    _shap_data_payload,
 )
+
+
+class FakeExplanation:
+    """Duck-typed stand-in for shap.Explanation."""
+
+    def __init__(self, values, data=None, feature_names=None, base_values=None):
+        self.values = np.asarray(values)
+        self.data = None if data is None else np.asarray(data)
+        self.feature_names = feature_names
+        self.base_values = base_values
 
 
 @pytest.fixture
@@ -98,6 +110,67 @@ class TestConfusionMatrixPayload:
         payload = _confusion_matrix_payload([[0, 0], [3, 7]], ["neg", "pos"])
         assert payload["normalized"][0] == [0.0, 0.0]
         assert payload["normalized"][1] == pytest.approx([0.3, 0.7])
+
+
+class TestShapDataPayload:
+    def test_2d_values_passthrough(self):
+        values = np.arange(12, dtype=float).reshape(4, 3)
+        data = values * 10
+        exp = FakeExplanation(values, data, ["a", "b", "c"], base_values=0.25)
+        payload = _shap_data_payload(exp, class_idx=-1)
+        assert set(payload) == {"feature_names", "values", "data", "base_value", "n_samples"}
+        assert payload["feature_names"] == ["a", "b", "c"]
+        assert payload["values"] == values.tolist()
+        assert payload["data"] == data.tolist()
+        assert payload["base_value"] == 0.25
+        assert payload["n_samples"] == 4
+        json.dumps(payload)
+
+    def test_3d_values_class_sliced(self):
+        rng = np.random.default_rng(0)
+        values = rng.normal(size=(5, 3, 2))
+        data = rng.normal(size=(5, 3))
+        base_values = np.tile([0.1, 0.9], (5, 1))
+        exp = FakeExplanation(values, data, ["x", "y", "z"], base_values=base_values)
+        payload = _shap_data_payload(exp, class_idx=1)
+        np.testing.assert_allclose(payload["values"], values[:, :, 1])
+        np.testing.assert_allclose(payload["data"], data)
+        assert payload["base_value"] == pytest.approx(0.9)
+        assert payload["n_samples"] == 5
+        json.dumps(payload)
+
+    def test_sampling_cap_and_alignment(self):
+        n = 500
+        values = np.arange(n, dtype=float)[:, None].repeat(2, axis=1)
+        data = values + 0.5
+        exp = FakeExplanation(values, data, ["f0", "f1"])
+        payload = _shap_data_payload(exp, class_idx=-1)
+        assert payload["n_samples"] == MAX_SHAP_SAMPLES == 200
+        assert len(payload["values"]) == len(payload["data"]) == 200
+        # First and last rows preserved.
+        assert payload["values"][0][0] == 0.0
+        assert payload["values"][-1][0] == n - 1
+        # values/data rows stay aligned (same original row index).
+        for v_row, d_row in zip(payload["values"], payload["data"]):
+            assert d_row[0] == pytest.approx(v_row[0] + 0.5)
+
+    def test_nan_and_inf_become_none(self):
+        values = np.array([[np.nan, 1.0], [np.inf, -np.inf]])
+        data = np.array([[0.0, np.nan], [2.0, 3.0]])
+        exp = FakeExplanation(values, data, base_values=np.nan)
+        payload = _shap_data_payload(exp, class_idx=-1)
+        assert payload["values"] == [[None, 1.0], [None, None]]
+        assert payload["data"] == [[0.0, None], [2.0, 3.0]]
+        assert payload["base_value"] is None
+        # No feature names supplied -> generated placeholders.
+        assert payload["feature_names"] == ["feature_0", "feature_1"]
+        json.dumps(payload)
+
+    def test_missing_data_yields_empty_list(self):
+        exp = FakeExplanation(np.ones((3, 2)), data=None, base_values=1.5)
+        payload = _shap_data_payload(exp, class_idx=-1)
+        assert payload["data"] == []
+        assert payload["base_value"] == 1.5
 
 
 class TestPositiveProba:
