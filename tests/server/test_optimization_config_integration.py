@@ -92,9 +92,13 @@ def test_optimization_configuration_full_pipeline(
     trial_numbers = [t["trial"] for t in job["trials"]]
     assert len(trial_numbers) == len(set(trial_numbers))
     tried_models = {t["params"].get("model_type") for t in job["trials"]}
-    study_models = {t.params.get("model_type") for t in load_study(
-        storage=f"sqlite:///db/{DATABASE_NAME}.db", study_name=STUDY_NAME
-    ).trials if t.state == TrialState.COMPLETE}
+    study_models = {
+        t.params.get("model_type")
+        for t in load_study(
+            storage=f"sqlite:///db/{DATABASE_NAME}.db", study_name=STUDY_NAME
+        ).trials
+        if t.state == TrialState.COMPLETE
+    }
     assert study_models <= tried_models
 
     # The Optuna study must have been persisted to db/<database_name>.db.

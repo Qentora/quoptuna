@@ -257,7 +257,9 @@ def _feature_importance_from_xai(xai) -> list[dict[str, Any]]:
 MAX_SHAP_SAMPLES = 200
 
 
-def _shap_data_payload(shap_values, class_idx: int, max_samples: int = MAX_SHAP_SAMPLES) -> dict[str, Any]:
+def _shap_data_payload(
+    shap_values, class_idx: int, max_samples: int = MAX_SHAP_SAMPLES
+) -> dict[str, Any]:
     """JSON-safe raw SHAP data from a shap.Explanation-like object.
 
     Slices a trailing per-class axis (values ``(samples, features, classes)``
@@ -640,9 +642,7 @@ async def generate_feature_importance_data(request: MetricsRequest):
     except HTTPException:
         raise
     except Exception as e:
-        raise HTTPException(
-            status_code=500, detail=f"Failed to compute feature importance: {e!s}"
-        )
+        raise HTTPException(status_code=500, detail=f"Failed to compute feature importance: {e!s}")
 
 
 @router.post("/study-plots")

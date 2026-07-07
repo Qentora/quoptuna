@@ -156,9 +156,7 @@ def serialize_study_trials(db_name: str, study_name: str) -> list:
     try:
         from optuna import load_study
 
-        study = load_study(
-            storage=optuna_storage_url(db_name), study_name=study_name, sampler=None
-        )
+        study = load_study(storage=optuna_storage_url(db_name), study_name=study_name, sampler=None)
         return [
             {
                 "trial": trial.number,
