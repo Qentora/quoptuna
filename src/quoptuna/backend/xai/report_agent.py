@@ -15,6 +15,7 @@ API keys (no environment mutation).
 from __future__ import annotations
 
 from pathlib import Path
+from typing import Any, cast
 
 from agents import Agent, Runner, set_tracing_disabled
 from agents.extensions.models.litellm_model import LitellmModel
@@ -85,7 +86,7 @@ async def generate_report(
         instructions=load_system_prompt(),
         model=model,
     )
-    draft = await Runner.run(analyst, _analyst_input(report_text, images))
+    draft = await Runner.run(analyst, cast(Any, _analyst_input(report_text, images)))
 
     reviewer = Agent(
         name="Reviewer",
@@ -94,19 +95,22 @@ async def generate_report(
     )
     reviewed = await Runner.run(
         reviewer,
-        [
-            {
-                "role": "user",
-                "content": [
-                    {"type": "input_text", "text": f"Draft report:\n\n{draft.final_output}"},
-                    {
-                        "type": "input_text",
-                        "text": (
-                            f"Raw metrics the report must be grounded in:\n```\n{report_text}\n```"
-                        ),
-                    },
-                ],
-            }
-        ],
+        cast(
+            Any,
+            [
+                {
+                    "role": "user",
+                    "content": [
+                        {"type": "input_text", "text": f"Draft report:\n\n{draft.final_output}"},
+                        {
+                            "type": "input_text",
+                            "text": (
+                                f"Raw metrics the report must be grounded in:\n```\n{report_text}\n```"
+                            ),
+                        },
+                    ],
+                }
+            ],
+        ),
     )
     return str(reviewed.final_output)

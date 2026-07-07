@@ -5,7 +5,7 @@ Analysis endpoints (SHAP, metrics, AI reports).
 import base64
 import io
 import logging
-from typing import Any, List, Optional
+from typing import Any, List, Optional, cast
 
 import matplotlib as mpl
 
@@ -426,7 +426,7 @@ async def generate_study_plots(request: StudyPlotsRequest):
     plots: dict[str, Any] = {}
     for name, func in plot_funcs.items():
         try:
-            fig = func(study)
+            fig = cast(Any, func)(study)
             plots[name] = json.loads(fig.to_json())
         except Exception as exc:
             logger.warning("%s plot failed: %s", name, exc)
