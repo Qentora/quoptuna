@@ -36,6 +36,8 @@ export interface WorkflowData {
     // Protected attribute used for fairness auditing (may be a column that is
     // not among the selected model features).
     sensitiveFeature: string | null;
+    // How categorical feature columns are encoded server-side.
+    categoricalEncoding: 'ordinal' | 'onehot';
   };
   configuration: {
     studyName: string;
@@ -46,7 +48,14 @@ export interface WorkflowData {
     status: 'idle' | 'pending' | 'running' | 'completed' | 'failed' | 'cancelled' | 'interrupted';
     bestValue: number | null;
     bestParams: Record<string, any> | null;
-    trials: Array<{ trial: number; value: number; params: Record<string, any>; state?: string }>;
+    trials: Array<{
+      trial: number;
+      // null for FAILED trials (user_attrs.error records why).
+      value: number | null;
+      params: Record<string, any>;
+      state?: string;
+      user_attrs?: Record<string, any>;
+    }>;
     selectedTrial: number | null;
   };
   analysis: {
@@ -73,6 +82,7 @@ export const initialWorkflowData: WorkflowData = {
     targetColumn: null,
     labelMapping: { neg: null, pos: null },
     sensitiveFeature: null,
+    categoricalEncoding: 'ordinal',
   },
   configuration: {
     studyName: 'my-optimization-study',

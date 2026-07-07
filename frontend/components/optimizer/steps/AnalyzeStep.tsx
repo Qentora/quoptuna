@@ -53,6 +53,7 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
 
   const { optimization, analysis, features } = workflowData;
   const [isMitigating, setIsMitigating] = useState(false);
+  const [fairnessError, setFairnessError] = useState<string | null>(null);
   const hasSHAP = analysis.featureImportance !== null;
   const autoRan = useRef(false);
 
@@ -69,6 +70,7 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
     const trial = optimization.selectedTrial ?? undefined;
     setIsGenerating(true);
     setError(null);
+    setFairnessError(null);
     try {
       const [shap, metrics, curves, study, fairness] = await Promise.all([
         generateSHAP({
@@ -87,7 +89,10 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
           optimization_id: id,
           trial_number: trial,
           sensitive_feature: features.sensitiveFeature ?? undefined,
-        }).catch(() => null),
+        }).catch((err) => {
+          setFairnessError(err instanceof Error ? err.message : 'Fairness audit failed');
+          return null;
+        }),
       ]);
 
       setWorkflowData((prev) => ({
@@ -122,6 +127,27 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
       void runAnalysis();
     }
   }, []);
+
+  const runFairness = async () => {
+    if (!optimization.executionId) return;
+    setIsMitigating(true);
+    setFairnessError(null);
+    try {
+      const result = await generateFairness({
+        optimization_id: optimization.executionId,
+        trial_number: optimization.selectedTrial ?? undefined,
+        sensitive_feature: features.sensitiveFeature ?? undefined,
+      });
+      setWorkflowData((prev) => ({
+        ...prev,
+        analysis: { ...prev.analysis, fairness: result },
+      }));
+    } catch (err) {
+      setFairnessError(err instanceof Error ? err.message : 'Fairness audit failed');
+    } finally {
+      setIsMitigating(false);
+    }
+  };
 
   const runMitigation = async () => {
     if (!optimization.executionId || !analysis.fairness) return;
@@ -449,7 +475,29 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
                   )}
                 </>
               ) : (
-                <EmptyState message="No fairness audit available. Select a protected attribute in the Features step, then re-run the analysis." />
+                <div className="space-y-3">
+                  <EmptyState
+                    message={
+                      fairnessError
+                        ? `Fairness audit failed: ${fairnessError}`
+                        : features.sensitiveFeature
+                          ? `Protected attribute "${features.sensitiveFeature}" selected — run the audit below.`
+                          : 'No fairness audit available. Select a protected attribute in the Features step, then run the audit.'
+                    }
+                  />
+                  {features.sensitiveFeature && (
+                    <div className="text-center">
+                      <Button type="button" size="sm" onClick={runFairness} disabled={isMitigating}>
+                        {isMitigating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Scale className="h-4 w-4" />
+                        )}
+                        Run fairness audit
+                      </Button>
+                    </div>
+                  )}
+                </div>
               )}
             </Tabs.Content>
 

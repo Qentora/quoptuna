@@ -194,8 +194,10 @@ async def preview_dataset(dataset_id: str):
     head = json.loads(df.head(10).to_json(orient="records"))
 
     target_values_by_column: dict[str, list] = {}
+    unique_counts: dict[str, int] = {}
     for col in df.columns:
         unique = df[col].dropna().unique()
+        unique_counts[col] = len(unique)
         if len(unique) <= MAX_UNIQUE_FOR_TARGET:
             target_values_by_column[col] = json.loads(pd.Series(unique).to_json(orient="values"))
 
@@ -206,6 +208,7 @@ async def preview_dataset(dataset_id: str):
         "head": head,
         "num_rows": len(df),
         "missing": missing,
+        "unique_counts": unique_counts,
         "target_values_by_column": target_values_by_column,
     }
 

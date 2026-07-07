@@ -64,9 +64,10 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
       }
 
       const trials = finalStatus.trials ?? [];
+      const succeeded = trials.filter((t) => t.value !== null);
       const bestTrialNumber =
-        trials.length > 0
-          ? trials.reduce((best, t) => (t.value > best.value ? t : best)).trial
+        succeeded.length > 0
+          ? succeeded.reduce((best, t) => ((t.value ?? 0) > (best.value ?? 0) ? t : best)).trial
           : null;
 
       setWorkflowData((prev) => ({
@@ -113,6 +114,7 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         num_trials: configuration.numTrials,
         label_mapping: labelMapping,
         sensitive_feature: features.sensitiveFeature ?? undefined,
+        categorical_encoding: features.categoricalEncoding,
       });
 
       // Persist the execution id immediately so a refresh mid-run can resume.
@@ -148,9 +150,10 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
       fetchOptimizationTrials(id)
         .then((trialsData) => {
           const trials = trialsData.trials ?? [];
+          const succeeded = trials.filter((t) => t.value !== null);
           const bestTrialNumber =
-            trials.length > 0
-              ? trials.reduce((best, t) => (t.value > best.value ? t : best)).trial
+            succeeded.length > 0
+              ? succeeded.reduce((best, t) => ((t.value ?? 0) > (best.value ?? 0) ? t : best)).trial
               : null;
           setWorkflowData((prev) => ({
             ...prev,
@@ -168,9 +171,14 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
   }, []);
 
   const allTrials = hasResults ? optimization.trials : liveTrials;
-  const sorted = [...allTrials].sort((a, b) => b.value - a.value);
-  const bestQuantum = sorted.find((t) => !isClassicalModel(t.params?.model_type));
-  const bestClassical = sorted.find((t) => isClassicalModel(t.params?.model_type));
+  // Failed trials (value null) sort to the bottom and never win "best".
+  const sorted = [...allTrials].sort((a, b) => (b.value ?? -1) - (a.value ?? -1));
+  const bestQuantum = sorted.find(
+    (t) => t.value !== null && !isClassicalModel(t.params?.model_type)
+  );
+  const bestClassical = sorted.find(
+    (t) => t.value !== null && isClassicalModel(t.params?.model_type)
+  );
 
   const selectTrial = (trialNumber: number) =>
     setWorkflowData((prev) => ({
@@ -289,15 +297,17 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
               </TableHead>
               <TableBody>
                 {sorted.map((trial, index) => {
+                  const failed = trial.value === null || trial.state === 'FAIL';
+                  const selectable = hasResults && !failed;
                   const selected = optimization.selectedTrial === trial.trial;
                   const classical = isClassicalModel(trial.params?.model_type);
-                  const isBest = index === 0;
+                  const isBest = index === 0 && !failed;
                   return (
                     <tr
                       key={trial.trial}
-                      onClick={hasResults ? () => selectTrial(trial.trial) : undefined}
+                      onClick={selectable ? () => selectTrial(trial.trial) : undefined}
                       onKeyDown={
-                        hasResults
+                        selectable
                           ? (e) => {
                               if (e.key === 'Enter' || e.key === ' ') {
                                 e.preventDefault();
@@ -306,11 +316,12 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
                             }
                           : undefined
                       }
-                      tabIndex={hasResults ? 0 : undefined}
+                      tabIndex={selectable ? 0 : undefined}
                       aria-selected={selected}
                       className={cn(
                         'transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand',
-                        hasResults && 'cursor-pointer',
+                        selectable && 'cursor-pointer',
+                        failed && 'opacity-60',
                         selected ? 'bg-brand/10 ring-1 ring-inset ring-brand/40' : 'hover:bg-muted'
                       )}
                     >
@@ -330,10 +341,24 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
                           selected && 'text-brand'
                         )}
                       >
-                        {trial.value.toFixed(4)}
+                        {failed ? (
+                          <span
+                            className="font-medium text-destructive"
+                            title={String(trial.user_attrs?.error ?? 'Trial failed')}
+                          >
+                            failed
+                          </span>
+                        ) : (
+                          trial.value?.toFixed(4)
+                        )}
                       </Td>
                       <Td className="text-xs text-muted-foreground">
                         {trial.params?.model_type ?? 'N/A'}
+                        {failed && trial.user_attrs?.error != null && (
+                          <span className="block max-w-[280px] truncate text-[11px] text-destructive/80">
+                            {String(trial.user_attrs.error)}
+                          </span>
+                        )}
                       </Td>
                       <Td className="text-xs">
                         <Badge variant={classical ? 'classical' : 'quantum'}>

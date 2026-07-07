@@ -81,6 +81,7 @@ export interface DatasetPreview {
   head: Array<Record<string, any>>;
   num_rows: number;
   missing: Record<string, number>;
+  unique_counts: Record<string, number>;
   target_values_by_column: Record<string, Array<string | number>>;
 }
 
@@ -108,6 +109,7 @@ export interface OptimizationRequest {
   model_name?: string;
   label_mapping?: LabelMapping;
   sensitive_feature?: string;
+  categorical_encoding?: 'ordinal' | 'onehot';
 }
 
 export type RunStatus =
@@ -127,8 +129,10 @@ export interface OptimizationStatus {
   best_params: Record<string, any> | null;
   trials: Array<{
     trial: number;
-    value: number;
+    value: number | null;
     params: Record<string, any>;
+    state?: string;
+    user_attrs?: Record<string, any>;
   }> | null;
   started_at: string;
   completed_at: string | null;
@@ -137,7 +141,8 @@ export interface OptimizationStatus {
 
 export interface OptimizationTrial {
   trial: number;
-  value: number;
+  // null for FAILED trials; user_attrs.error records the failure reason.
+  value: number | null;
   params: Record<string, any>;
   state: string;
   user_attrs?: Record<string, any>;

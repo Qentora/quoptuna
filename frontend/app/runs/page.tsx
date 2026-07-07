@@ -90,6 +90,7 @@ export default function RunsPage() {
             pos: req.label_mapping?.pos ?? null,
           },
           sensitiveFeature: req.sensitive_feature ?? null,
+          categoricalEncoding: req.categorical_encoding ?? 'ordinal',
         },
         configuration: {
           studyName: req.study_name ?? run.study_name ?? 'my-optimization-study',

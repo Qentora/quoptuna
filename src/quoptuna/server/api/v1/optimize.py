@@ -4,7 +4,7 @@ Optimization endpoints
 
 import uuid
 from datetime import datetime
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, ConfigDict
@@ -45,6 +45,9 @@ class OptimizationRequest(BaseModel):
     # Protected attribute column (may be outside selected_features) used for
     # fairness auditing; rows are aligned to the split via positional indices.
     sensitive_feature: Optional[str] = None
+    # How categorical feature columns are encoded: "ordinal" (1 column per
+    # feature — fast, quantum-friendly) or "onehot" (1 column per category).
+    categorical_encoding: Literal["ordinal", "onehot"] = "ordinal"
     # Optional overrides to shrink Optuna's search (defaults use the full space).
     model_types: Optional[List[str]] = None
     search_space: Optional[Dict[str, List[Any]]] = None
@@ -110,10 +113,11 @@ def build_workflow(
                 "config": {
                     "x_columns": request.selected_features,
                     "y_column": request.target_column,
+                    "categorical_encoding": request.categorical_encoding,
                 },
             },
         },
-        {"id": "split", "data": {"type": "train-test-split", "config": {}}},
+        {"id": "split", "data": {"type": "train-test-split", "config": label_config}},
         {"id": "label_encode", "data": {"type": "label-encoding", "config": label_config}},
         {
             "id": "model",
@@ -373,9 +377,12 @@ async def get_optimization_trials(optimization_id: str):
             # inflate the progress count and show up as a bogus 0.0 score.
             if not trial.state.is_finished():
                 continue
+            # FAILED trials keep value=None (coercing to 0.0 made broken
+            # configurations look like real F1=0 runs); the recorded "error"
+            # user attr says why.
             trial_data = {
                 "trial": trial.number,
-                "value": trial.value if trial.value is not None else 0.0,
+                "value": trial.value,
                 "params": trial.params,
                 "state": trial.state.name,
                 "user_attrs": trial.user_attrs,

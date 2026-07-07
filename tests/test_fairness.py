@@ -7,6 +7,7 @@ from sklearn.linear_model import LogisticRegression
 
 from quoptuna import DataPreparation
 from quoptuna.backend.xai import fairness as fm
+from quoptuna.server.services.workflow_service import WorkflowExecutor
 
 
 @pytest.fixture(scope="module")
@@ -51,6 +52,36 @@ def test_threshold_optimizer_mitigation(synthetic):
         <= result["before"]["disparities"]["equalized_odds_difference"] + 0.05
     )
     assert result["comparison_plot"].startswith("data:image/png;base64,")
+
+
+def test_explicit_label_mapping_survives_split_and_encoding():
+    """Regression: an explicit label mapping must be applied on ORIGINAL values.
+
+    Previously the split node encoded string labels to {-1, 1} and the
+    label-encoding node then compared those ints against the original strings,
+    mapping every row to -1 (degenerate labels, F1 = 0).
+    """
+    rng = np.random.default_rng(2)
+    n = 80
+    df = pd.DataFrame({"f1": rng.normal(size=n), "f2": rng.normal(size=n)})
+    df["target"] = np.where(df["f1"] > 0, "yes", "no")
+
+    executor = WorkflowExecutor({"nodes": [], "edges": []})
+    selected = {"type": "selected_data", "x": df[["f1", "f2"]], "y": df["target"],
+                "x_columns": ["f1", "f2"], "y_column": "target"}
+    split = executor._execute_train_test_split(
+        {"label_mapping": {"neg": "no", "pos": "yes"}}, {"in": selected}
+    )
+    encoded = executor._execute_label_encoding(
+        {"label_mapping": {"neg": "no", "pos": "yes"}}, {"in": split}
+    )
+
+    y_all = np.concatenate(
+        [np.ravel(encoded["y_train"].values), np.ravel(encoded["y_test"].values)]
+    )
+    assert set(np.unique(y_all).tolist()) == {-1, 1}
+    # "yes" must map to +1: positives match the f1 > 0 rows (order-insensitive check).
+    assert (y_all == 1).sum() == int((df["target"] == "yes").sum())
 
 
 def test_split_index_alignment_with_raw_dataframe():

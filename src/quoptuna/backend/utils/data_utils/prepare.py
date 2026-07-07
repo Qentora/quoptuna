@@ -10,19 +10,117 @@ from sklearn.preprocessing import StandardScaler
 if TYPE_CHECKING:
     from quoptuna.backend.typing.data_typing import DataSet
 
+MAX_ONEHOT_CATEGORIES = 10
+MAX_ORDINAL_CATEGORIES = 100
+
+
+def encode_features(x: pd.DataFrame, method: str = "ordinal") -> tuple[pd.DataFrame, dict]:
+    """Make a feature frame numeric: impute NaN and encode categorical columns.
+
+    - Numeric columns keep their name; NaN imputed with the column median.
+    - Bool columns are cast to float.
+    - Object/categorical columns get NaN imputed as "missing" and encoded per
+      ``method``:
+      - ``"ordinal"`` (default): sorted-category integer codes scaled to
+        [0, 1] — one column per feature, so quantum circuit width does not
+        grow. Cap ``MAX_ORDINAL_CATEGORIES``.
+      - ``"onehot"``: ``<col>_<category>`` 0/1 columns. Cap
+        ``MAX_ONEHOT_CATEGORIES`` — unbounded growth blows up qubit width.
+
+    Encoded columns are already well-scaled and must NOT be re-scaled by
+    StandardScaler downstream (see ``DataPreparation(passthrough_columns=...)``).
+
+    Row order and count are preserved (positional-index alignment with the raw
+    dataframe is relied upon downstream, e.g. by the fairness audit).
+
+    Returns the encoded frame and per-column metadata
+    ``{column: {"kind", "categories"?, "imputed"}}``. The metadata's non-numeric
+    entries identify the passthrough (encoded) output columns.
+    """
+    if method not in ("ordinal", "onehot"):
+        msg = f"Unknown categorical encoding method: {method!r}"
+        raise ValueError(msg)
+
+    parts: list[pd.DataFrame] = []
+    encoding: dict[str, dict] = {}
+    for col in x.columns:
+        series = x[col]
+        n_missing = int(series.isna().sum())
+        if pd.api.types.is_bool_dtype(series):
+            parts.append(series.astype(float).to_frame())
+            encoding[str(col)] = {"kind": "numeric", "imputed": 0}
+        elif pd.api.types.is_numeric_dtype(series):
+            if n_missing:
+                series = series.fillna(series.median())
+            parts.append(series.astype(float).to_frame())
+            encoding[str(col)] = {"kind": "numeric", "imputed": n_missing}
+        else:
+            series = series.astype(str).where(~series.isna(), "missing")
+            categories = sorted(series.unique().tolist())
+            if method == "onehot":
+                if len(categories) > MAX_ONEHOT_CATEGORIES:
+                    msg = (
+                        f"Column '{col}' has {len(categories)} unique categories "
+                        f"(max {MAX_ONEHOT_CATEGORIES} for one-hot encoding). "
+                        "Use ordinal encoding or drop the column."
+                    )
+                    raise ValueError(msg)
+                dummies = pd.get_dummies(series, prefix=str(col), dtype=float)
+                parts.append(dummies)
+                encoding[str(col)] = {
+                    "kind": "onehot",
+                    "categories": categories,
+                    "imputed": n_missing,
+                    "columns": [str(c) for c in dummies.columns],
+                }
+            else:
+                if len(categories) > MAX_ORDINAL_CATEGORIES:
+                    msg = (
+                        f"Column '{col}' has {len(categories)} unique categories "
+                        f"(max {MAX_ORDINAL_CATEGORIES} for ordinal encoding). "
+                        "It looks like an identifier — drop it before optimizing."
+                    )
+                    raise ValueError(msg)
+                code_of = {cat: i for i, cat in enumerate(categories)}
+                denom = float(max(len(categories) - 1, 1))
+                codes = series.map(code_of).astype(float) / denom
+                parts.append(codes.to_frame(name=str(col)))
+                encoding[str(col)] = {
+                    "kind": "ordinal",
+                    "categories": categories,
+                    "imputed": n_missing,
+                    "columns": [str(col)],
+                }
+    encoded = pd.concat(parts, axis=1) if parts else x.copy()
+    encoded.index = x.index
+    return encoded, encoding
+
+
+def encoded_passthrough_columns(encoding: dict) -> list[str]:
+    """Output columns produced by categorical encoding (already in [0, 1])."""
+    passthrough: list[str] = []
+    for meta in encoding.values():
+        if meta["kind"] in ("ordinal", "onehot"):
+            passthrough.extend(meta["columns"])
+    return passthrough
+
 
 class DataPreparation:
-    def __init__(
+    def __init__(  # noqa: PLR0913
         self,
         dataset: DataSet | None = None,
         file_path: str | None = None,
         x_cols: list[str] | None = None,
         y_col: str | None = None,
         scaler=None,
+        passthrough_columns: list[str] | None = None,
     ):
         self.x_cols = x_cols
         self.y_col = y_col
         self.scaler = scaler or StandardScaler()
+        # Columns that bypass the scaler — encoded categoricals are already in
+        # [0, 1]; z-scoring 0/1 dummies distorts quantum feature maps.
+        self.passthrough_columns = passthrough_columns or []
         if dataset is not None:
             x = self.update_column_names(dataset.get("x"))
             self.set_x_cols(x.columns)
@@ -60,10 +158,29 @@ class DataPreparation:
 
     def preprocess(self, x: pd.DataFrame, y: pd.Series, train_size: float = 0.75):
         """Preprocess the features and target."""
-        x = pd.DataFrame(self.scaler.fit_transform(x), columns=x.columns)
+        passthrough = [c for c in x.columns if c in set(self.passthrough_columns)]
+        to_scale = [c for c in x.columns if c not in set(passthrough)]
+        if to_scale:
+            scaled = pd.DataFrame(self.scaler.fit_transform(x[to_scale]), columns=to_scale)
+        else:
+            scaled = pd.DataFrame(index=range(len(x)))
+        if passthrough:
+            kept = x[passthrough].reset_index(drop=True)
+            x = pd.concat([scaled, kept], axis=1)[list(x.columns)]
+        else:
+            x = scaled
+        # Index is a fresh RangeIndex either way, so split indices remain
+        # positional row numbers into the raw dataframe.
         classes = np.unique(y)
+        # Labels already encoded to {-1, 1} (e.g. an explicit user mapping applied
+        # upstream) must pass through unchanged — re-encoding would invert them.
+        y_values = (
+            np.asarray(y).ravel()
+            if set(classes.tolist()) <= {-1, 1}
+            else np.where(np.asarray(y).ravel() == classes[0], 1, -1)
+        )
         y = pd.DataFrame(
-            np.where(y == classes[0], 1, -1),
+            y_values,
             columns=[self.y_col] if not isinstance(self.y_col, list) else self.y_col,
         )
         return train_test_split(x, y, train_size=train_size, random_state=42)
