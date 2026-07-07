@@ -121,7 +121,7 @@ export default function HomePage() {
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <Link
             href="/optimizer"
-            className="group rounded-lg bg-gradient-to-br from-brand to-brand/70 p-5 text-brand-foreground transition-shadow hover:shadow-glow-brand"
+            className="group rounded-lg bg-linear-to-br from-brand to-brand/70 p-5 text-brand-foreground transition-shadow hover:shadow-glow-brand"
           >
             <Zap className="mb-2 h-7 w-7" />
             <h3 className="mb-1 text-base font-semibold">Open the Optimizer</h3>

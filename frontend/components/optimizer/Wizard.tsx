@@ -123,15 +123,10 @@ export function Wizard() {
     setFooter,
   };
 
-  // Steps that manage their own height (panels fill the frame and scroll internally): Dataset (1),
-  // Features (2), Optimize (4), Analyze (5), Report (6). Step 3 (Configure) is a short form that
-  // keeps the container's normal vertical scroll.
-  const fillsFrame = currentStep !== 3;
-
   return (
-    <div className="flex h-full min-h-0 flex-col overflow-hidden bg-background">
-      {/* Header: title + context strip + chevron stepper (pinned) */}
-      <header className="shrink-0 border-b border-border bg-card px-6 py-4">
+    <div className="flex min-h-full flex-col bg-background">
+      {/* Header: title + context strip + chevron stepper (sticky within the page scroll) */}
+      <header className="sticky top-0 z-30 shrink-0 border-b border-border bg-card px-6 py-3">
         <div className="flex flex-wrap items-center justify-between gap-4">
           <PageHeader title="Optimizer" />
           <div className="flex items-center gap-2">
@@ -153,47 +148,34 @@ export function Wizard() {
           currentStep={currentStep}
           completedSteps={completedSteps}
           onStepClick={handleStepClick}
-          className="mt-4"
+          className="mt-3"
         />
       </header>
 
-      {/* Body: content region (scrolls for most steps; DatasetStep fills the frame) */}
-      <div className="min-h-0 flex-1 px-6 py-4">
-        <div
-          className={cn(
-            'h-full min-h-0 rounded-lg border border-border bg-card',
-            fillsFrame ? 'flex flex-col overflow-hidden' : 'overflow-y-auto'
-          )}
-        >
-          <div
-            className={cn(
-              'mx-auto w-full max-w-4xl p-6',
-              fillsFrame && 'flex min-h-0 flex-1 flex-col'
-            )}
-          >
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={currentStep}
-                className={fillsFrame ? 'flex min-h-0 w-full flex-1 flex-col' : undefined}
-                initial={{ opacity: 0, y: 8 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -8 }}
-                transition={{ duration: 0.18 }}
-              >
-                {currentStep === 1 && <DatasetStep {...stepProps} />}
-                {currentStep === 2 && <FeaturesStep {...stepProps} />}
-                {currentStep === 3 && <ConfigureStep {...stepProps} />}
-                {currentStep === 4 && <OptimizeStep {...stepProps} />}
-                {currentStep === 5 && <AnalyzeStep {...stepProps} />}
-                {currentStep === 6 && <ReportStep {...stepProps} />}
-              </motion.div>
-            </AnimatePresence>
-          </div>
+      {/* Body: content flows with the page scroll — no inner scroll containers */}
+      <div className="flex-1 px-6 py-4">
+        <div className="mx-auto w-full max-w-screen-2xl">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStep}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -8 }}
+              transition={{ duration: 0.18 }}
+            >
+              {currentStep === 1 && <DatasetStep {...stepProps} />}
+              {currentStep === 2 && <FeaturesStep {...stepProps} />}
+              {currentStep === 3 && <ConfigureStep {...stepProps} />}
+              {currentStep === 4 && <OptimizeStep {...stepProps} />}
+              {currentStep === 5 && <AnalyzeStep {...stepProps} />}
+              {currentStep === 6 && <ReportStep {...stepProps} />}
+            </motion.div>
+          </AnimatePresence>
         </div>
       </div>
 
-      {/* Single Back/Next footer (pinned) */}
-      <footer className="shrink-0 border-t border-border bg-card/95 px-6 py-3 backdrop-blur supports-[backdrop-filter]:bg-card/80">
+      {/* Single Back/Next footer (sticky within the page scroll) */}
+      <footer className="sticky bottom-0 z-30 shrink-0 border-t border-border bg-card/95 px-6 py-3 backdrop-blur-sm supports-backdrop-filter:bg-card/80">
         <div className="flex items-center justify-between">
           <Button
             type="button"

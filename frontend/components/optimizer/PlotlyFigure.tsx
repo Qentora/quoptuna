@@ -1,8 +1,17 @@
 'use client';
 
 import { Button } from '@/components/ui/button';
-import * as Dialog from '@radix-ui/react-dialog';
-import { Loader2, Maximize2, X } from 'lucide-react';
+import { Card, CardAction, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogTrigger,
+} from '@/components/ui/dialog';
+import { Skeleton } from '@/components/ui/skeleton';
+import { cn } from '@/lib/utils';
+import { Loader2, Maximize2 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 import type { PlotlyFigureJSON } from './types';
 
@@ -49,7 +58,7 @@ function PlotlyChart({ figure, className }: { figure: PlotlyFigureJSON; classNam
   return (
     <div className={className}>
       {loading && (
-        <div className="flex h-full min-h-[200px] items-center justify-center text-muted-foreground">
+        <div className="flex h-full min-h-[240px] items-center justify-center text-muted-foreground">
           <Loader2 className="h-5 w-5 animate-spin" />
         </div>
       )}
@@ -61,55 +70,50 @@ function PlotlyChart({ figure, className }: { figure: PlotlyFigureJSON; classNam
 export function PlotlyFigure({
   title,
   figure,
+  className,
 }: {
   title: string;
   figure: PlotlyFigureJSON;
+  className?: string;
 }) {
   const [fullscreen, setFullscreen] = useState(false);
 
   return (
-    <div className="flex flex-col rounded-lg border border-border bg-card">
-      <div className="flex items-center justify-between gap-2 border-b border-border bg-muted px-4 py-3">
-        <h4 className="text-sm font-semibold">{title}</h4>
-        <Button
-          type="button"
-          variant="ghost"
-          size="sm"
-          onClick={() => setFullscreen(true)}
-          aria-label={`Expand ${title}`}
-        >
-          <Maximize2 className="h-4 w-4" />
-        </Button>
-      </div>
-      <PlotlyChart figure={figure} className="h-[360px] p-2" />
-
-      <Dialog.Root open={fullscreen} onOpenChange={setFullscreen}>
-        <Dialog.Portal>
-          <Dialog.Overlay className="fixed inset-0 z-50 bg-black/60" />
-          <Dialog.Content className="fixed inset-4 z-50 flex flex-col rounded-lg border border-border bg-card shadow-xl md:inset-10">
-            <div className="flex items-center justify-between border-b border-border bg-muted px-4 py-3">
-              <Dialog.Title className="text-sm font-semibold">{title}</Dialog.Title>
-              <Dialog.Close asChild>
-                <Button type="button" variant="ghost" size="sm" aria-label="Close">
-                  <X className="h-4 w-4" />
-                </Button>
-              </Dialog.Close>
-            </div>
-            {fullscreen && <PlotlyChart figure={figure} className="min-h-0 flex-1 p-2" />}
-          </Dialog.Content>
-        </Dialog.Portal>
-      </Dialog.Root>
-    </div>
+    <Card className={className}>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+        <CardAction>
+          <Dialog open={fullscreen} onOpenChange={setFullscreen}>
+            <DialogTrigger asChild>
+              <Button type="button" variant="ghost" size="sm" aria-label={`Expand ${title}`}>
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+            </DialogTrigger>
+            <DialogContent className="inset-4 top-4 left-4 flex h-auto w-auto max-w-none translate-x-0 translate-y-0 flex-col gap-2 md:inset-10 md:top-10 md:left-10">
+              <DialogHeader>
+                <DialogTitle>{title}</DialogTitle>
+              </DialogHeader>
+              {fullscreen && <PlotlyChart figure={figure} className="min-h-0 flex-1" />}
+            </DialogContent>
+          </Dialog>
+        </CardAction>
+      </CardHeader>
+      <CardContent>
+        <PlotlyChart figure={figure} className="aspect-[16/9] min-h-[280px] w-full" />
+      </CardContent>
+    </Card>
   );
 }
 
-export function PlotSkeleton({ title }: { title: string }) {
+export function PlotSkeleton({ title, className }: { title: string; className?: string }) {
   return (
-    <div className="flex flex-col rounded-lg border border-border bg-card">
-      <div className="border-b border-border bg-muted px-4 py-3">
-        <h4 className="text-sm font-semibold">{title}</h4>
-      </div>
-      <div className="h-[360px] animate-pulse bg-muted/40 p-2" />
-    </div>
+    <Card className={cn(className)}>
+      <CardHeader>
+        <CardTitle>{title}</CardTitle>
+      </CardHeader>
+      <CardContent>
+        <Skeleton className="aspect-[16/9] min-h-[280px] w-full" />
+      </CardContent>
+    </Card>
   );
 }

@@ -2,13 +2,10 @@ import { Sidebar } from '@/components/Sidebar';
 import type { Metadata } from 'next';
 import { Inter, JetBrains_Mono } from 'next/font/google';
 import './globals.css';
+import { cn } from '@/lib/utils';
 import { Providers } from './providers';
 
-const inter = Inter({
-  subsets: ['latin'],
-  variable: '--font-sans',
-  display: 'swap',
-});
+const inter = Inter({ subsets: ['latin'], variable: '--font-sans' });
 
 const jetBrainsMono = JetBrains_Mono({
   subsets: ['latin'],
@@ -26,13 +23,15 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     <html
       lang="en"
       suppressHydrationWarning
-      className={`${inter.variable} ${jetBrainsMono.variable}`}
+      className={cn(jetBrainsMono.variable, 'font-sans', inter.variable)}
     >
       <body>
         <Providers>
           <div className="flex h-screen overflow-hidden">
             <Sidebar />
-            <div className="flex-1 overflow-auto">{children}</div>
+            <div data-app-scroll-container className="flex-1 overflow-auto">
+              {children}
+            </div>
           </div>
         </Providers>
       </body>

@@ -19,7 +19,7 @@ function Chip({
   return (
     <span
       className={cn(
-        'inline-flex max-w-[12rem] items-baseline gap-1 truncate rounded-full border border-border bg-muted px-2 py-0.5',
+        'inline-flex max-w-48 items-baseline gap-1 truncate rounded-full border border-border bg-muted px-2 py-0.5',
         tone === 'emerald' &&
           'border-accent-emerald bg-accent-emerald/30 text-accent-emerald-foreground'
       )}

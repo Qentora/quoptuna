@@ -109,25 +109,17 @@ export const initialWorkflowData: WorkflowData = {
   report: { markdown: null },
 };
 
-// Heuristic to label a trial's model_type as quantum or classical for display.
-const CLASSICAL_HINTS = [
-  'svc',
-  'svm',
-  'mlp',
-  'perceptron',
-  'forest',
-  'boosting',
-  'adaboost',
-  'logistic',
-  'tree',
-  'knn',
-  'gaussian',
-  'naive',
-  'bayes',
-];
+// Classical model names, mirroring the backend registry in
+// src/quoptuna/backend/models.py — everything else there is a quantum model.
+// An explicit list (not substring hints) because e.g. TreeTensorClassifier is
+// quantum despite containing "tree".
+const CLASSICAL_MODELS = new Set(
+  ['SVC', 'SVClinear', 'MLPClassifier', 'Perceptron', 'ConvolutionalNeuralNetwork'].map((m) =>
+    m.toLowerCase()
+  )
+);
 
 export function isClassicalModel(modelType: string | undefined): boolean {
   if (!modelType) return false;
-  const lower = modelType.toLowerCase();
-  return CLASSICAL_HINTS.some((hint) => lower.includes(hint));
+  return CLASSICAL_MODELS.has(modelType.toLowerCase());
 }

@@ -2,12 +2,22 @@
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Checkbox } from '@/components/ui/checkbox';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
-import { Select } from '@/components/ui/select';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import { Separator } from '@/components/ui/separator';
 import { useDatasetPreview } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
-import { Check, Crosshair, Search, Sparkles, X } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Check, Search, Sparkles } from 'lucide-react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
 
@@ -17,6 +27,8 @@ const isNumericDtype = (dtype: string | undefined) =>
 // Mirror the backend caps in prepare.py.
 const MAX_ONEHOT_CATEGORIES = 10;
 const MAX_ORDINAL_CATEGORIES = 100;
+
+const NONE_VALUE = '__none__';
 
 export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const preview = useDatasetPreview(workflowData.dataset?.id ?? null);
@@ -37,6 +49,7 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
   const tooManyCategories = (column: string) =>
     isCategorical(column) && (uniqueCounts[column] ?? 0) > encodingCap;
   const hasCategoricalSelected = selectedFeatures.some(isCategorical);
+  const categoricalSelectedCount = selectedFeatures.filter(isCategorical).length;
 
   const setEncoding = (value: 'ordinal' | 'onehot') =>
     setWorkflowData((prev) => ({
@@ -65,7 +78,7 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
       ...prev,
       features: {
         ...prev.features,
-        targetColumn: prev.features.targetColumn === column ? null : column,
+        targetColumn: column === NONE_VALUE ? null : column,
         selectedFeatures: prev.features.selectedFeatures.filter((f) => f !== column),
         labelMapping: { neg: null, pos: null },
       },
@@ -75,7 +88,7 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
   const setSensitiveFeature = (value: string) => {
     setWorkflowData((prev) => ({
       ...prev,
-      features: { ...prev.features, sensitiveFeature: value || null },
+      features: { ...prev.features, sensitiveFeature: value === NONE_VALUE ? null : value },
     }));
   };
 
@@ -100,6 +113,21 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
   const clearAll = () =>
     setWorkflowData((prev) => ({ ...prev, features: { ...prev.features, selectedFeatures: [] } }));
 
+  // Preselect all usable columns once when the preview loads and there is no
+  // prior selection (preserves persisted workflowData state on revisit).
+  const didDefaultSelect = useRef(false);
+  useEffect(() => {
+    if (didDefaultSelect.current || !preview.data || columns.length === 0) return;
+    didDefaultSelect.current = true;
+    if (selectedFeatures.length > 0 || targetColumn !== null) return;
+    const usable = columns.filter((c) => !tooManyCategories(c));
+    if (usable.length === 0) return;
+    setWorkflowData((prev) => ({
+      ...prev,
+      features: { ...prev.features, selectedFeatures: usable },
+    }));
+  });
+
   const targetValues = targetColumn
     ? (preview.data?.target_values_by_column[targetColumn] ?? [])
     : [];
@@ -122,26 +150,37 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
   }, [canProceed, setFooter]);
 
   return (
-    <div className="flex h-full min-h-0 flex-col gap-4">
-      <div className="shrink-0">
-        <StepHeader
-          step={2}
-          title="Feature Selection"
-          subtitle="Select input features, the target column, and map labels for binary classification"
-        />
-      </div>
+    <div className="flex flex-col gap-4">
+      <StepHeader
+        step={2}
+        title="Feature Selection"
+        subtitle="Select input features, the target column, and map labels for binary classification"
+      />
 
-      <div className="grid min-h-0 flex-1 grid-cols-1 gap-4 lg:grid-cols-2">
-        {/* Left panel: searchable columns */}
-        <div className="flex min-h-0 flex-col rounded-lg border border-border bg-card">
-          <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-muted px-4 py-3">
-            <h4 className="text-sm font-semibold">Columns ({columns.length})</h4>
-            <Button type="button" variant="ghost" size="sm" onClick={smartSelect}>
-              <Sparkles size={14} /> Smart select
-            </Button>
-          </div>
-          <div className="shrink-0 border-b border-border p-3">
-            <div className="relative">
+      <div className="grid grid-cols-1 items-start gap-4 lg:grid-cols-[1fr_320px]">
+        {/* Left: feature checkbox grid */}
+        <Card size="sm">
+          <CardHeader className="border-b">
+            <CardTitle className="flex items-center justify-between gap-3">
+              <span>Features ({columns.length} columns)</span>
+              <span className="flex items-center gap-1">
+                <Button type="button" variant="ghost" size="sm" onClick={smartSelect}>
+                  <Sparkles size={14} /> Smart select
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="sm"
+                  onClick={clearAll}
+                  disabled={selectedFeatures.length === 0}
+                >
+                  Clear
+                </Button>
+              </span>
+            </CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-3">
+            <div className="relative max-w-xs">
               <Search className="absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
               <Input
                 value={search}
@@ -150,248 +189,222 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
                 className="pl-8"
               />
             </div>
-          </div>
-          <div className="min-h-0 flex-1 space-y-1 overflow-y-auto p-2">
-            {filteredColumns.length === 0 && (
-              <p className="px-2 py-2 text-sm text-muted-foreground">No matching columns.</p>
+
+            {filteredColumns.length === 0 ? (
+              <p className="text-sm text-muted-foreground">No matching columns.</p>
+            ) : (
+              <div className="grid grid-cols-2 gap-x-3 gap-y-1 md:grid-cols-3 xl:grid-cols-4">
+                {filteredColumns.map((column) => {
+                  const isFeature = selectedFeatures.includes(column);
+                  const isTarget = targetColumn === column;
+                  const blocked = tooManyCategories(column);
+                  const disabled = isTarget || blocked;
+                  return (
+                    <label
+                      key={column}
+                      htmlFor={`feature-${column}`}
+                      className={cn(
+                        'flex min-w-0 items-center gap-2 rounded-md px-2 py-1.5 transition-colors',
+                        disabled ? 'opacity-50' : 'cursor-pointer hover:bg-muted'
+                      )}
+                      title={
+                        blocked
+                          ? `${uniqueCounts[column]} categories exceed the ${categoricalEncoding} limit of ${encodingCap}`
+                          : isTarget
+                            ? 'Target column'
+                            : dtypes[column]
+                      }
+                    >
+                      <Checkbox
+                        id={`feature-${column}`}
+                        checked={isFeature}
+                        disabled={disabled}
+                        onCheckedChange={() => toggleFeature(column)}
+                        aria-label={`Toggle ${column} as feature`}
+                      />
+                      <span className="truncate text-xs">{column}</span>
+                      {isTarget ? (
+                        <Badge variant="emerald" className="shrink-0">
+                          target
+                        </Badge>
+                      ) : blocked ? (
+                        <Badge variant="destructive" className="shrink-0">
+                          {uniqueCounts[column]} cats
+                        </Badge>
+                      ) : isCategorical(column) && isFeature ? (
+                        <Badge variant="amber" className="shrink-0">
+                          {categoricalEncoding === 'onehot' ? 'one-hot' : 'ordinal'}
+                        </Badge>
+                      ) : null}
+                      {(missingCounts[column] ?? 0) > 0 && (
+                        <Badge
+                          variant="secondary"
+                          className="shrink-0"
+                          title={`${missingCounts[column]} missing values — imputed automatically`}
+                        >
+                          {missingCounts[column]} NA
+                        </Badge>
+                      )}
+                    </label>
+                  );
+                })}
+              </div>
             )}
-            {filteredColumns.map((column) => {
-              const isFeature = selectedFeatures.includes(column);
-              const isTarget = targetColumn === column;
-              return (
-                <div
-                  key={column}
-                  className={cn(
-                    'flex items-center justify-between gap-2 rounded-md px-2 py-1.5 transition-colors',
-                    isTarget ? 'bg-brand/10' : 'hover:bg-muted'
-                  )}
-                >
-                  <div className="flex min-w-0 items-center gap-2">
-                    <span className="truncate text-sm">{column}</span>
-                    {dtypes[column] && (
-                      <Badge variant="outline" className="shrink-0">
-                        {dtypes[column]}
-                      </Badge>
-                    )}
-                    {tooManyCategories(column) ? (
-                      <Badge
-                        variant="destructive"
-                        className="shrink-0"
-                        title={`${uniqueCounts[column]} categories exceed the ${categoricalEncoding} limit of ${encodingCap}`}
-                      >
-                        too many categories
-                      </Badge>
-                    ) : isCategorical(column) && isFeature ? (
-                      <Badge
-                        variant="amber"
-                        className="shrink-0"
-                        title={`Categorical column — will be ${categoricalEncoding === 'onehot' ? 'one-hot' : 'ordinal'} encoded automatically`}
-                      >
-                        {categoricalEncoding === 'onehot' ? 'one-hot' : 'ordinal'}
-                      </Badge>
-                    ) : null}
-                    {(missingCounts[column] ?? 0) > 0 && (
-                      <Badge
-                        variant="secondary"
-                        className="shrink-0"
-                        title={`${missingCounts[column]} missing values — imputed automatically`}
-                      >
-                        {missingCounts[column]} NA
-                      </Badge>
-                    )}
-                  </div>
-                  <div className="flex shrink-0 items-center gap-1">
-                    <button
-                      type="button"
-                      onClick={() => toggleFeature(column)}
-                      disabled={isTarget}
-                      className={cn(
-                        'inline-flex h-7 items-center gap-1 rounded-md px-2 text-xs font-medium transition-colors',
-                        isFeature
-                          ? 'bg-brand/15 text-brand'
-                          : 'text-muted-foreground hover:bg-accent disabled:opacity-40'
-                      )}
-                    >
-                      {isFeature && <Check size={12} />}
-                      Feature
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setTarget(column)}
-                      title="Set as target"
-                      aria-label={`Set ${column} as target`}
-                      className={cn(
-                        'inline-flex h-7 w-7 items-center justify-center rounded-md transition-colors',
-                        isTarget
-                          ? 'bg-brand text-brand-foreground'
-                          : 'text-muted-foreground hover:bg-accent'
-                      )}
-                    >
-                      <Crosshair size={14} />
-                    </button>
-                  </div>
-                </div>
-              );
-            })}
-          </div>
-        </div>
+          </CardContent>
+        </Card>
 
-        {/* Right panel: selection */}
-        <div className="flex min-h-0 flex-col gap-4 overflow-y-auto">
-          {/* Selected features */}
-          <div className="flex flex-col rounded-lg border border-border bg-card">
-            <div className="flex shrink-0 items-center justify-between gap-3 border-b border-border bg-muted px-4 py-3">
-              <h4 className="text-sm font-semibold">
-                Selected features ({selectedFeatures.length})
-              </h4>
-              {selectedFeatures.length > 0 && (
-                <Button type="button" variant="ghost" size="sm" onClick={clearAll}>
-                  Clear
-                </Button>
-              )}
-            </div>
-            <div className="p-3">
-              {selectedFeatures.length === 0 ? (
-                <p className="text-sm text-muted-foreground">
-                  No features yet — pick columns on the left or use Smart select.
-                </p>
-              ) : (
-                <div className="flex flex-wrap gap-1.5">
-                  {selectedFeatures.map((f) => (
-                    <span
-                      key={f}
-                      className="inline-flex items-center gap-1 rounded-full bg-brand/15 px-2.5 py-0.5 text-xs font-medium text-brand"
-                    >
-                      {f}
-                      <button
-                        type="button"
-                        onClick={() => toggleFeature(f)}
-                        aria-label={`Remove ${f}`}
-                      >
-                        <X size={12} />
-                      </button>
-                    </span>
-                  ))}
-                </div>
-              )}
-            </div>
-          </div>
-
-          {/* Target column */}
-          <div className="flex flex-col rounded-lg border border-border bg-card">
-            <div className="shrink-0 border-b border-border bg-muted px-4 py-3">
-              <h4 className="text-sm font-semibold">Target column</h4>
-            </div>
-            <div className="p-3">
-              {targetColumn ? (
-                <Badge variant="emerald" size="md">
-                  {targetColumn}
-                </Badge>
-              ) : (
-                <p className="text-sm text-muted-foreground">
-                  Use the crosshair on a column to set the target.
-                </p>
-              )}
-
-              {targetColumn && needsMapping && (
-                <div className="mt-3 rounded-md border border-border bg-muted p-3">
-                  <p className="text-sm font-medium">Label mapping (binary)</p>
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Quantum models require labels encoded as -1 / 1.
-                  </p>
-                  <div className="mt-3 grid grid-cols-2 gap-3">
-                    <label className="text-xs" htmlFor="map-neg">
-                      <span className="mb-1 block">Maps to -1</span>
-                      <Select
-                        id="map-neg"
-                        value={labelMapping.neg === null ? '' : String(labelMapping.neg)}
-                        onChange={(e) => setMapping('neg', e.target.value)}
-                      >
-                        <option value="">Select…</option>
-                        {targetValues.map((v) => (
-                          <option key={String(v)} value={String(v)}>
-                            {String(v)}
-                          </option>
-                        ))}
-                      </Select>
-                    </label>
-                    <label className="text-xs" htmlFor="map-pos">
-                      <span className="mb-1 block">Maps to 1</span>
-                      <Select
-                        id="map-pos"
-                        value={labelMapping.pos === null ? '' : String(labelMapping.pos)}
-                        onChange={(e) => setMapping('pos', e.target.value)}
-                      >
-                        <option value="">Select…</option>
-                        {targetValues.map((v) => (
-                          <option key={String(v)} value={String(v)}>
-                            {String(v)}
-                          </option>
-                        ))}
-                      </Select>
-                    </label>
-                  </div>
-                </div>
-              )}
-            </div>
-          </div>
-          {/* Categorical encoding method */}
-          {hasCategoricalSelected && (
-            <div className="flex flex-col rounded-lg border border-border bg-card">
-              <div className="shrink-0 border-b border-border bg-muted px-4 py-3">
-                <h4 className="text-sm font-semibold">Categorical encoding</h4>
-              </div>
-              <div className="space-y-2 p-3">
-                <p className="text-xs text-muted-foreground">
-                  How selected categorical columns are converted to numbers. Ordinal keeps one
-                  column per feature (faster for quantum models); one-hot adds a column per
-                  category.
-                </p>
-                <Select
-                  aria-label="Categorical encoding"
-                  value={categoricalEncoding}
-                  onChange={(e) => setEncoding(e.target.value as 'ordinal' | 'onehot')}
-                >
-                  <option value="ordinal">Ordinal — 1 column per feature (recommended)</option>
-                  <option value="onehot">One-hot — 1 column per category (slower)</option>
-                </Select>
-              </div>
-            </div>
-          )}
-
-          {/* Protected attribute for fairness auditing */}
-          <div className="flex flex-col rounded-lg border border-border bg-card">
-            <div className="shrink-0 border-b border-border bg-muted px-4 py-3">
-              <h4 className="text-sm font-semibold">Protected attribute (optional)</h4>
-            </div>
-            <div className="space-y-2 p-3">
-              <p className="text-xs text-muted-foreground">
-                A categorical column (e.g. sex, race, age group) used to audit fairness across
-                groups. It does not need to be a model feature and is never used for training.
-              </p>
-              <Select
-                aria-label="Protected attribute"
-                value={sensitiveFeature ?? ''}
-                onChange={(e) => setSensitiveFeature(e.target.value)}
-              >
-                <option value="">None — skip fairness audit</option>
-                {columns
-                  .filter((c) => c !== targetColumn)
-                  .map((c) => (
-                    <option key={c} value={c}>
+        {/* Right rail */}
+        <Card size="sm" className="lg:sticky lg:top-4 lg:self-start">
+          <CardHeader className="border-b">
+            <CardTitle>Configuration</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            <Field>
+              <FieldLabel htmlFor="target-column">Target column</FieldLabel>
+              <Select value={targetColumn ?? NONE_VALUE} onValueChange={setTarget}>
+                <SelectTrigger id="target-column" className="w-full">
+                  <SelectValue placeholder="Select target…" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE_VALUE}>None — choose a target</SelectItem>
+                  {columns.map((c) => (
+                    <SelectItem key={c} value={c}>
                       {c}
-                    </option>
+                    </SelectItem>
                   ))}
+                </SelectContent>
               </Select>
+              <FieldDescription>The column the model learns to predict.</FieldDescription>
+            </Field>
+
+            {targetColumn && needsMapping && (
+              <div className="rounded-md border border-border bg-muted p-3">
+                <p className="text-xs font-medium">Label mapping (binary)</p>
+                <p className="mt-1 text-xs text-muted-foreground">
+                  Quantum models require labels encoded as -1 / 1.
+                </p>
+                <div className="mt-3 grid grid-cols-2 gap-3">
+                  <Field>
+                    <FieldLabel htmlFor="map-neg">Maps to -1</FieldLabel>
+                    <Select
+                      value={labelMapping.neg === null ? '' : String(labelMapping.neg)}
+                      onValueChange={(v) => setMapping('neg', v)}
+                    >
+                      <SelectTrigger id="map-neg" className="w-full">
+                        <SelectValue placeholder="Select…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {targetValues.map((v) => (
+                          <SelectItem key={String(v)} value={String(v)}>
+                            {String(v)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                  <Field>
+                    <FieldLabel htmlFor="map-pos">Maps to 1</FieldLabel>
+                    <Select
+                      value={labelMapping.pos === null ? '' : String(labelMapping.pos)}
+                      onValueChange={(v) => setMapping('pos', v)}
+                    >
+                      <SelectTrigger id="map-pos" className="w-full">
+                        <SelectValue placeholder="Select…" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {targetValues.map((v) => (
+                          <SelectItem key={String(v)} value={String(v)}>
+                            {String(v)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </Field>
+                </div>
+              </div>
+            )}
+
+            <Separator />
+
+            <Field>
+              <FieldLabel htmlFor="categorical-encoding">Categorical encoding</FieldLabel>
+              <Select
+                value={categoricalEncoding}
+                onValueChange={(v) => setEncoding(v as 'ordinal' | 'onehot')}
+              >
+                <SelectTrigger id="categorical-encoding" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="ordinal">Ordinal — 1 column per feature</SelectItem>
+                  <SelectItem value="onehot">One-hot — 1 column per category</SelectItem>
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                How categorical columns become numbers. Ordinal keeps one column per feature (faster
+                for quantum models); one-hot adds a column per category.
+                {!hasCategoricalSelected && ' No categorical features are currently selected.'}
+              </FieldDescription>
+            </Field>
+
+            <Separator />
+
+            <Field>
+              <FieldLabel htmlFor="protected-attribute">Protected attribute (optional)</FieldLabel>
+              <Select value={sensitiveFeature ?? NONE_VALUE} onValueChange={setSensitiveFeature}>
+                <SelectTrigger id="protected-attribute" className="w-full">
+                  <SelectValue placeholder="None — skip fairness audit" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value={NONE_VALUE}>None — skip fairness audit</SelectItem>
+                  {columns
+                    .filter((c) => c !== targetColumn)
+                    .map((c) => (
+                      <SelectItem key={c} value={c}>
+                        {c}
+                      </SelectItem>
+                    ))}
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                A categorical column (e.g. sex, race, age group) used to audit fairness across
+                groups. Never used for training.
+              </FieldDescription>
+            </Field>
+
+            <Separator />
+
+            {/* Selection summary */}
+            <div className="space-y-1.5 text-xs">
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Selected features</span>
+                <Badge variant={selectedFeatures.length > 0 ? 'brand' : 'outline'}>
+                  {selectedFeatures.length}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Categorical (auto-encoded)</span>
+                <Badge variant={categoricalSelectedCount > 0 ? 'amber' : 'outline'}>
+                  {categoricalSelectedCount}
+                </Badge>
+              </div>
+              <div className="flex items-center justify-between">
+                <span className="text-muted-foreground">Target</span>
+                {targetColumn ? (
+                  <Badge variant="emerald">{targetColumn}</Badge>
+                ) : (
+                  <span className="text-muted-foreground">—</span>
+                )}
+              </div>
             </div>
-          </div>
-        </div>
+          </CardContent>
+        </Card>
       </div>
 
       {/* Validation bar */}
       <div
         className={cn(
-          'flex shrink-0 items-center gap-2 rounded-lg border p-3 text-sm',
+          'flex items-center gap-2 rounded-lg border p-3 text-sm',
           canProceed
             ? 'border-accent-emerald bg-accent-emerald/30 text-accent-emerald-foreground'
             : 'border-accent-amber bg-accent-amber/30 text-accent-amber-foreground'

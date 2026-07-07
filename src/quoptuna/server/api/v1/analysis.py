@@ -176,6 +176,62 @@ def _positive_proba(proba):
     return np.ravel(arr)
 
 
+MAX_CURVE_POINTS = 500
+
+
+def _downsample_indices(n: int, max_points: int = MAX_CURVE_POINTS) -> np.ndarray:
+    """Evenly spaced indices (keeping both endpoints) capping a curve at max_points."""
+    if n <= max_points:
+        return np.arange(n)
+    return np.unique(np.linspace(0, n - 1, max_points).round().astype(int))
+
+
+def _roc_payload(y_test, proba) -> dict[str, Any]:
+    """Raw ROC curve points (downsampled) + AUC, from the same inputs as the PNG plot."""
+    from sklearn.metrics import roc_auc_score, roc_curve
+
+    fpr, tpr, _ = roc_curve(y_test, proba)
+    idx = _downsample_indices(len(fpr))
+    try:
+        auc = float(roc_auc_score(y_test, proba))
+    except Exception:
+        auc = None
+    return {
+        "fpr": np.asarray(fpr)[idx].tolist(),
+        "tpr": np.asarray(tpr)[idx].tolist(),
+        "auc": auc,
+    }
+
+
+def _pr_payload(y_test, proba) -> dict[str, Any]:
+    """Raw precision-recall points (downsampled) + AP, matching the PNG plot inputs."""
+    from sklearn.metrics import average_precision_score, precision_recall_curve
+
+    precision, recall, _ = precision_recall_curve(y_test, proba)
+    idx = _downsample_indices(len(precision))
+    try:
+        avg_prec = float(average_precision_score(y_test, proba))
+    except Exception:
+        avg_prec = None
+    return {
+        "precision": np.asarray(precision)[idx].tolist(),
+        "recall": np.asarray(recall)[idx].tolist(),
+        "average_precision": avg_prec,
+    }
+
+
+def _confusion_matrix_payload(matrix, labels) -> dict[str, Any]:
+    """Counts + row-normalized confusion matrix with string class labels."""
+    cm = np.asarray(matrix, dtype=float)
+    row_sums = cm.sum(axis=1, keepdims=True)
+    normalized = np.divide(cm, row_sums, out=np.zeros_like(cm), where=row_sums != 0)
+    return {
+        "labels": [str(label) for label in labels],
+        "matrix": cm.astype(int).tolist(),
+        "normalized": normalized.tolist(),
+    }
+
+
 def _feature_importance_from_xai(xai) -> list[dict[str, Any]]:
     shap_values = xai.shap_values
     importance: list[dict[str, Any]] = []
@@ -391,6 +447,114 @@ async def generate_curves(request: MetricsRequest):
         "average_precision": avg_prec,
         "status": "completed",
     }
+
+
+@router.post("/curves/data")
+async def generate_curves_data(request: MetricsRequest):
+    """Raw ROC and PR curve points as JSON (for frontend charting).
+
+    Uses the exact same model loading / test split / probability reduction as
+    the PNG ``/curves`` endpoint. Each curve is independently fault-tolerant
+    and yields ``null`` on failure (e.g. multiclass or missing probabilities).
+    Curves are downsampled to at most 500 points.
+    """
+    opt_result = _get_completed_result(request.optimization_id)
+
+    try:
+        xai = build_xai(
+            opt_result,
+            trial_number=request.trial_number,
+            use_proba=request.use_proba,
+            subset_size=request.subset_size,
+        )
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to build XAI: {e!s}")
+
+    proba = _positive_proba(xai.predictions_proba)
+    y_test = xai.y_test
+
+    roc = None
+    pr = None
+    try:
+        roc = _roc_payload(y_test, proba)
+    except Exception as exc:
+        logger.warning("ROC curve data failed: %s", exc)
+    try:
+        pr = _pr_payload(y_test, proba)
+    except Exception as exc:
+        logger.warning("PR curve data failed: %s", exc)
+
+    return {
+        "optimization_id": request.optimization_id,
+        "roc": roc,
+        "pr": pr,
+        "status": "completed",
+    }
+
+
+@router.post("/confusion-matrix/data")
+async def generate_confusion_matrix_data(request: MetricsRequest):
+    """Raw confusion matrix (counts + row-normalized) as JSON.
+
+    Same computation path as the PNG plot in ``/metrics``
+    (``xai.get_confusion_matrix()`` on the identical test split).
+    """
+    opt_result = _get_completed_result(request.optimization_id)
+
+    try:
+        xai = build_xai(
+            opt_result,
+            trial_number=request.trial_number,
+            use_proba=request.use_proba,
+            subset_size=request.subset_size,
+        )
+        cm = xai.get_confusion_matrix()
+        try:
+            labels = list(xai.get_classes())
+        except Exception:
+            labels = list(range(len(cm)))
+        return {
+            "optimization_id": request.optimization_id,
+            **_confusion_matrix_payload(cm, labels),
+            "status": "completed",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Failed to compute confusion matrix: {e!s}")
+
+
+@router.post("/feature-importance/data")
+async def generate_feature_importance_data(request: MetricsRequest):
+    """SHAP mean-|value| feature importances as parallel arrays for charting.
+
+    Reuses the same importance computation as ``/shap`` (mean absolute SHAP
+    value per feature, per-class axis averaged), sorted descending.
+    """
+    opt_result = _get_completed_result(request.optimization_id)
+
+    try:
+        xai = build_xai(
+            opt_result,
+            trial_number=request.trial_number,
+            use_proba=request.use_proba,
+            subset_size=request.subset_size,
+        )
+        importance = _feature_importance_from_xai(xai)
+        return {
+            "optimization_id": request.optimization_id,
+            "features": [item["feature"] for item in importance],
+            "importances": [item["importance"] for item in importance],
+            "status": "completed",
+        }
+    except HTTPException:
+        raise
+    except Exception as e:
+        raise HTTPException(
+            status_code=500, detail=f"Failed to compute feature importance: {e!s}"
+        )
 
 
 @router.post("/study-plots")

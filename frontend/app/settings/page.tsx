@@ -3,7 +3,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Field } from '@/components/ui/field';
+import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { PageShell } from '@/components/ui/page-shell';
 import { DEFAULT_DATABASE_NAME, loadAppSettings, saveAppSettings } from '@/lib/appSettings';
@@ -96,22 +96,16 @@ export default function SettingsPage() {
               const isSet = saved[field.key].trim().length > 0;
               const show = visible[field.key];
               return (
-                <Field
-                  key={field.key}
-                  htmlFor={field.key}
-                  helper={field.helper}
-                  label={
-                    <span className="flex w-full items-center justify-between">
-                      <span>{field.label}</span>
-                      <Badge variant={isSet ? 'emerald' : 'secondary'}>
-                        <span
-                          className={`h-1.5 w-1.5 rounded-full ${isSet ? 'bg-accent-emerald-foreground' : 'bg-muted-foreground/50'}`}
-                        />
-                        {isSet ? 'Configured' : 'Not set'}
-                      </Badge>
-                    </span>
-                  }
-                >
+                <Field key={field.key}>
+                  <div className="flex w-full items-center justify-between">
+                    <FieldLabel htmlFor={field.key}>{field.label}</FieldLabel>
+                    <Badge variant={isSet ? 'emerald' : 'secondary'}>
+                      <span
+                        className={`h-1.5 w-1.5 rounded-full ${isSet ? 'bg-accent-emerald-foreground' : 'bg-muted-foreground/50'}`}
+                      />
+                      {isSet ? 'Configured' : 'Not set'}
+                    </Badge>
+                  </div>
                   <div className="relative">
                     <Input
                       id={field.key}
@@ -134,6 +128,7 @@ export default function SettingsPage() {
                       {show ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                     </button>
                   </div>
+                  <FieldDescription>{field.helper}</FieldDescription>
                 </Field>
               );
             })}
@@ -145,16 +140,8 @@ export default function SettingsPage() {
             <CardTitle>Optimization Storage</CardTitle>
           </CardHeader>
           <CardContent>
-            <Field
-              label="Database Name"
-              htmlFor="database-name"
-              helper={
-                <>
-                  Optuna SQLite database used for all optimization runs (stored server-side under{' '}
-                  <code className="font-mono">db/&lt;name&gt;.db</code>).
-                </>
-              }
-            >
+            <Field>
+              <FieldLabel htmlFor="database-name">Database Name</FieldLabel>
               <Input
                 id="database-name"
                 type="text"
@@ -162,6 +149,10 @@ export default function SettingsPage() {
                 value={databaseName}
                 onChange={(e) => setDatabaseName(e.target.value)}
               />
+              <FieldDescription>
+                Optuna SQLite database used for all optimization runs (stored server-side under{' '}
+                <code className="font-mono">db/&lt;name&gt;.db</code>).
+              </FieldDescription>
             </Field>
           </CardContent>
         </Card>
