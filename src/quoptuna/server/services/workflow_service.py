@@ -279,7 +279,9 @@ class WorkflowExecutor:
             import numpy as np
 
             pos = str(label_mapping.get("pos"))
-            logger.info(f"Applying label mapping at split: {label_mapping.get('neg')} -> -1, {pos} -> 1")
+            logger.info(
+                f"Applying label mapping at split: {label_mapping.get('neg')} -> -1, {pos} -> 1"
+            )
             y = pd.Series(np.where(y.astype(str) == pos, 1, -1), name=data["y_column"])
 
         # Use DataPreparation class

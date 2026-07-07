@@ -130,8 +130,7 @@ def _get_completed_result(optimization_id: str) -> dict:
         except Exception as e:
             logger.exception("Failed to rehydrate result for %s", optimization_id)
             detail = (
-                f"Optimization has no completed trials to analyze "
-                f"(status: {job['status']}): {e!s}"
+                f"Optimization has no completed trials to analyze (status: {job['status']}): {e!s}"
                 if job["status"] != "completed"
                 else f"Optimization result not found: {e!s}"
             )

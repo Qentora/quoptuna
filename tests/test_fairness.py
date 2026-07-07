@@ -87,8 +87,13 @@ def test_explicit_label_mapping_survives_split_and_encoding():
     df["target"] = np.where(df["f1"] > 0, "yes", "no")
 
     executor = WorkflowExecutor({"nodes": [], "edges": []})
-    selected = {"type": "selected_data", "x": df[["f1", "f2"]], "y": df["target"],
-                "x_columns": ["f1", "f2"], "y_column": "target"}
+    selected = {
+        "type": "selected_data",
+        "x": df[["f1", "f2"]],
+        "y": df["target"],
+        "x_columns": ["f1", "f2"],
+        "y_column": "target",
+    }
     split = executor._execute_train_test_split(
         {"label_mapping": {"neg": "no", "pos": "yes"}}, {"in": selected}
     )

@@ -528,4 +528,3 @@ class XAI:
             raise ValueError(msg) from e
 
         return images
-

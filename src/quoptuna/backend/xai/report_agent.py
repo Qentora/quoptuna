@@ -102,8 +102,7 @@ async def generate_report(
                     {
                         "type": "input_text",
                         "text": (
-                            "Raw metrics the report must be grounded in:\n"
-                            f"```\n{report_text}\n```"
+                            f"Raw metrics the report must be grounded in:\n```\n{report_text}\n```"
                         ),
                     },
                 ],
