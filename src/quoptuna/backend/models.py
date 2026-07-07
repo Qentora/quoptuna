@@ -135,4 +135,13 @@ def create_model(model_type, **kwargs):
         params["hidden_layer_sizes"] = ast.literal_eval(params["hidden_layer_sizes"])
         params["learning_rate_init"] = kwargs.get("learning_rate")
 
-    return model_class(**params)
+    model = model_class(**params)
+
+    # Training-budget knobs for the iterative (JAX-trained) models. Applied
+    # post-construction because not every constructor accepts them.
+    for knob in ("max_steps", "convergence_interval"):
+        value = kwargs.get(knob)
+        if value is not None and hasattr(model, knob):
+            setattr(model, knob, value)
+
+    return model

@@ -104,6 +104,8 @@ export default function RunsPage() {
         configuration: {
           studyName: req.study_name ?? run.study_name ?? 'my-optimization-study',
           numTrials: req.num_trials ?? 50,
+          sampler: req.sampler ?? 'tpe',
+          pruner: req.pruner ?? 'none',
         },
         optimization: {
           executionId: detail.id,

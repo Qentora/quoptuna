@@ -110,6 +110,9 @@ export interface OptimizationRequest {
   label_mapping?: LabelMapping;
   sensitive_feature?: string;
   categorical_encoding?: 'ordinal' | 'onehot';
+  // Search strategy: sampler + optional early-stopping pruner (ASHA/Hyperband).
+  sampler?: 'tpe' | 'random' | 'grid';
+  pruner?: 'none' | 'asha' | 'hyperband';
 }
 
 export type RunStatus =

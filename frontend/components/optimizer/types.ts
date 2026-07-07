@@ -42,6 +42,8 @@ export interface WorkflowData {
   configuration: {
     studyName: string;
     numTrials: number;
+    sampler: 'tpe' | 'random' | 'grid';
+    pruner: 'none' | 'asha' | 'hyperband';
   };
   optimization: {
     executionId: string | null;
@@ -87,6 +89,8 @@ export const initialWorkflowData: WorkflowData = {
   configuration: {
     studyName: 'my-optimization-study',
     numTrials: 50,
+    sampler: 'tpe',
+    pruner: 'none',
   },
   optimization: {
     executionId: null,

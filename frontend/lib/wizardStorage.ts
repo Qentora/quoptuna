@@ -5,7 +5,7 @@
  * state between saves.
  */
 
-import type { WorkflowData } from '@/components/optimizer/types';
+import { type WorkflowData, initialWorkflowData } from '@/components/optimizer/types';
 
 const STORAGE_KEY = 'quoptuna.wizard.v1';
 
@@ -59,6 +59,12 @@ export function loadWizardState(): WizardState | null {
     if (!raw) return null;
     const parsed = JSON.parse(raw) as WizardState;
     if (!parsed || typeof parsed.currentStep !== 'number' || !parsed.workflowData) return null;
+    // States saved before new configuration fields existed (e.g. sampler/
+    // pruner) rehydrate with defaults filled in.
+    parsed.workflowData.configuration = {
+      ...initialWorkflowData.configuration,
+      ...parsed.workflowData.configuration,
+    };
     return parsed;
   } catch {
     window.localStorage.removeItem(STORAGE_KEY);
