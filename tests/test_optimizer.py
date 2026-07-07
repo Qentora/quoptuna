@@ -168,7 +168,11 @@ def test_create_or_load_study_is_idempotent(fake_create_model):
 
 
 def test_build_sampler_variants():
-    for name, cls_name in [("tpe", "TPESampler"), ("random", "RandomSampler"), ("grid", "GridSampler")]:
+    for name, cls_name in [
+        ("tpe", "TPESampler"),
+        ("random", "RandomSampler"),
+        ("grid", "GridSampler"),
+    ]:
         opt = Optimizer(
             db_name="unit",
             sampler=name,
