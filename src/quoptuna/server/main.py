@@ -18,7 +18,7 @@ from quoptuna.server.core.config import settings
 app = FastAPI(
     title="QuOptuna Next API",
     description="Backend API for quantum machine learning optimization with Optuna",
-    version="2.0.0",
+    version="0.0.9",
     docs_url="/api/docs",
     redoc_url="/api/redoc",
 )
@@ -44,7 +44,7 @@ async def api_root():
     """API metadata endpoint."""
     return {
         "message": "QuOptuna Next API",
-        "version": "2.0.0",
+        "version": "0.0.9",
         "docs": "/api/docs",
     }
 
