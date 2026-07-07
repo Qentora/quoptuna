@@ -206,6 +206,14 @@ class QuantumMetricLearner(BaseEstimator, ClassifierMixin):
             warnings.warn("batch size too large, setting to " + str(min(len(A), len(B))))
             self.batch_size = min(len(A), len(B))
 
+        # Store the comparison examples BEFORE training, not just after: predict
+        # needs them, and mid-training callbacks (e.g. Optuna pruning reports)
+        # call predict with the in-progress weights. The loss only reads
+        # params["weights"], so these extra entries get zero gradients and pass
+        # through the optimizer unchanged.
+        self.params_["examples_-1"] = A
+        self.params_["examples_+1"] = B
+
         def loss_fn(params, A=None, B=None):
             aa = self.forward(params, X1=A, X2=A)
             bb = self.forward(params, X1=B, X2=B)
