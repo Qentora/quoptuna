@@ -54,6 +54,9 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
   const { optimization, analysis, features } = workflowData;
   const [isMitigating, setIsMitigating] = useState(false);
   const [fairnessError, setFairnessError] = useState<string | null>(null);
+  // Plots may be absent even when metrics exist: the localStorage autosave
+  // strips them when the payload exceeds the quota. Re-fetch in that case.
+  const hasPlots = Object.keys(analysis.plots).length > 0;
   const hasSHAP = analysis.featureImportance !== null;
   const autoRan = useRef(false);
 
@@ -122,7 +125,7 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
   // Auto-run once on entering the step when results exist and none yet.
   // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount.
   useEffect(() => {
-    if (!autoRan.current && optimization.executionId && !hasSHAP) {
+    if (!autoRan.current && optimization.executionId && (!hasSHAP || !hasPlots)) {
       autoRan.current = true;
       void runAnalysis();
     }

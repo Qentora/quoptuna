@@ -135,17 +135,22 @@ def plot_mitigation_comparison(before: dict, after: dict) -> str:
 
 
 class _BinaryLabelAdapter:
-    """Expose a {-1,1}-label model to fairlearn as a {0,1}-label estimator."""
+    """Expose a {-1,1}-label model to fairlearn as a {0,1}-label estimator.
+
+    Outputs are coerced to numpy: quantum models built on JAX return
+    ``jaxlib.ArrayImpl``, which fairlearn rejects with
+    "Unexpected data type ... encountered".
+    """
 
     def __init__(self, model):
         self._model = model
         self.classes_ = np.array([0, 1])
 
     def predict(self, x):
-        return _to_binary(self._model.predict(x))
+        return _to_binary(np.asarray(self._model.predict(x)))
 
     def predict_proba(self, x):
-        return self._model.predict_proba(x)
+        return np.asarray(self._model.predict_proba(x))
 
     def fit(self, *args, **kwargs):  # noqa: ARG002  # pragma: no cover - prefit, never called
         return self

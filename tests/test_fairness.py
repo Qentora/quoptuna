@@ -54,6 +54,26 @@ def test_threshold_optimizer_mitigation(synthetic):
     assert result["comparison_plot"].startswith("data:image/png;base64,")
 
 
+def test_threshold_optimizer_accepts_jax_array_outputs(synthetic):
+    """Regression: JAX-based quantum models return jaxlib ArrayImpl from
+    predict/predict_proba, which fairlearn rejects unless coerced to numpy
+    ("Unexpected data type ... encountered")."""
+    jax = pytest.importorskip("jax")
+    x, y, sens, model = synthetic
+
+    class JaxModel:
+        classes_ = np.array([-1, 1])
+
+        def predict(self, xx):
+            return jax.numpy.asarray(model.predict(np.asarray(xx)))
+
+        def predict_proba(self, xx):
+            return jax.numpy.asarray(model.predict_proba(np.asarray(xx)))
+
+    result = fm.mitigate_with_threshold_optimizer(JaxModel(), x, y, sens, x, y, sens)
+    assert result["comparison_plot"].startswith("data:image/png;base64,")
+
+
 def test_explicit_label_mapping_survives_split_and_encoding():
     """Regression: an explicit label mapping must be applied on ORIGINAL values.
 

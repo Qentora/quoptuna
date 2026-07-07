@@ -114,7 +114,11 @@ def _rehydrate_result(job: dict) -> dict:
 
 def _get_completed_result(optimization_id: str) -> dict:
     job = get_job(optimization_id)
-    if job["status"] != "completed":
+    # A backend restart marks in-flight runs 'interrupted', but the Optuna
+    # study on disk may already hold completed trials — those runs are
+    # perfectly analyzable (rehydration below reloads the study; it fails
+    # with a clear error if no trial ever completed).
+    if job["status"] not in ("completed", "interrupted", "failed"):
         raise HTTPException(
             status_code=400,
             detail=f"Optimization not completed. Current status: {job['status']}",
@@ -125,7 +129,13 @@ def _get_completed_result(optimization_id: str) -> dict:
             result = _rehydrate_result(job)
         except Exception as e:
             logger.exception("Failed to rehydrate result for %s", optimization_id)
-            raise HTTPException(status_code=500, detail=f"Optimization result not found: {e!s}")
+            detail = (
+                f"Optimization has no completed trials to analyze "
+                f"(status: {job['status']}): {e!s}"
+                if job["status"] != "completed"
+                else f"Optimization result not found: {e!s}"
+            )
+            raise HTTPException(status_code=400, detail=detail)
         job["result"] = result  # cache for subsequent analysis calls
     return result
 
@@ -572,6 +582,10 @@ async def generate_ai_report(request: ReportRequest):
                 # No sensitive feature configured (or unusable column) — the
                 # report simply proceeds without a fairness section.
                 logger.info("Report fairness section skipped: %s", exc.detail)
+            except Exception:
+                # A fairness/mitigation failure must not take down the whole
+                # report; generate it without the fairness section instead.
+                logger.exception("Report fairness section failed; continuing without it")
 
         markdown = await xai.generate_report_with_llm(
             api_key=request.api_key,

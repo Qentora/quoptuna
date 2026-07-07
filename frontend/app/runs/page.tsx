@@ -108,10 +108,14 @@ export default function RunsPage() {
         report: { markdown: null },
       };
 
-      const completed = detail.status === 'completed';
+      // Interrupted runs (backend restarted mid-run) with a best value have
+      // completed trials on disk and are analyzable like completed ones.
+      const analyzable =
+        detail.status === 'completed' ||
+        (detail.status === 'interrupted' && detail.best_value !== null);
       saveWizardState({
-        currentStep: completed ? 5 : 4,
-        completedSteps: completed ? [1, 2, 3, 4] : [1, 2, 3],
+        currentStep: analyzable ? 5 : 4,
+        completedSteps: analyzable ? [1, 2, 3, 4] : [1, 2, 3],
         workflowData,
       });
       router.push('/optimizer');
