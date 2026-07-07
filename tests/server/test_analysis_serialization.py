@@ -9,6 +9,7 @@ import json
 
 import numpy as np
 import pytest
+from sklearn.metrics import average_precision_score, roc_auc_score
 
 from quoptuna.server.api.v1.analysis import (
     MAX_CURVE_POINTS,
@@ -70,8 +71,6 @@ class TestRocPayload:
         json.dumps(payload)  # must be JSON-serializable
 
     def test_matches_sklearn(self, binary_data):
-        from sklearn.metrics import roc_auc_score
-
         y, proba = binary_data
         payload = _roc_payload(y, proba)
         assert payload["auc"] == pytest.approx(roc_auc_score(y, proba))
@@ -89,8 +88,6 @@ class TestPrPayload:
         json.dumps(payload)
 
     def test_matches_sklearn(self, binary_data):
-        from sklearn.metrics import average_precision_score
-
         y, proba = binary_data
         payload = _pr_payload(y, proba)
         assert payload["average_precision"] == pytest.approx(average_precision_score(y, proba))
@@ -114,16 +111,17 @@ class TestConfusionMatrixPayload:
 
 class TestShapDataPayload:
     def test_2d_values_passthrough(self):
+        base_value = 0.25
         values = np.arange(12, dtype=float).reshape(4, 3)
         data = values * 10
-        exp = FakeExplanation(values, data, ["a", "b", "c"], base_values=0.25)
+        exp = FakeExplanation(values, data, ["a", "b", "c"], base_values=base_value)
         payload = _shap_data_payload(exp, class_idx=-1)
         assert set(payload) == {"feature_names", "values", "data", "base_value", "n_samples"}
         assert payload["feature_names"] == ["a", "b", "c"]
         assert payload["values"] == values.tolist()
         assert payload["data"] == data.tolist()
-        assert payload["base_value"] == 0.25
-        assert payload["n_samples"] == 4
+        assert payload["base_value"] == base_value
+        assert payload["n_samples"] == values.shape[0]
         json.dumps(payload)
 
     def test_3d_values_class_sliced(self):
@@ -135,8 +133,8 @@ class TestShapDataPayload:
         payload = _shap_data_payload(exp, class_idx=1)
         np.testing.assert_allclose(payload["values"], values[:, :, 1])
         np.testing.assert_allclose(payload["data"], data)
-        assert payload["base_value"] == pytest.approx(0.9)
-        assert payload["n_samples"] == 5
+        assert payload["base_value"] == pytest.approx(base_values[0, 1])
+        assert payload["n_samples"] == values.shape[0]
         json.dumps(payload)
 
     def test_sampling_cap_and_alignment(self):
@@ -145,8 +143,8 @@ class TestShapDataPayload:
         data = values + 0.5
         exp = FakeExplanation(values, data, ["f0", "f1"])
         payload = _shap_data_payload(exp, class_idx=-1)
-        assert payload["n_samples"] == MAX_SHAP_SAMPLES == 200
-        assert len(payload["values"]) == len(payload["data"]) == 200
+        assert payload["n_samples"] == MAX_SHAP_SAMPLES
+        assert len(payload["values"]) == len(payload["data"]) == MAX_SHAP_SAMPLES
         # First and last rows preserved.
         assert payload["values"][0][0] == 0.0
         assert payload["values"][-1][0] == n - 1
@@ -167,10 +165,11 @@ class TestShapDataPayload:
         json.dumps(payload)
 
     def test_missing_data_yields_empty_list(self):
-        exp = FakeExplanation(np.ones((3, 2)), data=None, base_values=1.5)
+        base_value = 1.5
+        exp = FakeExplanation(np.ones((3, 2)), data=None, base_values=base_value)
         payload = _shap_data_payload(exp, class_idx=-1)
         assert payload["data"] == []
-        assert payload["base_value"] == 1.5
+        assert payload["base_value"] == base_value
 
 
 class TestPositiveProba:

@@ -267,7 +267,7 @@ def _shap_data_payload(shap_values, class_idx: int, max_samples: int = MAX_SHAP_
     """
     values = np.asarray(shap_values.values, dtype=float)
     if values.ndim > 2:
-        idx = class_idx if class_idx >= 0 else 0
+        idx = max(class_idx, 0)
         values = values[:, :, idx]
 
     data = getattr(shap_values, "data", None)
@@ -289,7 +289,7 @@ def _shap_data_payload(shap_values, class_idx: int, max_samples: int = MAX_SHAP_
             bv = bv[row_idx[0]] if bv.shape[0] == n else bv
             bv = np.asarray(bv, dtype=float)
             if bv.ndim >= 1:  # per-class base values -> same class slice
-                bv = bv.flat[class_idx if class_idx >= 0 else 0]
+                bv = bv.flat[max(class_idx, 0)]
             base_value = float(bv)
         if base_value is not None and not np.isfinite(base_value):
             base_value = None

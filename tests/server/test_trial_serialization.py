@@ -24,10 +24,11 @@ def test_serializes_finished_trials_with_their_own_params(monkeypatch, tmp_path)
         model = trial.suggest_categorical("model_type", ["SVC", "IQPKernelClassifier"])
         return 0.9 if model == "IQPKernelClassifier" else 0.5
 
-    study.optimize(objective, n_trials=6)
+    n_trials = 6
+    study.optimize(objective, n_trials=n_trials)
 
     trials = serialize_study_trials(db_name, study_name)
-    assert len(trials) == 6
+    assert len(trials) == n_trials
     assert all(t["state"] == "COMPLETE" for t in trials)
     # Each row keeps its own params — both model families stay visible.
     models = {t["params"]["model_type"] for t in trials}
