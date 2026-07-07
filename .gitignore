@@ -142,3 +142,5 @@ next-env.d.ts
 /frontend/test-results/
 /frontend/blob-report/
 /frontend/playwright/.cache/
+/.agents/skills/shadcn
+/.agents/skills/migrate-radix-to-base
