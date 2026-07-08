@@ -113,6 +113,10 @@ export interface OptimizationRequest {
   // Search strategy: sampler + optional early-stopping pruner (ASHA/Hyperband).
   sampler?: 'tpe' | 'random' | 'grid';
   pruner?: 'none' | 'asha' | 'hyperband';
+  // Performance knobs (Settings → Optimizer Performance).
+  max_steps?: number;
+  convergence_interval?: number;
+  max_vmap?: number;
 }
 
 export type RunStatus =

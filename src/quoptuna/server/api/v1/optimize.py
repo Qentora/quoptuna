@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from optuna.trial import TrialState
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from quoptuna.server.services import dataset_registry, run_store
 from quoptuna.server.services.storage import optuna_storage_url
@@ -62,7 +62,13 @@ class OptimizationRequest(BaseModel):
     # Intermediate value iterative models report for pruning decisions.
     intermediate_metric: Literal["accuracy", "neg_loss"] = "accuracy"
     # Optional cap on training steps for iterative models.
-    max_steps: Optional[int] = None
+    max_steps: Optional[int] = Field(default=None, ge=1)
+    # Optional override of the flat-loss convergence window (also the cadence
+    # of pruning reports).
+    convergence_interval: Optional[int] = Field(default=None, ge=1)
+    # Optional override of circuit-evaluation vectorization width; must divide
+    # the batch size (32 in the default search space).
+    max_vmap: Optional[int] = Field(default=None, ge=1)
 
 
 class OptimizationStatus(BaseModel):
@@ -152,6 +158,8 @@ def build_workflow(
                     "pruner_reduction_factor": request.pruner_reduction_factor,
                     "intermediate_metric": request.intermediate_metric,
                     "max_steps": request.max_steps,
+                    "convergence_interval": request.convergence_interval,
+                    "max_vmap": request.max_vmap,
                 },
             },
         },

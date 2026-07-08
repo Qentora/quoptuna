@@ -22,7 +22,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { fetchOptimizationTrials, pollOptimization, startOptimization } from '@/lib/api';
-import { getDatabaseName } from '@/lib/appSettings';
+import { getDatabaseName, getOptimizerSettings } from '@/lib/appSettings';
 import { cn } from '@/lib/utils';
 import { Atom, Check, Cpu, PlayCircle, RotateCcw, Trophy } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -128,6 +128,7 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         ? { neg: features.labelMapping.neg, pos: features.labelMapping.pos }
         : undefined;
 
+    const optimizerSettings = getOptimizerSettings();
     try {
       const { id } = await startOptimization({
         dataset_id: dataset.id,
@@ -142,6 +143,9 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         categorical_encoding: features.categoricalEncoding,
         sampler: configuration.sampler,
         pruner: configuration.pruner,
+        max_steps: optimizerSettings.maxSteps,
+        convergence_interval: optimizerSettings.convergenceInterval,
+        max_vmap: optimizerSettings.maxVmap,
       });
 
       // Persist the execution id immediately so a refresh mid-run can resume.

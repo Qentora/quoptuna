@@ -84,6 +84,8 @@ class Optimizer:
         pruner_reduction_factor: int = 3,
         intermediate_metric: str = "accuracy",
         max_steps: Optional[int] = None,  # noqa: FA100
+        convergence_interval: Optional[int] = None,  # noqa: FA100
+        max_vmap: Optional[int] = None,  # noqa: FA100
     ):
         """Initialize the Optimizer class.
 
@@ -107,6 +109,11 @@ class Optimizer:
                 or "neg_loss" (negated recent training loss; cheaper, but only
                 meaningful when a single model type is searched).
             max_steps: Optional cap on training steps for iterative models.
+            convergence_interval: Optional override of the models' flat-loss
+                convergence window (also the cadence of pruning reports).
+            max_vmap: Optional override of the ``max_vmap`` search-space entry
+                (circuit evaluations vectorized per JAX call). Must divide the
+                batch size.
 
         Attributes:
             db_name: The name of the database.
@@ -147,6 +154,11 @@ class Optimizer:
         self.pruner_reduction_factor = pruner_reduction_factor
         self.intermediate_metric = intermediate_metric
         self.max_steps = max_steps
+        self.convergence_interval = convergence_interval
+        if max_vmap is not None and "max_vmap" in self.search_space:
+            # Override the vectorization width without touching other entries;
+            # objective() keeps sampling it like any other hyperparameter.
+            self.search_space = {**self.search_space, "max_vmap": [max_vmap]}
 
     def _build_sampler(self):
         if self.sampler == "tpe":
@@ -195,7 +207,12 @@ class Optimizer:
 
             model_type = trial.suggest_categorical("model_type", self.model_types)
 
-            model = create_model(model_type, max_steps=self.max_steps, **params)
+            model = create_model(
+                model_type,
+                max_steps=self.max_steps,
+                convergence_interval=self.convergence_interval,
+                **params,
+            )
 
             # Iterative (JAX-trained) models report intermediate values so the
             # pruner can stop unpromising trials early. Kernel/sklearn models

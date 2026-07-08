@@ -336,3 +336,35 @@ def test_unconverged_trial_is_scored_not_failed(tiny_data, monkeypatch):
     assert trial.value is not None
     assert trial.user_attrs["converged"] is False
     assert trial.user_attrs["n_steps"] == 12
+
+
+def test_max_vmap_override_replaces_search_space_entry():
+    opt = Optimizer(db_name="unit_vmap", max_vmap=32)
+    assert opt.search_space["max_vmap"] == [32]
+    # Other entries untouched.
+    assert opt.search_space["batch_size"] == DEFAULT_SEARCH_SPACE["batch_size"]
+    # No-op when the (custom) space has no max_vmap key.
+    opt2 = Optimizer(db_name="unit_vmap2", search_space={"C": [1.0]}, max_vmap=32)
+    assert "max_vmap" not in opt2.search_space
+
+
+def test_convergence_interval_reaches_create_model(tiny_data, monkeypatch):
+    captured = {}
+
+    def _factory(model_type, **kwargs):
+        captured.update(kwargs)
+        return _FakeModel(model_type=model_type)
+
+    monkeypatch.setattr(optimizer_module, "create_model", _factory)
+    opt = Optimizer(
+        db_name="unit_ci",
+        data=tiny_data,
+        model_types=["SVC"],
+        search_space=TINY_SEARCH_SPACE,
+        max_steps=500,
+        convergence_interval=50,
+    )
+    trial = FixedTrial({"C": 1.0, "model_type": "SVC"})
+    opt.objective(trial)
+    assert captured["max_steps"] == 500
+    assert captured["convergence_interval"] == 50

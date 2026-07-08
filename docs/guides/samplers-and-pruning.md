@@ -54,6 +54,23 @@ they always train to completion regardless of the pruner.
     exhaust every combination before `num_trials` — the study simply stops
     early.
 
+## Performance tuning
+
+The web UI's **Settings → Optimizer Performance** card (and the corresponding
+`POST /api/v1/optimize` fields) exposes three knobs that dominate trial
+wall-clock:
+
+- **`max_vmap`** (UI default 32): circuit evaluations vectorized per JAX call.
+  The historical value of 1 evaluates one sample at a time; on small tabular
+  datasets, 32 is severalfold faster. Must divide the batch size (32), so
+  valid values are 1/2/4/8/16/32.
+- **`max_steps`** (UI default 2000): training-step cap per trial (model
+  default 10,000). Trials that hit the cap unconverged are still scored.
+- **`convergence_interval`** (UI default 100): steps between flat-loss
+  convergence checks and pruning reports. Lower values let converged trials
+  exit sooner and give ASHA earlier decision points, at the cost of noisier
+  convergence estimates.
+
 ## Resource accounting
 
 Every completed or pruned trial records user attributes for
