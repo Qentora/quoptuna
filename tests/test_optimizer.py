@@ -278,3 +278,61 @@ def test_optimize_without_pruner_attaches_no_callback(tiny_data, monkeypatch):
     assert trial.user_attrs["pruned"] is False
     assert trial.user_attrs["n_steps"] == ITERATIVE_MAX_STEPS
     assert trial.user_attrs["batch_size"] == ITERATIVE_BATCH_SIZE
+
+
+def test_pruner_reports_use_report_index(tiny_data, monkeypatch):
+    """ASHA rungs must be fed the report index (0,1,2,...), not raw training
+    steps, so min_resource/reduction_factor mean 'number of reports'."""
+    import optuna
+
+    monkeypatch.setattr(
+        optimizer_module,
+        "create_model",
+        lambda model_type, **kwargs: _FakeIterativeModel(model_type=model_type, **kwargs),
+    )
+    opt = Optimizer(
+        db_name="unit_rung",
+        study_name="rung_study",
+        data=tiny_data,
+        model_types=["DataReuploadingClassifier"],
+        search_space=TINY_SEARCH_SPACE,
+        pruner="asha",
+        intermediate_metric="neg_loss",
+    )
+    study, _ = opt.optimize(n_trials=1)
+    (trial,) = study.trials
+    # max_steps=12, interval=3 -> 4 reports at indices 0..3 (not steps 2,5,8,11).
+    assert sorted(trial.intermediate_values.keys()) == [0, 1, 2, 3]
+
+
+def test_unconverged_trial_is_scored_not_failed(tiny_data, monkeypatch):
+    """ConvergenceWarning from the training loop must not waste the trial:
+    the partially-trained model is scored and the trial completes."""
+    from sklearn.exceptions import ConvergenceWarning
+
+    class _UnconvergedModel(_FakeModel):
+        max_steps = 12
+
+        def fit(self, _x, _y):
+            self.loss_history_ = np.ones(self.max_steps)
+            self.training_time_ = 0.05
+            raise ConvergenceWarning("did not converge")
+
+    monkeypatch.setattr(
+        optimizer_module,
+        "create_model",
+        lambda model_type, **kwargs: _UnconvergedModel(model_type=model_type, **kwargs),
+    )
+    opt = Optimizer(
+        db_name="unit_noconv",
+        study_name="noconv_study",
+        data=tiny_data,
+        model_types=["DataReuploadingClassifier"],
+        search_space=TINY_SEARCH_SPACE,
+    )
+    study, _ = opt.optimize(n_trials=1)
+    (trial,) = study.trials
+    assert trial.state.name == "COMPLETE"
+    assert trial.value is not None
+    assert trial.user_attrs["converged"] is False
+    assert trial.user_attrs["n_steps"] == 12

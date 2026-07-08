@@ -26,9 +26,22 @@ Iterative (JAX-trained) quantum models report an intermediate value every
 other trials at the same rung and stops trials in the bottom fraction — they
 end in the `PRUNED` state (not `FAILED`) and never win `best_trial`.
 
+The pruner operates on the **report index** (1st, 2nd, 3rd report...), so
+`pruner_min_resource=1` means "a trial may be stopped after its first
+intermediate report". The `accuracy` metric is evaluated on a fixed validation
+subset (first 128 test rows) to bound the circuit cost of each report.
+
 Kernel models (IQPKernel, ProjectedQuantumKernel, QuantumKitchenSinks,
 SeparableKernelClassifier) and classical sklearn models have no training steps;
 they always train to completion regardless of the pruner.
+
+!!! note "Non-converging trials"
+    A trial that reaches `max_steps` without meeting the flat-loss convergence
+    criterion is **not** discarded: the partially-trained model is scored and
+    the trial completes with user attribute `converged: false`. To stop slow
+    trials from consuming the full default budget (10,000 steps), set
+    `max_steps` to a smaller cap — pruning alone cannot stop a trial whose
+    intermediate accuracy stays competitive while its loss keeps drifting.
 
 !!! warning "`neg_loss` caveat"
     `intermediate_metric="neg_loss"` costs zero extra circuit evaluations, but

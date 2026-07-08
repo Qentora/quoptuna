@@ -144,11 +144,14 @@ export interface OptimizationStatus {
 
 export interface OptimizationTrial {
   trial: number;
-  // null for FAILED trials; user_attrs.error records the failure reason.
+  // null for FAILED/PRUNED/RUNNING trials; user_attrs.error records failures.
   value: number | null;
   params: Record<string, any>;
   state: string;
   user_attrs?: Record<string, any>;
+  // Live pruning telemetry: intermediate reports made so far + latest value.
+  n_reports?: number;
+  last_intermediate_value?: number | null;
 }
 
 export interface OptimizationTrials {

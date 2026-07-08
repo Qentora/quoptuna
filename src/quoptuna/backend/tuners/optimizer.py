@@ -6,6 +6,7 @@ import numpy as np
 from optuna import Trial, TrialPruned, create_study, load_study
 from optuna.pruners import HyperbandPruner, NopPruner, SuccessiveHalvingPruner
 from optuna.samplers import GridSampler, RandomSampler, TPESampler
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.metrics import accuracy_score, f1_score
 
 from quoptuna.backend.models import create_model
@@ -202,7 +203,15 @@ class Optimizer:
             if self.pruner != "none" and hasattr(model, "max_steps"):
                 model.training_callback = self._make_pruning_callback(trial, model)
 
-            model.fit(self.train_x, self.train_y)
+            try:
+                model.fit(self.train_x, self.train_y)
+                trial.set_user_attr("converged", True)
+            except ConvergenceWarning:
+                # The training loop hit max_steps without meeting the flat-loss
+                # criterion. The partially-trained parameters are still valid —
+                # score the model instead of discarding max_steps of compute.
+                logger.warning("Trial %s did not converge; scoring anyway", trial.number)
+                trial.set_user_attr("converged", False)
             score = model.score(self.test_x, self.test_y)
 
             f_score_ = f1_score(self.test_y, model.predict(self.test_x))
@@ -232,16 +241,34 @@ class Optimizer:
             self._log_resource_attributes(trial, model)
             raise
 
+    # Validation subset cap for the "accuracy" intermediate metric. Quantum
+    # predicts run in max_vmap-sized chunks, so evaluating the full test set at
+    # every report can rival the cost of training itself for some models
+    # (e.g. QuantumMetricLearner). A fixed prefix keeps values comparable
+    # across trials while bounding the per-report circuit count.
+    VALIDATION_SUBSET_SIZE = 128
+
     def _make_pruning_callback(self, trial: Trial, model):
-        """Build the per-interval hook consumed by ``model_utils.train``."""
+        """Build the per-interval hook consumed by ``model_utils.train``.
+
+        The pruner is fed the *report index* (0, 1, 2, ...), not the raw
+        training step, so ``pruner_min_resource``/``pruner_reduction_factor``
+        operate in units of intermediate reports as documented. Raw steps
+        would let a single report jump several ASHA rungs at once.
+        """
+        val_x = self.test_x[: self.VALIDATION_SUBSET_SIZE]
+        val_y = self.test_y[: self.VALIDATION_SUBSET_SIZE]
+        report_count = {"n": 0}
 
         def callback(step, loss_history):
             if self.intermediate_metric == "neg_loss":
                 window = getattr(model, "convergence_interval", 200)
                 value = -float(np.mean(loss_history[-window:]))
             else:
-                value = float(accuracy_score(self.test_y, model.predict(self.test_x)))
-            trial.report(value, step=step)
+                value = float(accuracy_score(val_y, model.predict(val_x)))
+            report_index = report_count["n"]
+            report_count["n"] += 1
+            trial.report(value, step=report_index)
             if trial.should_prune():
                 trial.set_user_attr("pruned_at_step", int(step))
                 msg = f"Pruned at step {step} ({self.intermediate_metric}={value:.4f})"
