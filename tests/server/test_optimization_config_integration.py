@@ -127,7 +127,8 @@ def test_optimizer_ten_trials_on_banknote(
     study, _best = optimizer.optimize(n_trials=10)
 
     assert len(study.trials) == 10  # noqa: PLR2004
-    assert all(t.state == TrialState.COMPLETE for t in study.trials)
+    # With a pruner configured trials may also legitimately end PRUNED.
+    assert all(t.state in (TrialState.COMPLETE, TrialState.PRUNED) for t in study.trials)
 
     assert study.best_value is not None
     assert math.isfinite(study.best_value)
@@ -136,3 +137,38 @@ def test_optimizer_ten_trials_on_banknote(
 
     # Per-model logging (quantum/classical attrs) should be exercised.
     assert any(t.user_attrs for t in study.trials)
+
+
+@pytest.mark.slow
+def test_optimizer_with_asha_pruner_on_banknote(
+    preprocessed_banknote, fast_optimizer_training, monkeypatch, tmp_path
+):
+    """ASHA + random sampler end to end: trials finish COMPLETE or PRUNED,
+    pruned trials carry resource attrs, and best_trial is a completed one."""
+    monkeypatch.chdir(tmp_path)
+
+    optimizer = Optimizer(
+        db_name="results-test-asha",
+        data=preprocessed_banknote,
+        study_name="my-optimization-study-test-asha",
+        model_types=["DataReuploadingClassifier", "SVC"],
+        search_space=TEST_SEARCH_SPACE,
+        sampler="random",
+        sampler_seed=7,
+        pruner="asha",
+        pruner_min_resource=1,
+        pruner_reduction_factor=2,
+        intermediate_metric="accuracy",
+    )
+
+    study, _best = optimizer.optimize(n_trials=8)
+
+    states = {t.state for t in study.trials}
+    assert states <= {TrialState.COMPLETE, TrialState.PRUNED}
+    completed = [t for t in study.trials if t.state == TrialState.COMPLETE]
+    assert completed, "ASHA pruned every trial"
+    assert study.best_trial.state == TrialState.COMPLETE
+    for t in study.trials:
+        if t.state == TrialState.PRUNED:
+            assert t.user_attrs.get("pruned") is True
+            assert "n_steps" in t.user_attrs

@@ -137,6 +137,8 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         label_mapping: labelMapping,
         sensitive_feature: features.sensitiveFeature ?? undefined,
         categorical_encoding: features.categoricalEncoding,
+        sampler: configuration.sampler,
+        pruner: configuration.pruner,
       });
 
       // Persist the execution id immediately so a refresh mid-run can resume.
@@ -344,8 +346,9 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
               </TableHeader>
               <TableBody>
                 {sorted.map((trial, index) => {
-                  const failed = trial.value === null || trial.state === 'FAIL';
-                  const selectable = hasResults && !failed;
+                  const pruned = trial.state === 'PRUNED';
+                  const failed = !pruned && (trial.value === null || trial.state === 'FAIL');
+                  const selectable = hasResults && !failed && !pruned;
                   const selected = optimization.selectedTrial === trial.trial;
                   const classical = isClassicalModel(trial.params?.model_type);
                   const isBest = index === 0 && !failed;
@@ -368,7 +371,7 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
                       className={cn(
                         'focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand',
                         selectable && 'cursor-pointer',
-                        failed && 'opacity-60',
+                        (failed || pruned) && 'opacity-60',
                         selected && 'bg-brand/10 ring-1 ring-inset ring-brand/40 hover:bg-brand/10'
                       )}
                     >
@@ -388,7 +391,18 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
                           selected && 'text-brand'
                         )}
                       >
-                        {failed ? (
+                        {pruned ? (
+                          <span
+                            className="font-medium text-muted-foreground"
+                            title={
+                              trial.user_attrs?.pruned_at_step != null
+                                ? `Pruned at step ${trial.user_attrs.pruned_at_step}`
+                                : 'Pruned early by the pruner'
+                            }
+                          >
+                            pruned
+                          </span>
+                        ) : failed ? (
                           <span
                             className="font-medium text-destructive"
                             title={String(trial.user_attrs?.error ?? 'Trial failed')}

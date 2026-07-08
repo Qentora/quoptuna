@@ -8,6 +8,7 @@ deterministically through both the classical and quantum logging branches.
 """
 
 import numpy as np
+import optuna
 import pytest
 from optuna.trial import FixedTrial
 
@@ -20,6 +21,11 @@ from quoptuna.backend.tuners.optimizer import (
 
 TINY_SEARCH_SPACE = {"C": [1.0]}
 EXPECTED_TRIALS = 2
+PRUNER_REDUCTION_FACTOR = 2
+ITERATIVE_MAX_STEPS = 12
+ITERATIVE_BATCH_SIZE = 4
+FIRST_PRUNE_CALLBACK_STEP = 2
+PRUNED_TRIAL_COUNT = 3
 
 
 class _FakeModel:
@@ -165,3 +171,110 @@ def test_create_or_load_study_is_idempotent(fake_create_model):
     # ``load_if_exists`` means a second call reuses the same study instead of raising.
     second = opt._create_or_load_study()
     assert first.study_name == second.study_name == "reused"
+
+
+def test_build_sampler_variants():
+    for name, cls_name in [
+        ("tpe", "TPESampler"),
+        ("random", "RandomSampler"),
+        ("grid", "GridSampler"),
+    ]:
+        opt = Optimizer(
+            db_name="unit",
+            sampler=name,
+            model_types=["SVC"],
+            search_space=TINY_SEARCH_SPACE,
+        )
+        assert type(opt._build_sampler()).__name__ == cls_name
+    with pytest.raises(ValueError, match="Unknown sampler"):
+        Optimizer(db_name="unit", sampler="bogus")._build_sampler()
+
+
+def test_build_pruner_variants():
+    for name, cls_name in [
+        ("none", "NopPruner"),
+        ("asha", "SuccessiveHalvingPruner"),
+        ("hyperband", "HyperbandPruner"),
+    ]:
+        opt = Optimizer(db_name="unit", pruner=name)
+        assert type(opt._build_pruner()).__name__ == cls_name
+    with pytest.raises(ValueError, match="Unknown pruner"):
+        Optimizer(db_name="unit", pruner="bogus")._build_pruner()
+
+
+class _FakeIterativeModel(_FakeModel):
+    """Fake with the iterative-training surface (max_steps + callback use)."""
+
+    max_steps = ITERATIVE_MAX_STEPS
+    convergence_interval = 3
+    batch_size = ITERATIVE_BATCH_SIZE
+
+    def fit(self, x, _y):
+        callback = getattr(self, "training_callback", None)
+        loss_history = []
+        for step in range(self.max_steps):
+            loss_history.append(1.0 / (step + 1))
+            if callback is not None and (step + 1) % self.convergence_interval == 0:
+                callback(step, loss_history)
+        self.loss_history_ = np.array(loss_history)
+        self.training_time_ = 0.1
+        return self
+
+
+def test_optimize_with_asha_prunes_trials(tiny_data, monkeypatch):
+    """With an aggressively-pruning study, iterative models get a callback,
+    pruned trials end PRUNED (not FAILED) and still carry resource attrs."""
+    monkeypatch.setattr(
+        optimizer_module,
+        "create_model",
+        lambda model_type, **kwargs: _FakeIterativeModel(model_type=model_type, **kwargs),
+    )
+
+    opt = Optimizer(
+        db_name="unit_asha",
+        study_name="asha_study",
+        data=tiny_data,
+        model_types=["DataReuploadingClassifier"],
+        search_space={"C": [0.1, 1.0, 10.0]},
+        sampler="random",
+        sampler_seed=0,
+        pruner="asha",
+        pruner_min_resource=1,
+        pruner_reduction_factor=PRUNER_REDUCTION_FACTOR,
+        intermediate_metric="neg_loss",
+    )
+    # Force pruning deterministically: every should_prune check says yes.
+    monkeypatch.setattr(optuna.trial.Trial, "should_prune", lambda _self: True)
+
+    study, _ = opt.optimize(n_trials=PRUNED_TRIAL_COUNT)
+    pruned = [t for t in study.trials if t.state == optuna.trial.TrialState.PRUNED]
+    assert len(pruned) == PRUNED_TRIAL_COUNT
+    for t in pruned:
+        assert t.user_attrs["pruned"] is True
+        assert t.user_attrs["pruned_at_step"] == FIRST_PRUNE_CALLBACK_STEP
+        assert "error" not in t.user_attrs
+
+
+def test_optimize_without_pruner_attaches_no_callback(tiny_data, monkeypatch):
+    created = []
+
+    def _factory(model_type, **kwargs):
+        model = _FakeIterativeModel(model_type=model_type, **kwargs)
+        created.append(model)
+        return model
+
+    monkeypatch.setattr(optimizer_module, "create_model", _factory)
+    opt = Optimizer(
+        db_name="unit_nopruner",
+        study_name="nopruner_study",
+        data=tiny_data,
+        model_types=["DataReuploadingClassifier"],
+        search_space=TINY_SEARCH_SPACE,
+    )
+    study, _ = opt.optimize(n_trials=1)
+    assert all(not hasattr(m, "training_callback") for m in created)
+    (trial,) = study.trials
+    # Resource accounting still recorded for completed trials.
+    assert trial.user_attrs["pruned"] is False
+    assert trial.user_attrs["n_steps"] == ITERATIVE_MAX_STEPS
+    assert trial.user_attrs["batch_size"] == ITERATIVE_BATCH_SIZE

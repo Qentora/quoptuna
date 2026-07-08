@@ -7,6 +7,7 @@ from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
+from optuna.trial import TrialState
 from pydantic import BaseModel, ConfigDict
 
 from quoptuna.server.services import dataset_registry, run_store
@@ -51,6 +52,17 @@ class OptimizationRequest(BaseModel):
     # Optional overrides to shrink Optuna's search (defaults use the full space).
     model_types: Optional[List[str]] = None
     search_space: Optional[Dict[str, List[Any]]] = None
+    # Search strategy: sampler ("tpe"/"random"/"grid") and pruner
+    # ("none"/"asha"/"hyperband") for early-stopping unpromising trials.
+    sampler: Literal["tpe", "random", "grid"] = "tpe"
+    sampler_seed: Optional[int] = None
+    pruner: Literal["none", "asha", "hyperband"] = "none"
+    pruner_min_resource: int = 1
+    pruner_reduction_factor: int = 3
+    # Intermediate value iterative models report for pruning decisions.
+    intermediate_metric: Literal["accuracy", "neg_loss"] = "accuracy"
+    # Optional cap on training steps for iterative models.
+    max_steps: Optional[int] = None
 
 
 class OptimizationStatus(BaseModel):
@@ -133,6 +145,13 @@ def build_workflow(
                     "db_name": request.database_name,
                     "model_types": request.model_types,
                     "search_space": request.search_space,
+                    "sampler": request.sampler,
+                    "sampler_seed": request.sampler_seed,
+                    "pruner": request.pruner,
+                    "pruner_min_resource": request.pruner_min_resource,
+                    "pruner_reduction_factor": request.pruner_reduction_factor,
+                    "intermediate_metric": request.intermediate_metric,
+                    "max_steps": request.max_steps,
                 },
             },
         },
@@ -160,7 +179,9 @@ def serialize_study_trials(db_name: str, study_name: str) -> list:
         return [
             {
                 "trial": trial.number,
-                "value": trial.value,
+                # PRUNED trials store their last *intermediate* report as
+                # value; expose None so it is never mistaken for a final F1.
+                "value": trial.value if trial.state == TrialState.COMPLETE else None,
                 "params": trial.params,
                 "state": trial.state.name,
                 "user_attrs": trial.user_attrs,
@@ -392,18 +413,24 @@ async def get_optimization_trials(optimization_id: str):
                 continue
             # FAILED trials keep value=None (coercing to 0.0 made broken
             # configurations look like real F1=0 runs); the recorded "error"
-            # user attr says why.
+            # user attr says why. PRUNED trials also expose None: their stored
+            # value is the last intermediate report, not a final F1.
+            is_complete = trial.state == TrialState.COMPLETE
             trial_data = {
                 "trial": trial.number,
-                "value": trial.value,
+                "value": trial.value if is_complete else None,
                 "params": trial.params,
                 "state": trial.state.name,
                 "user_attrs": trial.user_attrs,
             }
             trials.append(trial_data)
 
-            # Track best
-            if trial.value is not None and (best_value is None or trial.value > best_value):
+            # Track best (completed trials only)
+            if (
+                is_complete
+                and trial.value is not None
+                and (best_value is None or trial.value > best_value)
+            ):
                 best_value = trial.value
                 best_params = trial.params
 

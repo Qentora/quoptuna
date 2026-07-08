@@ -81,6 +81,10 @@ def train(model, loss_fn, optimizer, X, y, random_key_generator, convergence_int
 
     loss_history = []
     converged = False
+    # Optional hook (e.g. set by an HPO objective for pruning): called as
+    # callback(step, loss_history) every `convergence_interval` steps. It may
+    # raise to abort training early (e.g. optuna.TrialPruned).
+    callback = getattr(model, "training_callback", None)
     start = time.time()
     for step in range(model.max_steps):
         key = random_key_generator()
@@ -92,6 +96,20 @@ def train(model, loss_fn, optimizer, X, y, random_key_generator, convergence_int
         if np.isnan(loss_val):
             logging.info("nan encountered. Training aborted.")
             break
+
+        if callback is not None and (step + 1) % convergence_interval == 0:
+            # Expose the in-progress parameters so the callback can run
+            # predictions with the model mid-training.
+            model.params_ = params
+            try:
+                callback(step, loss_history)
+            except Exception:
+                # Finalize bookkeeping so aborted trainings (e.g. pruned
+                # trials) still record consumed resources.
+                aborted_history = np.array(loss_history)
+                model.loss_history_ = aborted_history / np.max(np.abs(aborted_history))
+                model.training_time_ = time.time() - start
+                raise
 
         # decide convergence
         if step > 2 * convergence_interval:

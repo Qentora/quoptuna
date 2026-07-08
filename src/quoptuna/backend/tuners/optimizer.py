@@ -2,8 +2,10 @@ import logging
 import time
 from typing import Optional
 
-from optuna import Trial, create_study, load_study
-from optuna.samplers import TPESampler
+import numpy as np
+from optuna import Trial, TrialPruned, create_study, load_study
+from optuna.pruners import HyperbandPruner, NopPruner, SuccessiveHalvingPruner
+from optuna.samplers import GridSampler, RandomSampler, TPESampler
 from sklearn.metrics import accuracy_score, f1_score
 
 from quoptuna.backend.models import create_model
@@ -74,6 +76,13 @@ class Optimizer:
         study_name: str = "",
         model_types: Optional[list] = None,  # noqa: FA100
         search_space: Optional[dict] = None,  # noqa: FA100
+        sampler: str = "tpe",
+        sampler_seed: Optional[int] = None,  # noqa: FA100
+        pruner: str = "none",
+        pruner_min_resource: int = 1,
+        pruner_reduction_factor: int = 3,
+        intermediate_metric: str = "accuracy",
+        max_steps: Optional[int] = None,  # noqa: FA100
     ):
         """Initialize the Optimizer class.
 
@@ -85,6 +94,18 @@ class Optimizer:
                 dictionary will be used. Expected keys are 'train_x', 'test_x', 'train_y', and
                 'test_y'.
             study_name: The name of the study for Optuna. Defaults to an empty string.
+            sampler: Optuna sampler to use: "tpe" (default), "random", or "grid".
+            sampler_seed: Optional seed for the sampler (reproducible searches).
+            pruner: Optuna pruner: "none" (default), "asha" (asynchronous
+                successive halving), or "hyperband".
+            pruner_min_resource: ASHA/Hyperband minimum resource (rung 0), in
+                units of intermediate reports.
+            pruner_reduction_factor: ASHA/Hyperband reduction factor.
+            intermediate_metric: What iterative models report for pruning:
+                "accuracy" (validation accuracy, comparable across model types)
+                or "neg_loss" (negated recent training loss; cheaper, but only
+                meaningful when a single model type is searched).
+            max_steps: Optional cap on training steps for iterative models.
 
         Attributes:
             db_name: The name of the database.
@@ -118,12 +139,51 @@ class Optimizer:
         self.study = None
         self.model_types = model_types or DEFAULT_MODEL_TYPES
         self.search_space = search_space or DEFAULT_SEARCH_SPACE
+        self.sampler = sampler
+        self.sampler_seed = sampler_seed
+        self.pruner = pruner
+        self.pruner_min_resource = pruner_min_resource
+        self.pruner_reduction_factor = pruner_reduction_factor
+        self.intermediate_metric = intermediate_metric
+        self.max_steps = max_steps
+
+    def _build_sampler(self):
+        if self.sampler == "tpe":
+            return TPESampler(seed=self.sampler_seed)
+        if self.sampler == "random":
+            return RandomSampler(seed=self.sampler_seed)
+        if self.sampler == "grid":
+            # All hyperparameters are categorical, so the search space doubles
+            # as a grid. Note the grid may be exhausted before n_trials.
+            return GridSampler(
+                {**self.search_space, "model_type": self.model_types},
+                seed=self.sampler_seed,
+            )
+        msg = f"Unknown sampler: {self.sampler!r} (expected 'tpe', 'random' or 'grid')"
+        raise ValueError(msg)
+
+    def _build_pruner(self):
+        if self.pruner == "none":
+            return NopPruner()
+        if self.pruner == "asha":
+            return SuccessiveHalvingPruner(
+                min_resource=self.pruner_min_resource,
+                reduction_factor=self.pruner_reduction_factor,
+            )
+        if self.pruner == "hyperband":
+            return HyperbandPruner(
+                min_resource=self.pruner_min_resource,
+                reduction_factor=self.pruner_reduction_factor,
+            )
+        msg = f"Unknown pruner: {self.pruner!r} (expected 'none', 'asha' or 'hyperband')"
+        raise ValueError(msg)
 
     def load_and_preprocess_data(self):
         self.X, self.y = load_data(self.data_path)
         self.train_x, self.test_x, self.train_y, self.test_y = preprocess_data(self.X, self.y)
 
     def objective(self, trial: Trial):
+        model = None
         try:
             # Sample one value per hyperparameter from the (possibly reduced)
             # search space. Insertion order is preserved for reproducibility.
@@ -134,7 +194,13 @@ class Optimizer:
 
             model_type = trial.suggest_categorical("model_type", self.model_types)
 
-            model = create_model(model_type, **params)
+            model = create_model(model_type, max_steps=self.max_steps, **params)
+
+            # Iterative (JAX-trained) models report intermediate values so the
+            # pruner can stop unpromising trials early. Kernel/sklearn models
+            # have no training steps and simply run to completion.
+            if self.pruner != "none" and hasattr(model, "max_steps"):
+                model.training_callback = self._make_pruning_callback(trial, model)
 
             model.fit(self.train_x, self.train_y)
             score = model.score(self.test_x, self.test_y)
@@ -147,15 +213,62 @@ class Optimizer:
                 {"accuracy": acc_, "f1_score": f_score_, "score": score},
                 trial,
             )
+            self._log_resource_attributes(trial, model)
 
             return f_score_  # noqa: TRY300
+        except TrialPruned:
+            # Must be re-raised before the generic handler below: pruning is a
+            # normal ASHA outcome, not a failure. Resource attrs are still
+            # recorded so pruned trials count toward "quantum calls" totals.
+            logger.info("Trial %s pruned", trial.number)
+            self._log_resource_attributes(trial, model, pruned=True)
+            raise
         except Exception as e:
             # Record why and re-raise so Optuna marks the trial FAILED (the
             # `catch` in study.optimize keeps the study going). Returning 0
             # here would make broken configurations look like real F1=0 runs.
             logger.exception("Trial %s failed", trial.number)
             trial.set_user_attr("error", f"{type(e).__name__}: {e}")
+            self._log_resource_attributes(trial, model)
             raise
+
+    def _make_pruning_callback(self, trial: Trial, model):
+        """Build the per-interval hook consumed by ``model_utils.train``."""
+
+        def callback(step, loss_history):
+            if self.intermediate_metric == "neg_loss":
+                window = getattr(model, "convergence_interval", 200)
+                value = -float(np.mean(loss_history[-window:]))
+            else:
+                value = float(accuracy_score(self.test_y, model.predict(self.test_x)))
+            trial.report(value, step=step)
+            if trial.should_prune():
+                trial.set_user_attr("pruned_at_step", int(step))
+                msg = f"Pruned at step {step} ({self.intermediate_metric}={value:.4f})"
+                raise TrialPruned(msg)
+
+        return callback
+
+    def _log_resource_attributes(
+        self,
+        trial: Trial,
+        model,
+        *,
+        pruned: bool = False,
+    ):
+        """Persist per-trial resource usage for time/shots-to-solution analysis."""
+        if model is None:
+            return
+        trial.set_user_attr("pruned", pruned)
+        training_time = getattr(model, "training_time_", None)
+        if training_time is not None:
+            trial.set_user_attr("training_time", float(training_time))
+        loss_history = getattr(model, "loss_history_", None)
+        if loss_history is not None:
+            trial.set_user_attr("n_steps", len(loss_history))
+        batch_size = getattr(model, "batch_size", None)
+        if batch_size is not None:
+            trial.set_user_attr("batch_size", int(batch_size))
 
     def log_user_attributes(self, model_type, eval_scores, trial):
         if model_type in ["SVC", "SVClinear", "MLPClassifier", "Perceptron"]:
@@ -189,12 +302,15 @@ class Optimizer:
         trials-polling endpoint) initializes the same brand-new database and both
         connections try to ``CREATE TABLE studies`` at once.
         """
+        sampler = self._build_sampler()
+        pruner = self._build_pruner()
         last_exc: Exception | None = None
         for attempt in range(retries):
             try:
                 return create_study(
                     storage=self.storage_location,
-                    sampler=TPESampler(),
+                    sampler=sampler,
+                    pruner=pruner,
                     directions=["maximize"],
                     study_name=self.study_name,
                     load_if_exists=True,
@@ -209,9 +325,15 @@ class Optimizer:
                     time.sleep(delay)
                     continue
                 raise
-        # Final fallback: the study/tables exist, so just load it.
+        # Final fallback: the study/tables exist, so just load it (with the
+        # same sampler/pruner — they are process-level, not persisted).
         try:
-            return load_study(storage=self.storage_location, study_name=self.study_name)
+            return load_study(
+                storage=self.storage_location,
+                study_name=self.study_name,
+                sampler=sampler,
+                pruner=pruner,
+            )
         except Exception:
             if last_exc is not None:
                 raise last_exc from None

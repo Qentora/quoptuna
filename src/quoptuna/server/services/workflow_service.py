@@ -419,6 +419,13 @@ class WorkflowExecutor:
             "db_name": config.get("db_name", "workflow_optimization.db"),
             "model_types": config.get("model_types"),
             "search_space": config.get("search_space"),
+            "sampler": config.get("sampler", "tpe"),
+            "sampler_seed": config.get("sampler_seed"),
+            "pruner": config.get("pruner", "none"),
+            "pruner_min_resource": config.get("pruner_min_resource", 1),
+            "pruner_reduction_factor": config.get("pruner_reduction_factor", 3),
+            "intermediate_metric": config.get("intermediate_metric", "accuracy"),
+            "max_steps": config.get("max_steps"),
         }
 
         # Merge input data if available
@@ -459,6 +466,13 @@ class WorkflowExecutor:
             study_name=opt_config.get("study_name", "workflow_study"),
             model_types=opt_config.get("model_types"),
             search_space=opt_config.get("search_space"),
+            sampler=opt_config.get("sampler", "tpe"),
+            sampler_seed=opt_config.get("sampler_seed"),
+            pruner=opt_config.get("pruner", "none"),
+            pruner_min_resource=opt_config.get("pruner_min_resource", 1),
+            pruner_reduction_factor=opt_config.get("pruner_reduction_factor", 3),
+            intermediate_metric=opt_config.get("intermediate_metric", "accuracy"),
+            max_steps=opt_config.get("max_steps"),
         )
 
         # Run optimization
