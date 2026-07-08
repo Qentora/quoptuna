@@ -17,6 +17,8 @@ from quoptuna.backend.base.pennylane_models.qml_benchmarks.model_utils import tr
 
 MAX_STEPS = 12
 INTERVAL = 3
+ABORT_STEP = 5
+EXPECTED_ABORT_HISTORY_LEN = 6
 
 
 class _TinyModel:
@@ -70,19 +72,19 @@ def test_raising_callback_finalizes_bookkeeping():
     model = _TinyModel()
     x, y = _make_data()
 
-    class _Abort(Exception):
+    class _AbortError(Exception):
         pass
 
     def _cb(step, _hist):
-        if step >= 5:  # noqa: PLR2004
-            raise _Abort
+        if step >= ABORT_STEP:
+            raise _AbortError
 
     model.training_callback = _cb
-    with pytest.raises(_Abort):
+    with pytest.raises(_AbortError):
         train(model, _loss_fn, optax.adam, x, y, _key_generator(), convergence_interval=INTERVAL)
 
     # Aborted training still records its consumed resources.
-    assert len(model.loss_history_) == 6  # aborted at step index 5
+    assert len(model.loss_history_) == EXPECTED_ABORT_HISTORY_LEN  # aborted at step index 5
     assert model.training_time_ >= 0
     # Params are exposed mid-training for callbacks that need to predict.
     assert "w" in model.params_

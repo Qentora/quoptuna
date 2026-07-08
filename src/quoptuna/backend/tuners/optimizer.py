@@ -249,7 +249,13 @@ class Optimizer:
 
         return callback
 
-    def _log_resource_attributes(self, trial: Trial, model, pruned: bool = False):
+    def _log_resource_attributes(
+        self,
+        trial: Trial,
+        model,
+        *,
+        pruned: bool = False,
+    ):
         """Persist per-trial resource usage for time/shots-to-solution analysis."""
         if model is None:
             return
@@ -259,7 +265,7 @@ class Optimizer:
             trial.set_user_attr("training_time", float(training_time))
         loss_history = getattr(model, "loss_history_", None)
         if loss_history is not None:
-            trial.set_user_attr("n_steps", int(len(loss_history)))
+            trial.set_user_attr("n_steps", len(loss_history))
         batch_size = getattr(model, "batch_size", None)
         if batch_size is not None:
             trial.set_user_attr("batch_size", int(batch_size))
