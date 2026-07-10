@@ -23,9 +23,65 @@ import {
   saveAppSettings,
 } from '@/lib/appSettings';
 import { type ApiKeys, loadApiKeys, saveApiKeys } from '@/lib/settings';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Minus, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+
+/** Integer input with -/+ stepper buttons; value is kept as a string state. */
+function IntegerStepper({
+  id,
+  value,
+  onChange,
+  step,
+  min = 1,
+  placeholder,
+}: {
+  id: string;
+  value: string;
+  onChange: (next: string) => void;
+  step: number;
+  min?: number;
+  placeholder?: string;
+}) {
+  const nudge = (direction: 1 | -1) => {
+    const current = Math.floor(Number(value));
+    const base = Number.isFinite(current) && current >= min ? current : min;
+    onChange(String(Math.max(min, base + direction * step)));
+  };
+  return (
+    <div className="flex w-full max-w-xs items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        aria-label="Decrease"
+        onClick={() => nudge(-1)}
+      >
+        <Minus className="h-4 w-4" />
+      </Button>
+      <Input
+        id={id}
+        type="number"
+        inputMode="numeric"
+        min={min}
+        step={step}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        aria-label="Increase"
+        onClick={() => nudge(1)}
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
 
 const FIELDS: Array<{ key: keyof ApiKeys; label: string; placeholder: string; helper: string }> = [
   {
@@ -243,14 +299,12 @@ export default function SettingsPage() {
 
             <Field>
               <FieldLabel htmlFor="max-steps">Max training steps per trial</FieldLabel>
-              <Input
+              <IntegerStepper
                 id="max-steps"
-                type="text"
-                inputMode="numeric"
-                placeholder={String(DEFAULT_MAX_STEPS)}
                 value={maxSteps}
-                onChange={(e) => setMaxSteps(e.target.value)}
-                className="max-w-xs"
+                onChange={setMaxSteps}
+                step={500}
+                placeholder={String(DEFAULT_MAX_STEPS)}
               />
               <FieldDescription>
                 Caps how long each quantum model trains (model default is 10,000). Trials that hit
@@ -260,14 +314,12 @@ export default function SettingsPage() {
 
             <Field>
               <FieldLabel htmlFor="convergence-interval">Convergence interval</FieldLabel>
-              <Input
+              <IntegerStepper
                 id="convergence-interval"
-                type="text"
-                inputMode="numeric"
-                placeholder={String(DEFAULT_CONVERGENCE_INTERVAL)}
                 value={convergenceInterval}
-                onChange={(e) => setConvergenceInterval(e.target.value)}
-                className="max-w-xs"
+                onChange={setConvergenceInterval}
+                step={25}
+                placeholder={String(DEFAULT_CONVERGENCE_INTERVAL)}
               />
               <FieldDescription>
                 Steps between flat-loss convergence checks and pruning reports. Lower values let
