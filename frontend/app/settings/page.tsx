@@ -6,11 +6,82 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Field, FieldDescription, FieldLabel } from '@/components/ui/field';
 import { Input } from '@/components/ui/input';
 import { PageShell } from '@/components/ui/page-shell';
-import { DEFAULT_DATABASE_NAME, loadAppSettings, saveAppSettings } from '@/lib/appSettings';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
+import {
+  DEFAULT_CONVERGENCE_INTERVAL,
+  DEFAULT_DATABASE_NAME,
+  DEFAULT_MAX_STEPS,
+  DEFAULT_MAX_VMAP,
+  MAX_VMAP_OPTIONS,
+  loadAppSettings,
+  saveAppSettings,
+} from '@/lib/appSettings';
 import { type ApiKeys, loadApiKeys, saveApiKeys } from '@/lib/settings';
-import { Eye, EyeOff } from 'lucide-react';
+import { Eye, EyeOff, Minus, Plus } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import toast from 'react-hot-toast';
+
+/** Integer input with -/+ stepper buttons; value is kept as a string state. */
+function IntegerStepper({
+  id,
+  value,
+  onChange,
+  step,
+  min = 1,
+  placeholder,
+}: {
+  id: string;
+  value: string;
+  onChange: (next: string) => void;
+  step: number;
+  min?: number;
+  placeholder?: string;
+}) {
+  const nudge = (direction: 1 | -1) => {
+    const current = Math.floor(Number(value));
+    const base = Number.isFinite(current) && current >= min ? current : min;
+    onChange(String(Math.max(min, base + direction * step)));
+  };
+  return (
+    <div className="flex w-full max-w-xs items-center gap-2">
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        aria-label="Decrease"
+        onClick={() => nudge(-1)}
+      >
+        <Minus className="h-4 w-4" />
+      </Button>
+      <Input
+        id={id}
+        type="number"
+        inputMode="numeric"
+        min={min}
+        step={step}
+        placeholder={placeholder}
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="text-center [appearance:textfield] [&::-webkit-inner-spin-button]:appearance-none [&::-webkit-outer-spin-button]:appearance-none"
+      />
+      <Button
+        type="button"
+        variant="outline"
+        size="icon"
+        aria-label="Increase"
+        onClick={() => nudge(1)}
+      >
+        <Plus className="h-4 w-4" />
+      </Button>
+    </div>
+  );
+}
 
 const FIELDS: Array<{ key: keyof ApiKeys; label: string; placeholder: string; helper: string }> = [
   {
@@ -46,6 +117,17 @@ export default function SettingsPage() {
   const [saving, setSaving] = useState(false);
   const [databaseName, setDatabaseName] = useState(DEFAULT_DATABASE_NAME);
   const [savedDatabaseName, setSavedDatabaseName] = useState(DEFAULT_DATABASE_NAME);
+  // Optimizer performance knobs; numeric fields kept as strings while editing.
+  const [maxVmap, setMaxVmap] = useState(String(DEFAULT_MAX_VMAP));
+  const [maxSteps, setMaxSteps] = useState(String(DEFAULT_MAX_STEPS));
+  const [convergenceInterval, setConvergenceInterval] = useState(
+    String(DEFAULT_CONVERGENCE_INTERVAL)
+  );
+  const [savedOptimizer, setSavedOptimizer] = useState({
+    maxVmap: String(DEFAULT_MAX_VMAP),
+    maxSteps: String(DEFAULT_MAX_STEPS),
+    convergenceInterval: String(DEFAULT_CONVERGENCE_INTERVAL),
+  });
 
   useEffect(() => {
     loadApiKeys()
@@ -57,10 +139,28 @@ export default function SettingsPage() {
     const appSettings = loadAppSettings();
     setDatabaseName(appSettings.databaseName);
     setSavedDatabaseName(appSettings.databaseName);
+    const optimizer = {
+      maxVmap: String(appSettings.maxVmap),
+      maxSteps: String(appSettings.maxSteps),
+      convergenceInterval: String(appSettings.convergenceInterval),
+    };
+    setMaxVmap(optimizer.maxVmap);
+    setMaxSteps(optimizer.maxSteps);
+    setConvergenceInterval(optimizer.convergenceInterval);
+    setSavedOptimizer(optimizer);
   }, []);
 
   const dirty =
-    FIELDS.some((f) => keys[f.key] !== saved[f.key]) || databaseName !== savedDatabaseName;
+    FIELDS.some((f) => keys[f.key] !== saved[f.key]) ||
+    databaseName !== savedDatabaseName ||
+    maxVmap !== savedOptimizer.maxVmap ||
+    maxSteps !== savedOptimizer.maxSteps ||
+    convergenceInterval !== savedOptimizer.convergenceInterval;
+
+  const parsePositiveInt = (raw: string, fallback: number): number => {
+    const n = Math.floor(Number(raw));
+    return Number.isFinite(n) && n >= 1 ? n : fallback;
+  };
 
   const handleSave = async () => {
     setSaving(true);
@@ -68,9 +168,23 @@ export default function SettingsPage() {
       await saveApiKeys(keys);
       setSaved(keys);
       const name = databaseName.trim() || DEFAULT_DATABASE_NAME;
-      saveAppSettings({ databaseName: name });
+      const optimizerValues = {
+        maxVmap: parsePositiveInt(maxVmap, DEFAULT_MAX_VMAP),
+        maxSteps: parsePositiveInt(maxSteps, DEFAULT_MAX_STEPS),
+        convergenceInterval: parsePositiveInt(convergenceInterval, DEFAULT_CONVERGENCE_INTERVAL),
+      };
+      saveAppSettings({ databaseName: name, ...optimizerValues });
       setDatabaseName(name);
       setSavedDatabaseName(name);
+      const optimizer = {
+        maxVmap: String(optimizerValues.maxVmap),
+        maxSteps: String(optimizerValues.maxSteps),
+        convergenceInterval: String(optimizerValues.convergenceInterval),
+      };
+      setMaxVmap(optimizer.maxVmap);
+      setMaxSteps(optimizer.maxSteps);
+      setConvergenceInterval(optimizer.convergenceInterval);
+      setSavedOptimizer(optimizer);
       toast.success('Settings saved');
     } catch {
       toast.error('Could not save settings');
@@ -152,6 +266,64 @@ export default function SettingsPage() {
               <FieldDescription>
                 Optuna SQLite database used for all optimization runs (stored server-side under{' '}
                 <code className="font-mono">db/&lt;name&gt;.db</code>).
+              </FieldDescription>
+            </Field>
+          </CardContent>
+        </Card>
+
+        <Card>
+          <CardHeader>
+            <CardTitle>Optimizer Performance</CardTitle>
+          </CardHeader>
+          <CardContent className="space-y-5">
+            <Field>
+              <FieldLabel htmlFor="max-vmap">Circuit vectorization (max_vmap)</FieldLabel>
+              <Select value={maxVmap} onValueChange={setMaxVmap}>
+                <SelectTrigger id="max-vmap" className="w-full max-w-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {MAX_VMAP_OPTIONS.map((v) => (
+                    <SelectItem key={v} value={String(v)}>
+                      {v}
+                      {v === DEFAULT_MAX_VMAP ? ' (default)' : v === 1 ? ' (slowest)' : ''}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                Quantum circuit evaluations vectorized per JAX call. Higher is much faster on small
+                datasets but uses more memory. Must divide the batch size (32).
+              </FieldDescription>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="max-steps">Max training steps per trial</FieldLabel>
+              <IntegerStepper
+                id="max-steps"
+                value={maxSteps}
+                onChange={setMaxSteps}
+                step={500}
+                placeholder={String(DEFAULT_MAX_STEPS)}
+              />
+              <FieldDescription>
+                Caps how long each quantum model trains (model default is 10,000). Trials that hit
+                the cap without converging are still scored.
+              </FieldDescription>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="convergence-interval">Convergence interval</FieldLabel>
+              <IntegerStepper
+                id="convergence-interval"
+                value={convergenceInterval}
+                onChange={setConvergenceInterval}
+                step={25}
+                placeholder={String(DEFAULT_CONVERGENCE_INTERVAL)}
+              />
+              <FieldDescription>
+                Steps between flat-loss convergence checks and pruning reports. Lower values let
+                converged trials exit sooner and give the pruner earlier decision points.
               </FieldDescription>
             </Field>
           </CardContent>

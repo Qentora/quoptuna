@@ -32,7 +32,10 @@ from quoptuna.backend.base.pennylane_models.qml_benchmarks.model_utils import (
 class QuantumKitchenSinks(BaseEstimator, ClassifierMixin):
     def __init__(
         self,
-        linear_model=LogisticRegression(penalty=None, solver="lbfgs", tol=10e-4),
+        # max_iter raised from sklearn's default 100: unregularized lbfgs on
+        # separable quantum features routinely needs more iterations and
+        # otherwise emits ConvergenceWarning on every fit.
+        linear_model=LogisticRegression(penalty=None, solver="lbfgs", tol=10e-4, max_iter=1000),
         n_episodes=100,
         n_qfeatures="full",
         var=1.0,

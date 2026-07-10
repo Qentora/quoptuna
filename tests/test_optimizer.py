@@ -11,6 +11,7 @@ import numpy as np
 import optuna
 import pytest
 from optuna.trial import FixedTrial
+from sklearn.exceptions import ConvergenceWarning
 
 from quoptuna.backend.tuners import optimizer as optimizer_module
 from quoptuna.backend.tuners.optimizer import (
@@ -26,6 +27,9 @@ ITERATIVE_MAX_STEPS = 12
 ITERATIVE_BATCH_SIZE = 4
 FIRST_PRUNE_CALLBACK_STEP = 2
 PRUNED_TRIAL_COUNT = 3
+UNCONVERGED_MAX_STEPS = 12
+CONVERGENCE_TEST_MAX_STEPS = 500
+CONVERGENCE_TEST_INTERVAL = 50
 
 
 class _FakeModel:
@@ -278,3 +282,91 @@ def test_optimize_without_pruner_attaches_no_callback(tiny_data, monkeypatch):
     assert trial.user_attrs["pruned"] is False
     assert trial.user_attrs["n_steps"] == ITERATIVE_MAX_STEPS
     assert trial.user_attrs["batch_size"] == ITERATIVE_BATCH_SIZE
+
+
+def test_pruner_reports_use_report_index(tiny_data, monkeypatch):
+    """ASHA rungs must be fed the report index (0,1,2,...), not raw training
+    steps, so min_resource/reduction_factor mean 'number of reports'."""
+    monkeypatch.setattr(
+        optimizer_module,
+        "create_model",
+        lambda model_type, **kwargs: _FakeIterativeModel(model_type=model_type, **kwargs),
+    )
+    opt = Optimizer(
+        db_name="unit_rung",
+        study_name="rung_study",
+        data=tiny_data,
+        model_types=["DataReuploadingClassifier"],
+        search_space=TINY_SEARCH_SPACE,
+        pruner="asha",
+        intermediate_metric="neg_loss",
+    )
+    study, _ = opt.optimize(n_trials=1)
+    (trial,) = study.trials
+    # max_steps=12, interval=3 -> 4 reports at indices 0..3 (not steps 2,5,8,11).
+    assert sorted(trial.intermediate_values.keys()) == [0, 1, 2, 3]
+
+
+def test_unconverged_trial_is_scored_not_failed(tiny_data, monkeypatch):
+    """ConvergenceWarning from the training loop must not waste the trial:
+    the partially-trained model is scored and the trial completes."""
+
+    class _UnconvergedModel(_FakeModel):
+        max_steps = UNCONVERGED_MAX_STEPS
+
+        def fit(self, _x, _y):
+            self.loss_history_ = np.ones(self.max_steps)
+            self.training_time_ = 0.05
+            msg = "did not converge"
+            raise ConvergenceWarning(msg)
+
+    monkeypatch.setattr(
+        optimizer_module,
+        "create_model",
+        lambda model_type, **kwargs: _UnconvergedModel(model_type=model_type, **kwargs),
+    )
+    opt = Optimizer(
+        db_name="unit_noconv",
+        study_name="noconv_study",
+        data=tiny_data,
+        model_types=["DataReuploadingClassifier"],
+        search_space=TINY_SEARCH_SPACE,
+    )
+    study, _ = opt.optimize(n_trials=1)
+    (trial,) = study.trials
+    assert trial.state.name == "COMPLETE"
+    assert trial.value is not None
+    assert trial.user_attrs["converged"] is False
+    assert trial.user_attrs["n_steps"] == UNCONVERGED_MAX_STEPS
+
+
+def test_max_vmap_override_replaces_search_space_entry():
+    opt = Optimizer(db_name="unit_vmap", max_vmap=32)
+    assert opt.search_space["max_vmap"] == [32]
+    # Other entries untouched.
+    assert opt.search_space["batch_size"] == DEFAULT_SEARCH_SPACE["batch_size"]
+    # No-op when the (custom) space has no max_vmap key.
+    opt2 = Optimizer(db_name="unit_vmap2", search_space={"C": [1.0]}, max_vmap=32)
+    assert "max_vmap" not in opt2.search_space
+
+
+def test_convergence_interval_reaches_create_model(tiny_data, monkeypatch):
+    captured = {}
+
+    def _factory(model_type, **kwargs):
+        captured.update(kwargs)
+        return _FakeModel(model_type=model_type)
+
+    monkeypatch.setattr(optimizer_module, "create_model", _factory)
+    opt = Optimizer(
+        db_name="unit_ci",
+        data=tiny_data,
+        model_types=["SVC"],
+        search_space=TINY_SEARCH_SPACE,
+        max_steps=CONVERGENCE_TEST_MAX_STEPS,
+        convergence_interval=CONVERGENCE_TEST_INTERVAL,
+    )
+    trial = FixedTrial({"C": 1.0, "model_type": "SVC"})
+    opt.objective(trial)
+    assert captured["max_steps"] == CONVERGENCE_TEST_MAX_STEPS
+    assert captured["convergence_interval"] == CONVERGENCE_TEST_INTERVAL

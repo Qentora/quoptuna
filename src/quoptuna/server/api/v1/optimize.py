@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from optuna.trial import TrialState
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from quoptuna.server.services import dataset_registry, run_store
 from quoptuna.server.services.storage import optuna_storage_url
@@ -62,7 +62,13 @@ class OptimizationRequest(BaseModel):
     # Intermediate value iterative models report for pruning decisions.
     intermediate_metric: Literal["accuracy", "neg_loss"] = "accuracy"
     # Optional cap on training steps for iterative models.
-    max_steps: Optional[int] = None
+    max_steps: Optional[int] = Field(default=None, ge=1)
+    # Optional override of the flat-loss convergence window (also the cadence
+    # of pruning reports).
+    convergence_interval: Optional[int] = Field(default=None, ge=1)
+    # Optional override of circuit-evaluation vectorization width; must divide
+    # the batch size (32 in the default search space).
+    max_vmap: Optional[int] = Field(default=None, ge=1)
 
 
 class OptimizationStatus(BaseModel):
@@ -152,6 +158,8 @@ def build_workflow(
                     "pruner_reduction_factor": request.pruner_reduction_factor,
                     "intermediate_metric": request.intermediate_metric,
                     "max_steps": request.max_steps,
+                    "convergence_interval": request.convergence_interval,
+                    "max_vmap": request.max_vmap,
                 },
             },
         },
@@ -406,22 +414,33 @@ async def get_optimization_trials(optimization_id: str):
         best_value = None
         best_params = None
 
+        finished_count = 0
         for trial in study.trials:
-            # Skip in-flight trials: they have no value yet and would both
-            # inflate the progress count and show up as a bogus 0.0 score.
-            if not trial.state.is_finished():
+            # Include RUNNING trials so the UI can show live training progress
+            # (intermediate pruning reports); skip WAITING/other states.
+            is_running = trial.state == TrialState.RUNNING
+            if not (trial.state.is_finished() or is_running):
                 continue
+            if trial.state.is_finished():
+                finished_count += 1
             # FAILED trials keep value=None (coercing to 0.0 made broken
             # configurations look like real F1=0 runs); the recorded "error"
-            # user attr says why. PRUNED trials also expose None: their stored
-            # value is the last intermediate report, not a final F1.
+            # user attr says why. PRUNED/RUNNING trials also expose None: their
+            # stored value is the last intermediate report, not a final F1.
             is_complete = trial.state == TrialState.COMPLETE
+            intermediate = trial.intermediate_values
             trial_data = {
                 "trial": trial.number,
                 "value": trial.value if is_complete else None,
                 "params": trial.params,
                 "state": trial.state.name,
                 "user_attrs": trial.user_attrs,
+                # Live pruning telemetry: how many intermediate reports the
+                # trial has made and the latest reported value.
+                "n_reports": len(intermediate),
+                "last_intermediate_value": (
+                    intermediate[max(intermediate)] if intermediate else None
+                ),
             }
             trials.append(trial_data)
 
@@ -434,13 +453,14 @@ async def get_optimization_trials(optimization_id: str):
                 best_value = trial.value
                 best_params = trial.params
 
-        # Update job with latest data
+        # Update job with latest data (progress counts finished trials only —
+        # a RUNNING row would advance the progress bar prematurely).
         job["trials"] = trials
-        job["current_trial"] = len(trials)
+        job["current_trial"] = finished_count
         if best_value is not None:
             job["best_value"] = best_value
             job["best_params"] = best_params
-        progress: Dict[str, Any] = {"current_trial": len(trials)}
+        progress: Dict[str, Any] = {"current_trial": finished_count}
         if best_value is not None:
             progress.update(best_value=best_value, best_params=best_params)
         run_store.update_run(optimization_id, **progress)

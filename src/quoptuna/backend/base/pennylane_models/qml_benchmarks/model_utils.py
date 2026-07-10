@@ -130,6 +130,9 @@ def train(model, loss_fn, optimizer, X, y, random_key_generator, convergence_int
 
     if not converged:
         print("Loss did not converge:", loss_history)
+        # Keep the trained parameters on the model: callers that choose to
+        # tolerate non-convergence can still score/use it as-is.
+        model.params_ = params
         raise ConvergenceWarning(
             f"Model {model.__class__.__name__} has not converged after the maximum number of {model.max_steps} steps."
         )

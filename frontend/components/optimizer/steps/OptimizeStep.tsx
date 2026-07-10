@@ -22,7 +22,7 @@ import {
   TableRow,
 } from '@/components/ui/table';
 import { fetchOptimizationTrials, pollOptimization, startOptimization } from '@/lib/api';
-import { getDatabaseName } from '@/lib/appSettings';
+import { getDatabaseName, getOptimizerSettings } from '@/lib/appSettings';
 import { cn } from '@/lib/utils';
 import { Atom, Check, Cpu, PlayCircle, RotateCcw, Trophy } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -59,8 +59,11 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
     try {
       const finalStatus = await pollOptimization(id, (status, trialsData) => {
         // The live trial list from the Optuna DB is fresher than the job's
-        // current_trial counter; prefer it when available.
-        const trialCount = trialsData?.trials?.length ?? status.current_trial;
+        // current_trial counter; prefer it when available. Count finished
+        // trials only — RUNNING rows would advance progress prematurely.
+        const trialCount = trialsData?.trials
+          ? trialsData.trials.filter((t) => t.state !== 'RUNNING').length
+          : status.current_trial;
         setCurrentTrial(trialCount);
         setProgress(status.total_trials ? (trialCount / status.total_trials) * 100 : 0);
         if (trialsData?.trials) {
@@ -125,6 +128,7 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         ? { neg: features.labelMapping.neg, pos: features.labelMapping.pos }
         : undefined;
 
+    const optimizerSettings = getOptimizerSettings();
     try {
       const { id } = await startOptimization({
         dataset_id: dataset.id,
@@ -139,6 +143,9 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         categorical_encoding: features.categoricalEncoding,
         sampler: configuration.sampler,
         pruner: configuration.pruner,
+        max_steps: optimizerSettings.maxSteps,
+        convergence_interval: optimizerSettings.convergenceInterval,
+        max_vmap: optimizerSettings.maxVmap,
       });
 
       // Persist the execution id immediately so a refresh mid-run can resume.
@@ -347,8 +354,10 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
               <TableBody>
                 {sorted.map((trial, index) => {
                   const pruned = trial.state === 'PRUNED';
-                  const failed = !pruned && (trial.value === null || trial.state === 'FAIL');
-                  const selectable = hasResults && !failed && !pruned;
+                  const running = trial.state === 'RUNNING';
+                  const failed =
+                    !pruned && !running && (trial.value === null || trial.state === 'FAIL');
+                  const selectable = hasResults && !failed && !pruned && !running;
                   const selected = optimization.selectedTrial === trial.trial;
                   const classical = isClassicalModel(trial.params?.model_type);
                   const isBest = index === 0 && !failed;
@@ -391,7 +400,20 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
                           selected && 'text-brand'
                         )}
                       >
-                        {pruned ? (
+                        {running ? (
+                          <span
+                            className="font-medium text-brand"
+                            title={
+                              trial.n_reports
+                                ? `${trial.n_reports} intermediate report${trial.n_reports === 1 ? '' : 's'} so far`
+                                : 'Training in progress'
+                            }
+                          >
+                            {trial.last_intermediate_value != null
+                              ? `~${trial.last_intermediate_value.toFixed(4)}`
+                              : 'running…'}
+                          </span>
+                        ) : pruned ? (
                           <span
                             className="font-medium text-muted-foreground"
                             title={

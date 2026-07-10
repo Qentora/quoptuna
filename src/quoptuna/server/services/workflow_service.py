@@ -426,6 +426,8 @@ class WorkflowExecutor:
             "pruner_reduction_factor": config.get("pruner_reduction_factor", 3),
             "intermediate_metric": config.get("intermediate_metric", "accuracy"),
             "max_steps": config.get("max_steps"),
+            "convergence_interval": config.get("convergence_interval"),
+            "max_vmap": config.get("max_vmap"),
         }
 
         # Merge input data if available
@@ -473,6 +475,8 @@ class WorkflowExecutor:
             pruner_reduction_factor=opt_config.get("pruner_reduction_factor", 3),
             intermediate_metric=opt_config.get("intermediate_metric", "accuracy"),
             max_steps=opt_config.get("max_steps"),
+            convergence_interval=opt_config.get("convergence_interval"),
+            max_vmap=opt_config.get("max_vmap"),
         )
 
         # Run optimization

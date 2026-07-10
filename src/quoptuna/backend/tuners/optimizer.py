@@ -6,6 +6,7 @@ import numpy as np
 from optuna import Trial, TrialPruned, create_study, load_study
 from optuna.pruners import HyperbandPruner, NopPruner, SuccessiveHalvingPruner
 from optuna.samplers import GridSampler, RandomSampler, TPESampler
+from sklearn.exceptions import ConvergenceWarning
 from sklearn.metrics import accuracy_score, f1_score
 
 from quoptuna.backend.models import create_model
@@ -83,6 +84,8 @@ class Optimizer:
         pruner_reduction_factor: int = 3,
         intermediate_metric: str = "accuracy",
         max_steps: Optional[int] = None,  # noqa: FA100
+        convergence_interval: Optional[int] = None,  # noqa: FA100
+        max_vmap: Optional[int] = None,  # noqa: FA100
     ):
         """Initialize the Optimizer class.
 
@@ -106,6 +109,11 @@ class Optimizer:
                 or "neg_loss" (negated recent training loss; cheaper, but only
                 meaningful when a single model type is searched).
             max_steps: Optional cap on training steps for iterative models.
+            convergence_interval: Optional override of the models' flat-loss
+                convergence window (also the cadence of pruning reports).
+            max_vmap: Optional override of the ``max_vmap`` search-space entry
+                (circuit evaluations vectorized per JAX call). Must divide the
+                batch size.
 
         Attributes:
             db_name: The name of the database.
@@ -146,6 +154,11 @@ class Optimizer:
         self.pruner_reduction_factor = pruner_reduction_factor
         self.intermediate_metric = intermediate_metric
         self.max_steps = max_steps
+        self.convergence_interval = convergence_interval
+        if max_vmap is not None and "max_vmap" in self.search_space:
+            # Override the vectorization width without touching other entries;
+            # objective() keeps sampling it like any other hyperparameter.
+            self.search_space = {**self.search_space, "max_vmap": [max_vmap]}
 
     def _build_sampler(self):
         if self.sampler == "tpe":
@@ -194,7 +207,12 @@ class Optimizer:
 
             model_type = trial.suggest_categorical("model_type", self.model_types)
 
-            model = create_model(model_type, max_steps=self.max_steps, **params)
+            model = create_model(
+                model_type,
+                max_steps=self.max_steps,
+                convergence_interval=self.convergence_interval,
+                **params,
+            )
 
             # Iterative (JAX-trained) models report intermediate values so the
             # pruner can stop unpromising trials early. Kernel/sklearn models
@@ -202,7 +220,15 @@ class Optimizer:
             if self.pruner != "none" and hasattr(model, "max_steps"):
                 model.training_callback = self._make_pruning_callback(trial, model)
 
-            model.fit(self.train_x, self.train_y)
+            try:
+                model.fit(self.train_x, self.train_y)
+                trial.set_user_attr(key="converged", value=True)
+            except ConvergenceWarning:
+                # The training loop hit max_steps without meeting the flat-loss
+                # criterion. The partially-trained parameters are still valid —
+                # score the model instead of discarding max_steps of compute.
+                logger.warning("Trial %s did not converge; scoring anyway", trial.number)
+                trial.set_user_attr(key="converged", value=False)
             score = model.score(self.test_x, self.test_y)
 
             f_score_ = f1_score(self.test_y, model.predict(self.test_x))
@@ -232,16 +258,39 @@ class Optimizer:
             self._log_resource_attributes(trial, model)
             raise
 
+    # Validation subset cap for the "accuracy" intermediate metric. Quantum
+    # predicts run in max_vmap-sized chunks, so evaluating the full test set at
+    # every report can rival the cost of training itself for some models
+    # (e.g. QuantumMetricLearner). A fixed prefix keeps values comparable
+    # across trials while bounding the per-report circuit count.
+    VALIDATION_SUBSET_SIZE = 128
+
     def _make_pruning_callback(self, trial: Trial, model):
-        """Build the per-interval hook consumed by ``model_utils.train``."""
+        """Build the per-interval hook consumed by ``model_utils.train``.
+
+        The pruner is fed the *report index* (0, 1, 2, ...), not the raw
+        training step, so ``pruner_min_resource``/``pruner_reduction_factor``
+        operate in units of intermediate reports as documented. Raw steps
+        would let a single report jump several ASHA rungs at once.
+        """
+        test_x = self.test_x
+        test_y = self.test_y
+        if test_x is None or test_y is None:
+            msg = "Pruning callback requires test features and labels"
+            raise ValueError(msg)
+        val_x = test_x[: self.VALIDATION_SUBSET_SIZE]
+        val_y = test_y[: self.VALIDATION_SUBSET_SIZE]
+        report_count = {"n": 0}
 
         def callback(step, loss_history):
             if self.intermediate_metric == "neg_loss":
                 window = getattr(model, "convergence_interval", 200)
                 value = -float(np.mean(loss_history[-window:]))
             else:
-                value = float(accuracy_score(self.test_y, model.predict(self.test_x)))
-            trial.report(value, step=step)
+                value = float(accuracy_score(val_y, model.predict(val_x)))
+            report_index = report_count["n"]
+            report_count["n"] += 1
+            trial.report(value, step=report_index)
             if trial.should_prune():
                 trial.set_user_attr("pruned_at_step", int(step))
                 msg = f"Pruned at step {step} ({self.intermediate_metric}={value:.4f})"

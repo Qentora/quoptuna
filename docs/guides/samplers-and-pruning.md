@@ -26,9 +26,22 @@ Iterative (JAX-trained) quantum models report an intermediate value every
 other trials at the same rung and stops trials in the bottom fraction — they
 end in the `PRUNED` state (not `FAILED`) and never win `best_trial`.
 
+The pruner operates on the **report index** (1st, 2nd, 3rd report...), so
+`pruner_min_resource=1` means "a trial may be stopped after its first
+intermediate report". The `accuracy` metric is evaluated on a fixed validation
+subset (first 128 test rows) to bound the circuit cost of each report.
+
 Kernel models (IQPKernel, ProjectedQuantumKernel, QuantumKitchenSinks,
 SeparableKernelClassifier) and classical sklearn models have no training steps;
 they always train to completion regardless of the pruner.
+
+!!! note "Non-converging trials"
+    A trial that reaches `max_steps` without meeting the flat-loss convergence
+    criterion is **not** discarded: the partially-trained model is scored and
+    the trial completes with user attribute `converged: false`. To stop slow
+    trials from consuming the full default budget (10,000 steps), set
+    `max_steps` to a smaller cap — pruning alone cannot stop a trial whose
+    intermediate accuracy stays competitive while its loss keeps drifting.
 
 !!! warning "`neg_loss` caveat"
     `intermediate_metric="neg_loss"` costs zero extra circuit evaluations, but
@@ -40,6 +53,23 @@ they always train to completion regardless of the pruner.
     `sampler="grid"` builds the grid from the categorical search space and may
     exhaust every combination before `num_trials` — the study simply stops
     early.
+
+## Performance tuning
+
+The web UI's **Settings → Optimizer Performance** card (and the corresponding
+`POST /api/v1/optimize` fields) exposes three knobs that dominate trial
+wall-clock:
+
+- **`max_vmap`** (UI default 32): circuit evaluations vectorized per JAX call.
+  The historical value of 1 evaluates one sample at a time; on small tabular
+  datasets, 32 is severalfold faster. Must divide the batch size (32), so
+  valid values are 1/2/4/8/16/32.
+- **`max_steps`** (UI default 2000): training-step cap per trial (model
+  default 10,000). Trials that hit the cap unconverged are still scored.
+- **`convergence_interval`** (UI default 100): steps between flat-loss
+  convergence checks and pruning reports. Lower values let converged trials
+  exit sooner and give ASHA earlier decision points, at the cost of noisier
+  convergence estimates.
 
 ## Resource accounting
 
