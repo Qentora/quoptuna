@@ -17,6 +17,7 @@ from fairlearn.metrics import (
     MetricFrame,
     demographic_parity_difference,
     demographic_parity_ratio,
+    equal_opportunity_difference,
     equalized_odds_difference,
     false_negative_rate,
     false_positive_rate,
@@ -26,6 +27,18 @@ from fairlearn.postprocessing import ThresholdOptimizer
 from sklearn.metrics import accuracy_score, f1_score, precision_score, recall_score
 
 MAX_SENSITIVE_GROUPS = 20
+
+# Disparity metrics that can drive the fairness-aware search (see
+# ``compute_disparity``). All are scalars where 0.0 means perfect parity.
+FAIRNESS_METRICS = (
+    "equal_opportunity_difference",
+    "disparate_impact",
+    "demographic_parity_difference",
+)
+
+# Assigned when a trial's disparity cannot be computed (e.g. a sensitive group
+# with a single class); also the natural upper bound of every metric above.
+WORST_DISPARITY = 1.0
 
 # Quantum/classical models in this project use labels in {-1, 1}; fairlearn's
 # rate metrics assume a {0, 1} positive class, so map at this boundary.
@@ -84,8 +97,37 @@ def compute_fairness(y_true, y_pred, sensitive: pd.Series) -> dict:
         "equalized_odds_difference": float(
             equalized_odds_difference(yt, yp, sensitive_features=sf)
         ),
+        # Disparate Impact is the selection-rate ratio (four-fifths rule);
+        # kept under its dissertation name alongside demographic_parity_ratio.
+        "disparate_impact": float(demographic_parity_ratio(yt, yp, sensitive_features=sf)),
+        "equal_opportunity_difference": float(
+            equal_opportunity_difference(yt, yp, sensitive_features=sf)
+        ),
     }
     return {"by_group": by_group, "overall": overall, "disparities": disparities}
+
+
+def compute_disparity(y_true, y_pred, sensitive, metric: str) -> float:
+    """Scalar disparity to MINIMIZE during search; 0.0 means perfect parity.
+
+    ``disparate_impact`` (a ratio where 1.0 is parity) is mapped to
+    ``max(0, 1 - ratio)`` so every metric shares the same direction; the
+    difference metrics are returned as-is (fairlearn guarantees them
+    non-negative).
+    """
+    yt, yp = _to_binary(y_true), _to_binary(y_pred)
+    sf = np.asarray(sensitive).ravel()
+    if metric == "equal_opportunity_difference":
+        return float(equal_opportunity_difference(yt, yp, sensitive_features=sf))
+    if metric == "disparate_impact":
+        ratio = float(demographic_parity_ratio(yt, yp, sensitive_features=sf))
+        if np.isnan(ratio):
+            return WORST_DISPARITY
+        return max(0.0, 1.0 - ratio)
+    if metric == "demographic_parity_difference":
+        return float(demographic_parity_difference(yt, yp, sensitive_features=sf))
+    msg = f"Unknown fairness metric: {metric!r}. Expected one of {FAIRNESS_METRICS}."
+    raise ValueError(msg)
 
 
 def plot_group_metrics(fairness: dict, title_prefix: str = "") -> dict[str, str]:

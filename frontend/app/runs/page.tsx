@@ -106,6 +106,9 @@ export default function RunsPage() {
           numTrials: req.num_trials ?? 50,
           sampler: req.sampler ?? 'tpe',
           pruner: req.pruner ?? 'none',
+          fairnessMode: req.fairness_mode ?? 'off',
+          fairnessMetric: req.fairness_metric ?? 'equal_opportunity_difference',
+          fairnessThreshold: req.fairness_threshold ?? null,
         },
         optimization: {
           executionId: detail.id,
@@ -114,6 +117,7 @@ export default function RunsPage() {
           bestParams: detail.best_params,
           trials: [],
           selectedTrial: null,
+          paretoTrials: null,
         },
         analysis: { ...initialWorkflowData.analysis },
         report: { markdown: null },

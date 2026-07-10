@@ -117,6 +117,21 @@ export interface OptimizationRequest {
   max_steps?: number;
   convergence_interval?: number;
   max_vmap?: number;
+  // Fairness-aware search. 'constrained' requires sampler 'tpe';
+  // 'multi_objective' requires pruner 'none'; both require sensitive_feature.
+  fairness_mode?: 'off' | 'constrained' | 'multi_objective';
+  fairness_metric?:
+    | 'equal_opportunity_difference'
+    | 'disparate_impact'
+    | 'demographic_parity_difference';
+  fairness_threshold?: number;
+}
+
+// Pareto-front entry of a multi-objective run; values = [f1, disparity].
+export interface ParetoTrial {
+  trial: number;
+  values: number[];
+  params: Record<string, any>;
 }
 
 export type RunStatus =
@@ -150,6 +165,8 @@ export interface OptimizationTrial {
   trial: number;
   // null for FAILED/PRUNED/RUNNING trials; user_attrs.error records failures.
   value: number | null;
+  // Multi-objective runs: [f1, disparity] for COMPLETE trials.
+  values?: number[] | null;
   params: Record<string, any>;
   state: string;
   user_attrs?: Record<string, any>;
@@ -161,6 +178,7 @@ export interface OptimizationTrial {
 export interface OptimizationTrials {
   trials: OptimizationTrial[];
   best_trial: { value: number; params: Record<string, any> } | null;
+  pareto_trials?: ParetoTrial[] | null;
 }
 
 export async function startOptimization(

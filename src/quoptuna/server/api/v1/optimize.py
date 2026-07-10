@@ -8,7 +8,7 @@ from typing import Any, Dict, List, Literal, Optional
 
 from fastapi import APIRouter, BackgroundTasks, HTTPException
 from optuna.trial import TrialState
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from quoptuna.server.services import dataset_registry, run_store
 from quoptuna.server.services.storage import optuna_storage_url
@@ -69,6 +69,31 @@ class OptimizationRequest(BaseModel):
     # Optional override of circuit-evaluation vectorization width; must divide
     # the batch size (32 in the default search space).
     max_vmap: Optional[int] = Field(default=None, ge=1)
+    # Fairness-aware search: "constrained" adds a TPE feasibility constraint on
+    # the disparity; "multi_objective" searches the F1-vs-disparity Pareto front.
+    fairness_mode: Literal["off", "constrained", "multi_objective"] = "off"
+    fairness_metric: Literal[
+        "equal_opportunity_difference", "disparate_impact", "demographic_parity_difference"
+    ] = "equal_opportunity_difference"
+    # Feasibility threshold: difference metrics are feasible when disparity <=
+    # threshold (default 0.1); disparate_impact when the DI ratio >= threshold
+    # (default 0.8, the four-fifths rule).
+    fairness_threshold: Optional[float] = Field(default=None, ge=0, le=1)
+
+    @model_validator(mode="after")
+    def _validate_fairness(self):
+        if self.fairness_mode == "off":
+            return self
+        if not self.sensitive_feature:
+            msg = f"fairness_mode='{self.fairness_mode}' requires sensitive_feature"
+            raise ValueError(msg)
+        if self.fairness_mode == "constrained" and self.sampler != "tpe":
+            msg = "fairness_mode='constrained' requires sampler='tpe' (constraints are TPE-only)"
+            raise ValueError(msg)
+        if self.fairness_mode == "multi_objective" and self.pruner != "none":
+            msg = "fairness_mode='multi_objective' does not support pruning; set pruner='none'"
+            raise ValueError(msg)
+        return self
 
 
 class OptimizationStatus(BaseModel):
@@ -160,6 +185,11 @@ def build_workflow(
                     "max_steps": request.max_steps,
                     "convergence_interval": request.convergence_interval,
                     "max_vmap": request.max_vmap,
+                    "fairness_mode": request.fairness_mode,
+                    "fairness_metric": request.fairness_metric,
+                    "fairness_threshold": request.fairness_threshold,
+                    "sensitive_feature": request.sensitive_feature,
+                    "dataset_id": request.dataset_id,
                 },
             },
         },
@@ -189,7 +219,13 @@ def serialize_study_trials(db_name: str, study_name: str) -> list:
                 "trial": trial.number,
                 # PRUNED trials store their last *intermediate* report as
                 # value; expose None so it is never mistaken for a final F1.
-                "value": trial.value if trial.state == TrialState.COMPLETE else None,
+                # Multi-objective trials have value=None; values[0] is F1.
+                "value": (
+                    trial.values[0] if trial.state == TrialState.COMPLETE and trial.values else None
+                ),
+                "values": list(trial.values)
+                if trial.state == TrialState.COMPLETE and trial.values
+                else None,
                 "params": trial.params,
                 "state": trial.state.name,
                 "user_attrs": trial.user_attrs,
@@ -232,6 +268,7 @@ def run_optimization_background(job_id: str, request: OptimizationRequest):
                 "best_value": opt_result["best_value"],
                 "best_params": opt_result["best_params"],
                 "trials": trials,
+                "pareto_trials": opt_result.get("pareto_trials"),
                 "completed_at": completed_at,
                 "result": opt_result,  # Store full result for SHAP
             }
@@ -429,9 +466,13 @@ async def get_optimization_trials(optimization_id: str):
             # stored value is the last intermediate report, not a final F1.
             is_complete = trial.state == TrialState.COMPLETE
             intermediate = trial.intermediate_values
+            # Multi-objective trials have trial.value=None; values[0] is F1 in
+            # all modes, so "best" below stays "best F1 so far".
+            f1_value = trial.values[0] if is_complete and trial.values else None
             trial_data = {
                 "trial": trial.number,
-                "value": trial.value if is_complete else None,
+                "value": f1_value,
+                "values": list(trial.values) if is_complete and trial.values else None,
                 "params": trial.params,
                 "state": trial.state.name,
                 "user_attrs": trial.user_attrs,
@@ -444,13 +485,9 @@ async def get_optimization_trials(optimization_id: str):
             }
             trials.append(trial_data)
 
-            # Track best (completed trials only)
-            if (
-                is_complete
-                and trial.value is not None
-                and (best_value is None or trial.value > best_value)
-            ):
-                best_value = trial.value
+            # Track best F1 (completed trials only)
+            if f1_value is not None and (best_value is None or f1_value > best_value):
+                best_value = f1_value
                 best_params = trial.params
 
         # Update job with latest data (progress counts finished trials only —
@@ -470,6 +507,7 @@ async def get_optimization_trials(optimization_id: str):
             "best_trial": {"value": best_value, "params": best_params}
             if best_value is not None
             else None,
+            "pareto_trials": job.get("pareto_trials"),
         }
     except Exception:
         # Fallback to stored trials

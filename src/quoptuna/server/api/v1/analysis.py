@@ -26,7 +26,11 @@ from quoptuna.server.api.v1.optimize import (
     get_job,
 )
 from quoptuna.server.services.storage import optuna_storage_url
-from quoptuna.server.services.workflow_service import WorkflowExecutor, build_xai
+from quoptuna.server.services.workflow_service import (
+    WorkflowExecutor,
+    build_xai,
+    study_best_trial,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -99,11 +103,11 @@ def _rehydrate_result(job: dict) -> dict:
     study = load_study(
         storage=optuna_storage_url(request.database_name), study_name=request.study_name
     )
-    best_trial = study.best_trial
+    best_trial = study_best_trial(study)
     result.update(
         {
             "type": "optimization_result",
-            "best_value": best_trial.value,
+            "best_value": best_trial.values[0],
             "best_params": best_trial.params,
             "best_trial_number": best_trial.number,
             "model_name": request.model_name,
@@ -675,10 +679,17 @@ async def generate_study_plots(request: StudyPlotsRequest):
         "timeline": ov.plot_timeline,
     }
 
+    # Multi-objective studies need an explicit target (F1); single-objective
+    # plots reject the kwarg-less form otherwise.
+    plot_kwargs: dict[str, Any] = {}
+    if len(study.directions) > 1:
+        plot_kwargs = {"target": lambda t: t.values[0], "target_name": "F1"}
+
     plots: dict[str, Any] = {}
     for name, func in plot_funcs.items():
         try:
-            fig = cast("Any", func)(study)
+            kwargs = plot_kwargs if name != "timeline" else {}
+            fig = cast("Any", func)(study, **kwargs)
             plots[name] = json.loads(fig.to_json())
         except Exception as exc:
             logger.warning("%s plot failed: %s", name, exc)
@@ -702,7 +713,7 @@ def _resolve_sensitive_series(optimization_id: str, sensitive_feature: Optional[
     row numbers into the raw dataframe (post feature-selection, which only
     selects columns).
     """
-    from quoptuna.server.services import dataset_registry
+    from quoptuna.server.services.sensitive import SensitiveColumnError, resolve_sensitive_series
 
     job = get_job(optimization_id)
     request = OptimizationRequest(**job["request"])
@@ -713,37 +724,13 @@ def _resolve_sensitive_series(optimization_id: str, sensitive_feature: Optional[
             detail="No sensitive_feature provided or stored with this optimization",
         )
 
-    record = dataset_registry.get(request.dataset_id)
-    if not record or not record.get("file_path"):
-        raise HTTPException(status_code=400, detail="Dataset file not found in registry")
-
-    import pandas as pd
-
-    raw_df = pd.read_csv(record["file_path"]).reset_index(drop=True)
-    if column not in raw_df.columns:
-        raise HTTPException(status_code=400, detail=f"Column '{column}' not in dataset")
-
-    x_train = xai.data.get("x_train")
-    n_split = len(x_train) + len(xai.x_test)
-    if len(raw_df) != n_split:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Dataset rows ({len(raw_df)}) do not match the optimization split "
-                f"({n_split}); the dataset file may have changed since the run"
-            ),
+    try:
+        sens_train, sens_test = resolve_sensitive_series(
+            request.dataset_id, column, xai.data.get("x_train"), xai.x_test
         )
-
-    series = raw_df[column]
-    if series.nunique() > MAX_SENSITIVE_GROUPS:
-        raise HTTPException(
-            status_code=400,
-            detail=(
-                f"Column '{column}' has {series.nunique()} unique values "
-                f"(max {MAX_SENSITIVE_GROUPS}); pick a categorical column"
-            ),
-        )
-    return column, series.iloc[x_train.index], series.iloc[xai.x_test.index]
+    except SensitiveColumnError as exc:
+        raise HTTPException(status_code=400, detail=str(exc)) from exc
+    return column, sens_train, sens_test
 
 
 def _compute_fairness_payload(

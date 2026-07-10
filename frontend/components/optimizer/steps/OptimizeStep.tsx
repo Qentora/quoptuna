@@ -104,6 +104,7 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
           bestParams: finalStatus.best_params,
           trials,
           selectedTrial: prev.optimization.selectedTrial ?? bestTrialNumber,
+          paretoTrials: liveTrialsData?.pareto_trials ?? null,
         },
       }));
       setIsRunning(false);
@@ -143,6 +144,9 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         categorical_encoding: features.categoricalEncoding,
         sampler: configuration.sampler,
         pruner: configuration.pruner,
+        fairness_mode: configuration.fairnessMode,
+        fairness_metric: configuration.fairnessMetric,
+        fairness_threshold: configuration.fairnessThreshold ?? undefined,
         max_steps: optimizerSettings.maxSteps,
         convergence_interval: optimizerSettings.convergenceInterval,
         max_vmap: optimizerSettings.maxVmap,
@@ -194,6 +198,7 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
               bestValue: trialsData.best_trial?.value ?? prev.optimization.bestValue,
               bestParams: trialsData.best_trial?.params ?? prev.optimization.bestParams,
               selectedTrial: prev.optimization.selectedTrial ?? bestTrialNumber,
+              paretoTrials: trialsData.pareto_trials ?? prev.optimization.paretoTrials,
             },
           }));
         })
@@ -315,6 +320,15 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
             onSelect={hasResults ? selectTrial : undefined}
           />
         </div>
+      )}
+
+      {hasResults && optimization.paretoTrials && optimization.paretoTrials.length > 0 && (
+        <ParetoFrontCard
+          paretoTrials={optimization.paretoTrials}
+          fairnessMetric={configuration.fairnessMetric}
+          selectedTrial={optimization.selectedTrial}
+          onSelect={selectTrial}
+        />
       )}
 
       <div className="grid grid-cols-1 items-start gap-3 xl:grid-cols-2">
@@ -460,6 +474,91 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         )}
       </div>
     </div>
+  );
+}
+
+const METRIC_LABELS: Record<string, string> = {
+  equal_opportunity_difference: 'Equal opportunity difference',
+  disparate_impact: 'Disparity (1 − DI ratio)',
+  demographic_parity_difference: 'Demographic parity difference',
+};
+
+function ParetoFrontCard({
+  paretoTrials,
+  fairnessMetric,
+  selectedTrial,
+  onSelect,
+}: {
+  paretoTrials: Array<{ trial: number; values: number[]; params: Record<string, any> }>;
+  fairnessMetric: string;
+  selectedTrial: number | null;
+  onSelect: (trialNumber: number) => void;
+}) {
+  // Sort by F1 descending; every row is Pareto-optimal (no trial beats it on
+  // both F1 and fairness), so the user picks the trade-off to analyze.
+  const sorted = [...paretoTrials].sort((a, b) => (b.values[0] ?? 0) - (a.values[0] ?? 0));
+  return (
+    <Card size="sm" className="gap-0 py-0">
+      <div className="border-b border-border bg-muted px-3 py-2">
+        <h4 className="text-xs font-semibold text-foreground">
+          Pareto front ({sorted.length} trade-off{sorted.length === 1 ? '' : 's'})
+        </h4>
+        <p className="text-xs text-muted-foreground">
+          Each row is optimal: improving F1 worsens fairness and vice versa. Click a row to analyze
+          that trial.
+        </p>
+      </div>
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead className="w-10" />
+            <TableHead className="text-right">F1 score</TableHead>
+            <TableHead className="text-right">
+              {METRIC_LABELS[fairnessMetric] ?? 'Disparity'}
+            </TableHead>
+            <TableHead>Model</TableHead>
+            <TableHead className="text-right">Trial</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {sorted.map((t) => {
+            const selected = selectedTrial === t.trial;
+            return (
+              <TableRow
+                key={t.trial}
+                onClick={() => onSelect(t.trial)}
+                onKeyDown={(e) => {
+                  if (e.key === 'Enter' || e.key === ' ') {
+                    e.preventDefault();
+                    onSelect(t.trial);
+                  }
+                }}
+                tabIndex={0}
+                aria-selected={selected}
+                className={cn(
+                  'cursor-pointer focus:outline-hidden focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-brand',
+                  selected && 'bg-brand/10 ring-1 ring-inset ring-brand/40 hover:bg-brand/10'
+                )}
+              >
+                <TableCell className="text-center">
+                  {selected && <Check size={16} className="mx-auto text-brand" />}
+                </TableCell>
+                <TableCell className="text-right font-semibold tabular-nums">
+                  {t.values[0]?.toFixed(4)}
+                </TableCell>
+                <TableCell className="text-right tabular-nums">{t.values[1]?.toFixed(4)}</TableCell>
+                <TableCell className="text-xs text-muted-foreground">
+                  {t.params?.model_type ?? 'N/A'}
+                </TableCell>
+                <TableCell className="text-right text-xs text-muted-foreground tabular-nums">
+                  #{t.trial}
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
+    </Card>
   );
 }
 

@@ -44,6 +44,17 @@ export interface WorkflowData {
     numTrials: number;
     sampler: 'tpe' | 'random' | 'grid';
     pruner: 'none' | 'asha' | 'hyperband';
+    // Fairness-aware search: constrained (TPE feasibility constraint) or
+    // multi-objective (F1 vs disparity Pareto front). Requires a protected
+    // attribute selected in the Features step.
+    fairnessMode: 'off' | 'constrained' | 'multi_objective';
+    fairnessMetric:
+      | 'equal_opportunity_difference'
+      | 'disparate_impact'
+      | 'demographic_parity_difference';
+    // Difference metrics: feasible when disparity <= threshold (default 0.1).
+    // Disparate impact: feasible when ratio >= threshold (default 0.8).
+    fairnessThreshold: number | null;
   };
   optimization: {
     executionId: string | null;
@@ -54,11 +65,19 @@ export interface WorkflowData {
       trial: number;
       // null for FAILED trials (user_attrs.error records why).
       value: number | null;
+      // Multi-objective runs: [f1, disparity]; null otherwise.
+      values?: number[] | null;
       params: Record<string, any>;
       state?: string;
       user_attrs?: Record<string, any>;
     }>;
     selectedTrial: number | null;
+    // Pareto front of a multi-objective run (values = [f1, disparity]).
+    paretoTrials: Array<{
+      trial: number;
+      values: number[];
+      params: Record<string, any>;
+    }> | null;
   };
   analysis: {
     featureImportance: Array<{ feature: string; importance: number }> | null;
@@ -91,6 +110,9 @@ export const initialWorkflowData: WorkflowData = {
     numTrials: 50,
     sampler: 'tpe',
     pruner: 'none',
+    fairnessMode: 'off',
+    fairnessMetric: 'equal_opportunity_difference',
+    fairnessThreshold: null,
   },
   optimization: {
     executionId: null,
@@ -99,6 +121,7 @@ export const initialWorkflowData: WorkflowData = {
     bestParams: null,
     trials: [],
     selectedTrial: null,
+    paretoTrials: null,
   },
   analysis: {
     featureImportance: null,

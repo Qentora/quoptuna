@@ -65,6 +65,10 @@ export function loadWizardState(): WizardState | null {
       ...initialWorkflowData.configuration,
       ...parsed.workflowData.configuration,
     };
+    parsed.workflowData.optimization = {
+      ...initialWorkflowData.optimization,
+      ...parsed.workflowData.optimization,
+    };
     return parsed;
   } catch {
     window.localStorage.removeItem(STORAGE_KEY);
