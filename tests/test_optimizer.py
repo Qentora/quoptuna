@@ -310,6 +310,7 @@ def test_pruner_reports_use_report_index(tiny_data, monkeypatch):
 def test_unconverged_trial_is_scored_not_failed(tiny_data, monkeypatch):
     """ConvergenceWarning from the training loop must not waste the trial:
     the partially-trained model is scored and the trial completes."""
+
     class _UnconvergedModel(_FakeModel):
         max_steps = UNCONVERGED_MAX_STEPS
 
