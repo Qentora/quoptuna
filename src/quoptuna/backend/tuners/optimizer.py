@@ -222,13 +222,13 @@ class Optimizer:
 
             try:
                 model.fit(self.train_x, self.train_y)
-                trial.set_user_attr("converged", True)
+                trial.set_user_attr(key="converged", value=True)
             except ConvergenceWarning:
                 # The training loop hit max_steps without meeting the flat-loss
                 # criterion. The partially-trained parameters are still valid —
                 # score the model instead of discarding max_steps of compute.
                 logger.warning("Trial %s did not converge; scoring anyway", trial.number)
-                trial.set_user_attr("converged", False)
+                trial.set_user_attr(key="converged", value=False)
             score = model.score(self.test_x, self.test_y)
 
             f_score_ = f1_score(self.test_y, model.predict(self.test_x))
@@ -273,8 +273,13 @@ class Optimizer:
         operate in units of intermediate reports as documented. Raw steps
         would let a single report jump several ASHA rungs at once.
         """
-        val_x = self.test_x[: self.VALIDATION_SUBSET_SIZE]
-        val_y = self.test_y[: self.VALIDATION_SUBSET_SIZE]
+        test_x = self.test_x
+        test_y = self.test_y
+        if test_x is None or test_y is None:
+            msg = "Pruning callback requires test features and labels"
+            raise ValueError(msg)
+        val_x = test_x[: self.VALIDATION_SUBSET_SIZE]
+        val_y = test_y[: self.VALIDATION_SUBSET_SIZE]
         report_count = {"n": 0}
 
         def callback(step, loss_history):

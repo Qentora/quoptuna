@@ -11,6 +11,7 @@ import numpy as np
 import optuna
 import pytest
 from optuna.trial import FixedTrial
+from sklearn.exceptions import ConvergenceWarning
 
 from quoptuna.backend.tuners import optimizer as optimizer_module
 from quoptuna.backend.tuners.optimizer import (
@@ -26,6 +27,9 @@ ITERATIVE_MAX_STEPS = 12
 ITERATIVE_BATCH_SIZE = 4
 FIRST_PRUNE_CALLBACK_STEP = 2
 PRUNED_TRIAL_COUNT = 3
+UNCONVERGED_MAX_STEPS = 12
+CONVERGENCE_TEST_MAX_STEPS = 500
+CONVERGENCE_TEST_INTERVAL = 50
 
 
 class _FakeModel:
@@ -283,8 +287,6 @@ def test_optimize_without_pruner_attaches_no_callback(tiny_data, monkeypatch):
 def test_pruner_reports_use_report_index(tiny_data, monkeypatch):
     """ASHA rungs must be fed the report index (0,1,2,...), not raw training
     steps, so min_resource/reduction_factor mean 'number of reports'."""
-    import optuna
-
     monkeypatch.setattr(
         optimizer_module,
         "create_model",
@@ -308,15 +310,14 @@ def test_pruner_reports_use_report_index(tiny_data, monkeypatch):
 def test_unconverged_trial_is_scored_not_failed(tiny_data, monkeypatch):
     """ConvergenceWarning from the training loop must not waste the trial:
     the partially-trained model is scored and the trial completes."""
-    from sklearn.exceptions import ConvergenceWarning
-
     class _UnconvergedModel(_FakeModel):
-        max_steps = 12
+        max_steps = UNCONVERGED_MAX_STEPS
 
         def fit(self, _x, _y):
             self.loss_history_ = np.ones(self.max_steps)
             self.training_time_ = 0.05
-            raise ConvergenceWarning("did not converge")
+            msg = "did not converge"
+            raise ConvergenceWarning(msg)
 
     monkeypatch.setattr(
         optimizer_module,
@@ -335,7 +336,7 @@ def test_unconverged_trial_is_scored_not_failed(tiny_data, monkeypatch):
     assert trial.state.name == "COMPLETE"
     assert trial.value is not None
     assert trial.user_attrs["converged"] is False
-    assert trial.user_attrs["n_steps"] == 12
+    assert trial.user_attrs["n_steps"] == UNCONVERGED_MAX_STEPS
 
 
 def test_max_vmap_override_replaces_search_space_entry():
@@ -361,10 +362,10 @@ def test_convergence_interval_reaches_create_model(tiny_data, monkeypatch):
         data=tiny_data,
         model_types=["SVC"],
         search_space=TINY_SEARCH_SPACE,
-        max_steps=500,
-        convergence_interval=50,
+        max_steps=CONVERGENCE_TEST_MAX_STEPS,
+        convergence_interval=CONVERGENCE_TEST_INTERVAL,
     )
     trial = FixedTrial({"C": 1.0, "model_type": "SVC"})
     opt.objective(trial)
-    assert captured["max_steps"] == 500
-    assert captured["convergence_interval"] == 50
+    assert captured["max_steps"] == CONVERGENCE_TEST_MAX_STEPS
+    assert captured["convergence_interval"] == CONVERGENCE_TEST_INTERVAL
