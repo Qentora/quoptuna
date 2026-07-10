@@ -25,6 +25,7 @@ dependencies = [
     "langchain-anthropic>=0.2.0",
     "langchain-google-genai>=2.0.0",
     "ucimlrepo>=0.0.3",
+    "auth0-server-python>=1.0.0b1,<2",
 ]
 
 # PEP 735 dependency group (installed by default by `uv run`/`uv sync`), so

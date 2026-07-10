@@ -1,3 +1,4 @@
+import { AuthGate } from '@/components/AuthGate';
 import { Sidebar } from '@/components/Sidebar';
 import { SidebarInset, SidebarProvider } from '@/components/ui/sidebar';
 import type { Metadata } from 'next';
@@ -28,14 +29,16 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
     >
       <body>
         <Providers>
-          <SidebarProvider>
-            <Sidebar />
-            <SidebarInset className="h-svh min-w-0">
-              <div data-app-scroll-container className="flex-1 overflow-auto">
-                {children}
-              </div>
-            </SidebarInset>
-          </SidebarProvider>
+          <AuthGate>
+            <SidebarProvider>
+              <Sidebar />
+              <SidebarInset className="h-svh min-w-0">
+                <div data-app-scroll-container className="flex-1 overflow-auto">
+                  {children}
+                </div>
+              </SidebarInset>
+            </SidebarProvider>
+          </AuthGate>
         </Providers>
       </body>
     </html>

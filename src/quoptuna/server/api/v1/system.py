@@ -2,7 +2,9 @@
 System endpoints (health, info, etc.)
 """
 
-from fastapi import APIRouter
+from fastapi import APIRouter, Depends
+
+from quoptuna.server.core.auth import require_user
 
 router = APIRouter()
 
@@ -16,7 +18,7 @@ async def health_check():
     }
 
 
-@router.get("/info")
+@router.get("/info", dependencies=[Depends(require_user)])
 async def system_info():
     """Get system information"""
     return {
@@ -27,7 +29,7 @@ async def system_info():
     }
 
 
-@router.get("/models")
+@router.get("/models", dependencies=[Depends(require_user)])
 async def list_available_models():
     """List all available models"""
     return {

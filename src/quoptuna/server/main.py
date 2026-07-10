@@ -6,13 +6,14 @@ Modern, high-performance backend for quantum machine learning optimization.
 
 from pathlib import Path
 
-from fastapi import FastAPI
+from fastapi import Depends, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.types import Scope
 
-from quoptuna.server.api.v1 import analysis, data, optimize, system
+from quoptuna.server.api.v1 import analysis, auth, data, optimize, system
+from quoptuna.server.core.auth import require_user
 from quoptuna.server.core.config import settings
 
 app = FastAPI(
@@ -32,10 +33,13 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Include routers
-app.include_router(data.router, prefix="/api/v1/data", tags=["data"])
-app.include_router(optimize.router, prefix="/api/v1/optimize", tags=["optimization"])
-app.include_router(analysis.router, prefix="/api/v1/analysis", tags=["analysis"])
+# Include routers. API routes require a session when Auth0 is configured
+# (AUTH0_* env vars set); /auth/*, /api/v1/health, and docs stay open.
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
+_protected = [Depends(require_user)]
+app.include_router(data.router, prefix="/api/v1/data", tags=["data"], dependencies=_protected)
+app.include_router(optimize.router, prefix="/api/v1/optimize", tags=["optimization"], dependencies=_protected)
+app.include_router(analysis.router, prefix="/api/v1/analysis", tags=["analysis"], dependencies=_protected)
 app.include_router(system.router, prefix="/api/v1", tags=["system"])
 
 

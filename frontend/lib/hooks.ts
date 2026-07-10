@@ -6,7 +6,9 @@ import {
   type SHAPRequest,
   generateReport,
   generateSHAP,
+  getAuthProfile,
   getDatasetPreview,
+  getHealth,
   getMetrics,
   getSystemInfo,
   listUCIDatasets,
@@ -24,13 +26,31 @@ export function useSystemInfo() {
  * offline backend resolves to `online: false` rather than throwing.
  */
 export function useBackendStatus() {
+  // Uses the unauthenticated health endpoint so the dot reflects reachability
+  // even when the user is logged out.
   const { data, isLoading, isFetched } = useQuery({
-    queryKey: ['system-info'],
-    queryFn: () => getSystemInfo().catch(() => null),
+    queryKey: ['backend-health'],
+    queryFn: () => getHealth().catch(() => null),
   });
   return {
     online: Boolean(data),
     loading: isLoading || !isFetched,
+  } as const;
+}
+
+/**
+ * Current Auth0 user. `user` is null when logged out; `authEnabled` is false
+ * when the backend has no Auth0 configuration (auth UI hides itself).
+ */
+export function useUser() {
+  const { data, isLoading } = useQuery({
+    queryKey: ['auth-profile'],
+    queryFn: () => getAuthProfile().catch(() => null),
+  });
+  return {
+    user: data?.user ?? null,
+    authEnabled: data?.auth_enabled ?? false,
+    loading: isLoading,
   } as const;
 }
 
