@@ -58,9 +58,7 @@ class CookieStore(AbstractDataStore):
             max_age=self.max_age,
         )
 
-    async def get(
-        self, identifier: str, options: Optional[dict[str, Any]] = None
-    ) -> Optional[Any]:
+    async def get(self, identifier: str, options: Optional[dict[str, Any]] = None) -> Optional[Any]:
         request: Optional[Request] = (options or {}).get("request")
         if request is None:
             return None
@@ -73,9 +71,7 @@ class CookieStore(AbstractDataStore):
             logger.warning("Failed to decrypt cookie %s", self.cookie_name, exc_info=True)
             return None
 
-    async def delete(
-        self, identifier: str, options: Optional[dict[str, Any]] = None
-    ) -> None:
+    async def delete(self, identifier: str, options: Optional[dict[str, Any]] = None) -> None:
         self._response(options).delete_cookie(self.cookie_name)
 
 
@@ -97,7 +93,9 @@ def get_auth_client() -> ServerClient:
             authorization_params={"scope": "openid profile email"},
             secret=secret,
             state_store=CookieStore(secret, SESSION_COOKIE, 259200, StateData),  # 3 days
-            transaction_store=CookieStore(secret, TRANSACTION_COOKIE, 300, TransactionData),  # 5 min
+            transaction_store=CookieStore(
+                secret, TRANSACTION_COOKIE, 300, TransactionData
+            ),  # 5 min
         )
     return _client
 

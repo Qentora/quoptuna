@@ -38,8 +38,12 @@ app.add_middleware(
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 _protected = [Depends(require_user)]
 app.include_router(data.router, prefix="/api/v1/data", tags=["data"], dependencies=_protected)
-app.include_router(optimize.router, prefix="/api/v1/optimize", tags=["optimization"], dependencies=_protected)
-app.include_router(analysis.router, prefix="/api/v1/analysis", tags=["analysis"], dependencies=_protected)
+app.include_router(
+    optimize.router, prefix="/api/v1/optimize", tags=["optimization"], dependencies=_protected
+)
+app.include_router(
+    analysis.router, prefix="/api/v1/analysis", tags=["analysis"], dependencies=_protected
+)
 app.include_router(system.router, prefix="/api/v1", tags=["system"])
 
 
