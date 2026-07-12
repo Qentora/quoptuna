@@ -171,9 +171,14 @@ def _extract_artifacts(value: Any, directory: Path, prefix: str = "payload") -> 
         (directory / filename).write_bytes(base64.b64decode(encoded))
         return {"$artifact": filename, "mime_type": mime}
     if isinstance(value, dict):
-        return {key: _extract_artifacts(item, directory, f"{prefix}.{key}") for key, item in value.items()}
+        return {
+            key: _extract_artifacts(item, directory, f"{prefix}.{key}")
+            for key, item in value.items()
+        }
     if isinstance(value, list):
-        return [_extract_artifacts(item, directory, f"{prefix}.{i}") for i, item in enumerate(value)]
+        return [
+            _extract_artifacts(item, directory, f"{prefix}.{i}") for i, item in enumerate(value)
+        ]
     return value
 
 
@@ -225,7 +230,9 @@ def _hydrate_artifacts(value: Any, directory: Path) -> Any:
 
 def get_snapshot(snapshot_id: str, hydrate: bool = True) -> dict[str, Any] | None:
     with _connect() as conn:
-        row = conn.execute("SELECT * FROM analysis_snapshots WHERE id = ?", (snapshot_id,)).fetchone()
+        row = conn.execute(
+            "SELECT * FROM analysis_snapshots WHERE id = ?", (snapshot_id,)
+        ).fetchone()
     if not row:
         return None
     result = dict(row)
@@ -260,14 +267,25 @@ def list_snapshots(optimization_id: str) -> list[dict[str, Any]]:
     ]
 
 
-def create_report(snapshot: dict[str, Any], provider: str, model_name: str, description: str | None) -> str:
+def create_report(
+    snapshot: dict[str, Any], provider: str, model_name: str, description: str | None
+) -> str:
     report_id = str(uuid.uuid4())
     with _connect() as conn:
         conn.execute(
             "INSERT INTO analysis_reports (id, optimization_id, snapshot_id, snapshot_revision, "
             "status, provider, model_name, dataset_description, created_at) "
             "VALUES (?, ?, ?, ?, 'running', ?, ?, ?, ?)",
-            (report_id, snapshot["optimization_id"], snapshot["id"], snapshot["revision"], provider, model_name, description, _now()),
+            (
+                report_id,
+                snapshot["optimization_id"],
+                snapshot["id"],
+                snapshot["revision"],
+                provider,
+                model_name,
+                description,
+                _now(),
+            ),
         )
     return report_id
 
@@ -299,9 +317,12 @@ def list_reports(snapshot_id: str) -> list[dict[str, Any]]:
 
 def delete_for_run(optimization_id: str) -> None:
     with _connect() as conn:
-        snapshot_ids = [row["id"] for row in conn.execute(
-            "SELECT id FROM analysis_snapshots WHERE optimization_id = ?", (optimization_id,)
-        ).fetchall()]
+        snapshot_ids = [
+            row["id"]
+            for row in conn.execute(
+                "SELECT id FROM analysis_snapshots WHERE optimization_id = ?", (optimization_id,)
+            ).fetchall()
+        ]
         for snapshot_id in snapshot_ids:
             conn.execute("DELETE FROM analysis_jobs WHERE snapshot_id = ?", (snapshot_id,))
             conn.execute("DELETE FROM analysis_reports WHERE snapshot_id = ?", (snapshot_id,))

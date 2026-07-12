@@ -506,7 +506,8 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
         )
         shap_data = await optional("shap_data", generate_shap_data(shap_request))
         study = await optional(
-            "study_plots", generate_study_plots(StudyPlotsRequest(optimization_id=request.optimization_id))
+            "study_plots",
+            generate_study_plots(StudyPlotsRequest(optimization_id=request.optimization_id)),
         )
         fairness = None
         job = get_job(request.optimization_id)
