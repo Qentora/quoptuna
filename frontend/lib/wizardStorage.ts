@@ -16,9 +16,8 @@ export interface WizardState {
 }
 
 /**
- * Drop the bulky, re-derivable analysis payloads (base64 plot images, Plotly
- * JSON) that can exceed the ~5MB localStorage quota. Metrics and flags are
- * kept; AnalyzeStep re-fetches missing plots automatically on restore.
+ * Persist only the server-side snapshot identity and lightweight workflow
+ * state. Analysis values and artifacts are restored from the backend.
  */
 function stripHeavyData(state: WizardState): WizardState {
   return {
@@ -31,6 +30,8 @@ function stripHeavyData(state: WizardState): WizardState {
         studyPlots: null,
         confusionMatrixPlot: null,
         fairness: null,
+        featureImportance: null,
+        metrics: null,
       },
     },
   };
@@ -39,7 +40,7 @@ function stripHeavyData(state: WizardState): WizardState {
 export function saveWizardState(state: WizardState): void {
   if (typeof window === 'undefined') return;
   try {
-    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+    window.localStorage.setItem(STORAGE_KEY, JSON.stringify(stripHeavyData(state)));
   } catch {
     // Quota exceeded (analysis plots are megabytes of base64). Losing the
     // WHOLE state silently is far worse than losing the plots — retry with
@@ -68,6 +69,10 @@ export function loadWizardState(): WizardState | null {
     parsed.workflowData.optimization = {
       ...initialWorkflowData.optimization,
       ...parsed.workflowData.optimization,
+    };
+    parsed.workflowData.analysis = {
+      ...initialWorkflowData.analysis,
+      ...parsed.workflowData.analysis,
     };
     return parsed;
   } catch {

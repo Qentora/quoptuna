@@ -22,23 +22,20 @@ import { Label } from '@/components/ui/label';
 import { Metric } from '@/components/ui/metric';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  type AnalysisSnapshot,
   type ConfusionMatrixData,
   type CurvesData,
   type FeatureImportanceData,
   type ShapData,
-  generateFairness,
-  generateSHAP,
-  getConfusionMatrixData,
-  getCurves,
-  getCurvesData,
-  getFeatureImportanceData,
-  getMetrics,
-  getShapData,
-  getStudyPlots,
+  getAnalysisJob,
+  getAnalysisSnapshot,
+  listAnalysisSnapshots,
+  startAnalysisJob,
+  updateSnapshotFairness,
 } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { BarChart3, Download, Loader2, Scale } from 'lucide-react';
-import { Fragment, useEffect, useRef, useState } from 'react';
+import { Fragment, useCallback, useEffect, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -56,7 +53,7 @@ import { ErrorBanner } from '../NavButtons';
 import { PlotSkeleton, PlotlyFigure } from '../PlotlyFigure';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
-import type { FairnessMetrics } from '../types';
+import type { FairnessMetrics, WorkflowData } from '../types';
 
 const STUDY_PLOTS: Array<{ id: string; label: string; wide?: boolean }> = [
   { id: 'optimization_history', label: 'Optimization history', wide: true },
@@ -78,21 +75,34 @@ function downloadDataUrl(dataUrl: string, filename: string) {
 const fmt = (v: unknown) =>
   typeof v === 'number' ? v.toFixed(4) : v === null || v === undefined ? '—' : String(v);
 
+function initialEmptyAnalysis(current: WorkflowData['analysis']): WorkflowData['analysis'] {
+  return {
+    ...current,
+    snapshotId: null,
+    snapshotRevision: null,
+    config: null,
+    featureImportance: null,
+    plots: {},
+    studyPlots: null,
+    metrics: null,
+    confusionMatrixPlot: null,
+    rocAuc: null,
+    averagePrecision: null,
+    fairness: null,
+  };
+}
+
 export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const [isGenerating, setIsGenerating] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [useProba, setUseProba] = useState(true);
-  const [subsetSize, setSubsetSize] = useState(50);
-  const [sampleIndex, setSampleIndex] = useState(0);
+  const [useProba, setUseProba] = useState(workflowData.analysis.config?.useProba ?? true);
+  const [subsetSize, setSubsetSize] = useState(workflowData.analysis.config?.subsetSize ?? 50);
+  const [sampleIndex, setSampleIndex] = useState(workflowData.analysis.config?.sampleIndex ?? 0);
 
   const { optimization, analysis, features } = workflowData;
   const [isMitigating, setIsMitigating] = useState(false);
   const [fairnessError, setFairnessError] = useState<string | null>(null);
-  // Plots may be absent even when metrics exist: the localStorage autosave
-  // strips them when the payload exceeds the quota. Re-fetch in that case.
-  const hasPlots = Object.keys(analysis.plots).length > 0;
-  const hasSHAP = analysis.featureImportance !== null;
-  const autoRan = useRef(false);
+  const hasSHAP = analysis.status === 'completed' && analysis.featureImportance !== null;
 
   // Native chart data (JSON endpoints); each falls back to the PNG plot when null.
   const [curvesData, setCurvesData] = useState<CurvesData | null>(null);
@@ -100,32 +110,92 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
   const [importanceData, setImportanceData] = useState<FeatureImportanceData | null>(null);
   const [shapData, setShapData] = useState<ShapData | null>(null);
   // Multiclass: which class's SHAP slice is displayed.
-  const [shapClassIndex, setShapClassIndex] = useState(0);
+  const [shapClassIndex, setShapClassIndex] = useState(
+    workflowData.analysis.config?.classIndex ?? 0
+  );
 
-  // biome-ignore lint/correctness/useExhaustiveDependencies: useProba/subsetSize are read at fetch time only.
+  const applySnapshot = useCallback(
+    (snapshot: AnalysisSnapshot) => {
+      const payload = snapshot.payload;
+      setCurvesData(payload.curves_data);
+      setConfusionData(payload.confusion_data);
+      setImportanceData(payload.importance_data);
+      setShapData(payload.shap_data);
+      setWorkflowData((prev) => ({
+        ...prev,
+        report: { markdown: null },
+        analysis: {
+          snapshotId: snapshot.id,
+          snapshotRevision: snapshot.revision,
+          status: 'completed',
+          config: {
+            trialNumber: snapshot.config.trial_number,
+            useProba: snapshot.config.use_proba,
+            subsetSize: snapshot.config.subset_size,
+            classIndex: snapshot.config.class_index,
+            sampleIndex: snapshot.config.sample_index,
+          },
+          featureImportance: payload.feature_importance,
+          plots: payload.plots ?? {},
+          studyPlots: payload.study_plots,
+          metrics: payload.metrics,
+          confusionMatrixPlot: payload.confusion_matrix_plot,
+          rocAuc: payload.roc_auc,
+          averagePrecision: payload.average_precision,
+          fairness: payload.fairness,
+        },
+      }));
+    },
+    [setWorkflowData]
+  );
+
+  // Restore persisted data only; this effect never starts computation.
   useEffect(() => {
-    const id = optimization.executionId;
-    if (!id) return;
+    const optimizationId = optimization.executionId;
+    if (!optimizationId || isGenerating) return;
     let cancelled = false;
-    const body = { optimization_id: id, trial_number: optimization.selectedTrial ?? undefined };
-    void Promise.all([
-      getCurvesData({ ...body, use_proba: useProba, subset_size: subsetSize }).catch(() => null),
-      getConfusionMatrixData(body).catch(() => null),
-      getFeatureImportanceData(body).catch(() => null),
-      getShapData({ ...body, subset_size: subsetSize, class_index: shapClassIndex }).catch(
-        () => null
-      ),
-    ]).then(([curves, cm, fi, shap]) => {
+    const restore = async () => {
+      const snapshots = await listAnalysisSnapshots(optimizationId);
+      const match = snapshots.find(
+        (item) =>
+          item.config.trial_number === optimization.selectedTrial &&
+          item.config.use_proba === useProba &&
+          item.config.subset_size === subsetSize &&
+          item.config.class_index === shapClassIndex &&
+          item.config.sample_index === sampleIndex
+      );
       if (cancelled) return;
-      setCurvesData(curves);
-      setConfusionData(cm);
-      setImportanceData(fi);
-      setShapData(shap);
+      if (match) {
+        applySnapshot(await getAnalysisSnapshot(match.id));
+      } else {
+        setCurvesData(null);
+        setConfusionData(null);
+        setImportanceData(null);
+        setShapData(null);
+        setWorkflowData((prev) => ({
+          ...prev,
+          report: { markdown: null },
+          analysis: { ...initialEmptyAnalysis(prev.analysis), status: 'idle' },
+        }));
+      }
+    };
+    void restore().catch((err) => {
+      if (!cancelled) setError(err instanceof Error ? err.message : 'Could not restore analysis');
     });
     return () => {
       cancelled = true;
     };
-  }, [optimization.executionId, optimization.selectedTrial, shapClassIndex]);
+  }, [
+    optimization.executionId,
+    optimization.selectedTrial,
+    useProba,
+    subsetSize,
+    shapClassIndex,
+    sampleIndex,
+    isGenerating,
+    applySnapshot,
+    setWorkflowData,
+  ]);
 
   useEffect(() => {
     setFooter({ canContinue: hasSHAP, nextBusy: isGenerating, backDisabled: isGenerating });
@@ -142,47 +212,29 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
     setError(null);
     setFairnessError(null);
     try {
-      const [shap, metrics, curves, study, fairness] = await Promise.all([
-        generateSHAP({
-          optimization_id: id,
-          trial_number: trial,
-          sample_index: sampleIndex,
-          use_proba: useProba,
-          subset_size: subsetSize,
-          class_index: shapClassIndex,
-        }),
-        getMetrics(id, trial).catch(() => null),
-        getCurves(id, trial, useProba, subsetSize).catch(() => null),
-        getStudyPlots(id).catch(() => null),
-        // Runs only when a protected attribute was stored with the run or is
-        // set in this session; the endpoint 400s harmlessly otherwise.
-        generateFairness({
-          optimization_id: id,
-          trial_number: trial,
-          sensitive_feature: features.sensitiveFeature ?? undefined,
-        }).catch((err) => {
-          setFairnessError(err instanceof Error ? err.message : 'Fairness audit failed');
-          return null;
-        }),
-      ]);
-
+      const started = await startAnalysisJob({
+        optimization_id: id,
+        trial_number: trial,
+        sample_index: sampleIndex,
+        use_proba: useProba,
+        subset_size: subsetSize,
+        class_index: shapClassIndex,
+      });
       setWorkflowData((prev) => ({
         ...prev,
-        analysis: {
-          featureImportance: shap.feature_importance,
-          plots: {
-            ...shap.plots,
-            ...(curves?.roc_curve_plot ? { rocCurve: curves.roc_curve_plot } : {}),
-            ...(curves?.pr_curve_plot ? { prCurve: curves.pr_curve_plot } : {}),
-          },
-          studyPlots: study?.plots ?? null,
-          metrics: metrics?.metrics ?? null,
-          confusionMatrixPlot: metrics?.confusion_matrix_plot ?? null,
-          rocAuc: curves?.roc_auc ?? null,
-          averagePrecision: curves?.average_precision ?? null,
-          fairness,
-        },
+        analysis: { ...prev.analysis, snapshotId: started.snapshot_id, status: 'pending' },
       }));
+      let job = started;
+      while (job.status === 'pending' || job.status === 'running') {
+        await new Promise((resolve) => setTimeout(resolve, 1000));
+        job = await getAnalysisJob(started.id);
+        setWorkflowData((prev) => ({
+          ...prev,
+          analysis: { ...prev.analysis, status: job.status },
+        }));
+      }
+      if (job.status === 'failed') throw new Error(job.error || 'Analysis failed');
+      applySnapshot(await getAnalysisSnapshot(started.snapshot_id));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed');
     } finally {
@@ -190,28 +242,21 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
     }
   };
 
-  // Auto-run once on entering the step when results exist and none yet.
-  // biome-ignore lint/correctness/useExhaustiveDependencies: run once on mount.
-  useEffect(() => {
-    if (!autoRan.current && optimization.executionId && (!hasSHAP || !hasPlots)) {
-      autoRan.current = true;
-      void runAnalysis();
-    }
-  }, []);
-
   const runFairness = async () => {
-    if (!optimization.executionId) return;
+    if (!analysis.snapshotId) return;
     setIsMitigating(true);
     setFairnessError(null);
     try {
-      const result = await generateFairness({
-        optimization_id: optimization.executionId,
-        trial_number: optimization.selectedTrial ?? undefined,
+      const result = await updateSnapshotFairness(analysis.snapshotId, {
         sensitive_feature: features.sensitiveFeature ?? undefined,
       });
       setWorkflowData((prev) => ({
         ...prev,
-        analysis: { ...prev.analysis, fairness: result },
+        analysis: {
+          ...prev.analysis,
+          fairness: result.fairness,
+          snapshotRevision: result.revision,
+        },
       }));
     } catch (err) {
       setFairnessError(err instanceof Error ? err.message : 'Fairness audit failed');
@@ -221,19 +266,21 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
   };
 
   const runMitigation = async () => {
-    if (!optimization.executionId || !analysis.fairness) return;
+    if (!analysis.snapshotId || !analysis.fairness) return;
     setIsMitigating(true);
     setError(null);
     try {
-      const result = await generateFairness({
-        optimization_id: optimization.executionId,
-        trial_number: optimization.selectedTrial ?? undefined,
+      const result = await updateSnapshotFairness(analysis.snapshotId, {
         sensitive_feature: analysis.fairness.sensitive_feature,
         mitigate: true,
       });
       setWorkflowData((prev) => ({
         ...prev,
-        analysis: { ...prev.analysis, fairness: result },
+        analysis: {
+          ...prev.analysis,
+          fairness: result.fairness,
+          snapshotRevision: result.revision,
+        },
       }));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Mitigation failed');
@@ -575,15 +622,22 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
                     >
                       Mitigation (ThresholdOptimizer) is available for binary targets only.
                     </p>
-                  ) : !analysis.fairness.mitigation && (
-                    <Button type="button" size="sm" onClick={runMitigation} disabled={isMitigating}>
-                      {isMitigating ? (
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                      ) : (
-                        <Scale className="h-4 w-4" />
-                      )}
-                      Run mitigation (ThresholdOptimizer)
-                    </Button>
+                  ) : (
+                    !analysis.fairness.mitigation && (
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={runMitigation}
+                        disabled={isMitigating}
+                      >
+                        {isMitigating ? (
+                          <Loader2 className="h-4 w-4 animate-spin" />
+                        ) : (
+                          <Scale className="h-4 w-4" />
+                        )}
+                        Run mitigation (ThresholdOptimizer)
+                      </Button>
+                    )
                   )}
                 </div>
 
@@ -810,15 +864,21 @@ const CLASS_CHART_COLORS = [
 
 const classColor = (i: number) => CLASS_CHART_COLORS[i % CLASS_CHART_COLORS.length];
 
-function isPerClassRoc(
-  roc: NonNullable<CurvesData['roc']>
-): roc is { per_class: Array<{ label: string; fpr: number[]; tpr: number[]; auc: number | null }>; macro_auc: number | null } {
+function isPerClassRoc(roc: NonNullable<CurvesData['roc']>): roc is {
+  per_class: Array<{ label: string; fpr: number[]; tpr: number[]; auc: number | null }>;
+  macro_auc: number | null;
+} {
   return 'per_class' in roc;
 }
 
-function isPerClassPr(
-  pr: NonNullable<CurvesData['pr']>
-): pr is { per_class: Array<{ label: string; precision: number[]; recall: number[]; average_precision: number | null }> } {
+function isPerClassPr(pr: NonNullable<CurvesData['pr']>): pr is {
+  per_class: Array<{
+    label: string;
+    precision: number[];
+    recall: number[];
+    average_precision: number | null;
+  }>;
+} {
   return 'per_class' in pr;
 }
 

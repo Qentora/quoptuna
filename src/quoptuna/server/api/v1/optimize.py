@@ -554,6 +554,9 @@ async def cancel_optimization(optimization_id: str):
         run_store.update_run(optimization_id, status="cancelled", completed_at=job["completed_at"])
         return {"message": "Optimization cancelled"}
 
+    from quoptuna.server.services import analysis_store
+
+    analysis_store.delete_for_run(optimization_id)
     run_store.delete_run(optimization_id)
     optimization_jobs.pop(optimization_id, None)
     return {"message": "Optimization run deleted"}

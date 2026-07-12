@@ -546,6 +546,8 @@ export async function generateFairness(body: {
 
 export interface ReportRequest {
   optimization_id: string;
+  analysis_snapshot_id: string;
+  analysis_revision: number;
   trial_number?: number;
   llm_provider: 'google' | 'openai' | 'anthropic';
   api_key: string;
@@ -559,6 +561,112 @@ export interface ReportResponse {
   optimization_id: string;
   status: string;
   report_markdown: string;
+}
+
+export interface AnalysisConfig {
+  trial_number: number | null;
+  use_proba: boolean;
+  subset_size: number;
+  class_index: number;
+  sample_index: number;
+}
+
+export interface AnalysisSnapshotPayload {
+  feature_importance: FeatureImportance[] | null;
+  plots: Record<string, string>;
+  study_plots: Record<string, PlotlyFigureJSON | null> | null;
+  metrics: Record<string, any> | null;
+  confusion_matrix_plot: string | null;
+  roc_auc: number | null;
+  average_precision: number | null;
+  fairness: FairnessResponse | null;
+  curves_data: CurvesData | null;
+  confusion_data: ConfusionMatrixData | null;
+  importance_data: FeatureImportanceData | null;
+  shap_data: ShapData | null;
+  warnings: Record<string, string>;
+}
+
+export interface AnalysisSnapshotSummary {
+  id: string;
+  optimization_id: string;
+  revision: number;
+  config: AnalysisConfig;
+  completed_at: string;
+}
+
+export interface AnalysisSnapshot extends AnalysisSnapshotSummary {
+  payload: AnalysisSnapshotPayload;
+}
+
+export interface AnalysisJob {
+  id: string;
+  snapshot_id: string;
+  status: 'pending' | 'running' | 'completed' | 'failed';
+  current_section?: string | null;
+  error?: string | null;
+  revision?: number;
+}
+
+export async function startAnalysisJob(body: {
+  optimization_id: string;
+  trial_number?: number;
+  use_proba: boolean;
+  subset_size: number;
+  class_index: number;
+  sample_index: number;
+}): Promise<AnalysisJob> {
+  return request<AnalysisJob>('/api/v1/analysis/jobs', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
+}
+
+export async function getAnalysisJob(id: string): Promise<AnalysisJob> {
+  return request<AnalysisJob>(`/api/v1/analysis/jobs/${id}`);
+}
+
+export async function getAnalysisSnapshot(id: string): Promise<AnalysisSnapshot> {
+  return request<AnalysisSnapshot>(`/api/v1/analysis/snapshots/${id}`);
+}
+
+export async function listAnalysisSnapshots(
+  optimizationId: string
+): Promise<AnalysisSnapshotSummary[]> {
+  const result = await request<{ snapshots: AnalysisSnapshotSummary[] }>(
+    `/api/v1/analysis/snapshots?optimization_id=${encodeURIComponent(optimizationId)}`
+  );
+  return result.snapshots;
+}
+
+export interface PersistedReport {
+  id: string;
+  snapshot_id: string;
+  snapshot_revision: number;
+  status: 'running' | 'completed' | 'failed';
+  markdown: string | null;
+  provider: string;
+  model_name: string;
+  created_at: string;
+}
+
+export async function listSnapshotReports(snapshotId: string): Promise<PersistedReport[]> {
+  const result = await request<{ reports: PersistedReport[] }>(
+    `/api/v1/analysis/snapshots/${snapshotId}/reports`
+  );
+  return result.reports;
+}
+
+export async function updateSnapshotFairness(
+  snapshotId: string,
+  body: { sensitive_feature?: string; mitigate?: boolean; constraint?: string }
+): Promise<{ fairness: FairnessResponse; snapshot_id: string; revision: number }> {
+  return request(`/api/v1/analysis/snapshots/${snapshotId}/fairness`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify(body),
+  });
 }
 
 export async function generateReport(body: ReportRequest): Promise<ReportResponse> {
