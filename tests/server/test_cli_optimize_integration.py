@@ -137,20 +137,25 @@ def test_cli_optimize_dispatches(monkeypatch, iris_csv):
         seen.update(kwargs)
         return {"best_value": 1.0, "task_spec": None}
 
-    monkeypatch.setattr(
-        "quoptuna.server.services.headless.run_headless_optimization", _fake_run
-    )
+    monkeypatch.setattr("quoptuna.server.services.headless.run_headless_optimization", _fake_run)
     result = runner.invoke(
         cli.app,
         [
             "optimize",
-            "--csv", iris_csv,
-            "--target", "species",
-            "--trials", "2",
-            "--models", "SVC,IQPKernelClassifier",
-            "--favorable-class", "setosa",
-            "--sensitive-feature", "sw",
-            "--seed", "7",
+            "--csv",
+            iris_csv,
+            "--target",
+            "species",
+            "--trials",
+            "2",
+            "--models",
+            "SVC,IQPKernelClassifier",
+            "--favorable-class",
+            "setosa",
+            "--sensitive-feature",
+            "sw",
+            "--seed",
+            "7",
         ],
     )
     assert result.exit_code == 0, result.output

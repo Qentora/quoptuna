@@ -206,7 +206,7 @@ def _spec_display_labels(spec: Optional[dict], encoded: list) -> list[str]:
         return [str(v) for v in encoded]
     labels = [str(c) for c in spec.get("class_labels", [])]
     if spec.get("kind") == "binary":
-        mapping = {-1: labels[0], 1: labels[1]} if len(labels) == 2 else {}  # noqa: PLR2004
+        mapping = {-1: labels[0], 1: labels[1]} if len(labels) == 2 else {}
         return [mapping.get(int(v), str(v)) for v in encoded]
     out = []
     for v in encoded:
@@ -521,9 +521,7 @@ async def generate_metrics(request: MetricsRequest):
             )
             _safe(
                 "average_precision_score",
-                lambda: average_precision_score(
-                    xai.y_test, _positive_proba(xai.predictions_proba)
-                ),
+                lambda: average_precision_score(xai.y_test, _positive_proba(xai.predictions_proba)),
             )
         _safe("mcc", xai.get_mcc)
         _safe("cohens_kappa", xai.get_cohens_kappa)
@@ -543,9 +541,7 @@ async def generate_metrics(request: MetricsRequest):
                     output_dict=True,
                     zero_division=0,
                 )
-                metrics["per_class"] = {
-                    name: report[name] for name in names if name in report
-                }
+                metrics["per_class"] = {name: report[name] for name in names if name in report}
             except Exception as exc:
                 logger.warning("per_class metrics failed: %s", exc)
 

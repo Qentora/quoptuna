@@ -124,9 +124,7 @@ def compute_fairness(y_true, y_pred, sensitive: pd.Series, favorable: int = _POS
     return {"by_group": by_group, "overall": overall, "disparities": disparities}
 
 
-def compute_disparity(
-    y_true, y_pred, sensitive, metric: str, favorable: int = _POS_LABEL
-) -> float:
+def compute_disparity(y_true, y_pred, sensitive, metric: str, favorable: int = _POS_LABEL) -> float:
     """Scalar disparity to MINIMIZE during search; 0.0 means perfect parity.
 
     ``disparate_impact`` (a ratio where 1.0 is parity) is mapped to
