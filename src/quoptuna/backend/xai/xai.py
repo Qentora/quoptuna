@@ -349,9 +349,9 @@ class XAI:
         """Get the average precision score of the model."""
         return average_precision_score(self.y_test, self.predictions_proba)
 
-    def get_f1_score(self):
-        """Get the f1 score of the model."""
-        return f1_score(self.y_test, self.predictions)
+    def get_f1_score(self, average: str = "binary"):
+        """Get the f1 score of the model (pass average='macro' for multiclass)."""
+        return f1_score(self.y_test, self.predictions, average=average)
 
     def get_mcc(self):
         """Get the mcc of the model."""
@@ -365,13 +365,13 @@ class XAI:
         """Get the cohens kappa of the model."""
         return cohen_kappa_score(self.y_test, self.predictions)
 
-    def get_precision(self):
-        """Get the precision of the model."""
-        return precision_score(self.y_test, self.predictions)
+    def get_precision(self, average: str = "binary"):
+        """Get the precision of the model (pass average='macro' for multiclass)."""
+        return precision_score(self.y_test, self.predictions, average=average)
 
-    def get_recall(self):
-        """Get the recall of the model."""
-        return recall_score(self.y_test, self.predictions)
+    def get_recall(self, average: str = "binary"):
+        """Get the recall of the model (pass average='macro' for multiclass)."""
+        return recall_score(self.y_test, self.predictions, average=average)
 
     def get_report(self):
         """Get the report of the model."""
@@ -428,25 +428,51 @@ class XAI:
     def __str__(self):
         return str(self.get_report())
 
-    async def generate_report_with_llm(
+    async def generate_report_with_llm(  # noqa: PLR0913
         self,
         api_key: str,
         model_name: str = "gpt-4o",
         provider: str = "google",
         num_waterfall_plots: int = 5,
         fairness: dict | None = None,
+        task_spec: dict | None = None,
     ) -> str:
         """Generate a markdown report via the OpenAI Agents SDK pipeline.
 
         ``fairness`` is the payload produced by the fairness audit (metrics,
         group plots, optional mitigation); its plots and numbers are passed to
-        the LLM alongside the SHAP/metric evidence.
+        the LLM alongside the SHAP/metric evidence. ``task_spec`` (see
+        ``TaskSpec.to_dict``) switches the metric summary and framing to
+        multiclass (macro averages, per-class narrative) when K > 2.
         """
         # Imported lazily: pulls in litellm/openai, which the sklearn-only
         # XAI paths (tests, SHAP endpoints) should not pay for.
         from quoptuna.backend.xai import report_agent  # noqa: PLC0415
 
         report = self.get_report()
+        if task_spec and task_spec.get("kind") == "multiclass":
+            # The binary getters in get_report fail for K>2; replace them with
+            # macro averages and give the LLM the class structure explicitly.
+            report["f1_score"] = self.get_f1_score(average="macro")
+            report["precision"] = self.get_precision(average="macro")
+            report["recall"] = self.get_recall(average="macro")
+            report.pop("roc_auc_score", None)
+            report.pop("average_precision_score", None)
+            report.pop("roc_curve", None)
+            report.pop("precision_recall_curve", None)
+            report["task"] = {
+                "type": "multiclass",
+                "n_classes": task_spec.get("n_classes"),
+                "class_labels": task_spec.get("class_labels"),
+                "favorable_class": task_spec.get("favorable_class"),
+                "note": (
+                    "This is a multiclass classification task. F1/precision/recall "
+                    "are macro averages (equal weight per class). Discuss per-class "
+                    "performance using the classification report and confusion "
+                    "matrix. Fairness metrics, if present, are computed on the "
+                    "favorable class vs the rest."
+                ),
+            }
         images = self._generate_report_images(num_waterfall_plots)
 
         if fairness:

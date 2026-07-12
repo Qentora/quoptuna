@@ -174,11 +174,13 @@ class DataPreparation:
         classes = np.unique(y)
         # Labels already encoded to {-1, 1} (e.g. an explicit user mapping applied
         # upstream) must pass through unchanged — re-encoding would invert them.
-        y_values = (
-            np.asarray(y).ravel()
-            if set(classes.tolist()) <= {-1, 1}
-            else np.where(np.asarray(y).ravel() == classes[0], 1, -1)
-        )
+        # Multiclass targets (K>2) also pass through: they arrive pre-encoded to
+        # 0..K-1 codes, and the binary re-encode would silently collapse them.
+        y_values: np.ndarray
+        if set(classes.tolist()) <= {-1, 1} or len(classes) != 2:  # noqa: PLR2004
+            y_values = np.asarray(y).ravel()
+        else:
+            y_values = np.where(np.asarray(y).ravel() == classes[0], 1, -1)
         y = pd.DataFrame(
             y_values,
             columns=[self.y_col] if not isinstance(self.y_col, list) else self.y_col,

@@ -161,8 +161,11 @@ class IQPKernelClassifier(BaseEstimator, ClassifierMixin):
 
         self.classes_ = classes
         self.n_classes_ = len(self.classes_)
-        assert self.n_classes_ == 2
-        assert 1 in self.classes_ and -1 in self.classes_
+        # The quantum part only builds the kernel; the inner SVC handles any
+        # number of classes (OvO), so multiclass integer codes are accepted.
+        assert self.n_classes_ >= 2
+        if self.n_classes_ == 2:
+            assert 1 in self.classes_ and -1 in self.classes_
 
         self.n_qubits_ = n_features
 
@@ -177,7 +180,7 @@ class IQPKernelClassifier(BaseEstimator, ClassifierMixin):
         """
 
         self.svm.random_state = int(
-            jax.random.randint(self.generate_key(), shape=(1,), minval=0, maxval=1000000)
+            jax.random.randint(self.generate_key(), shape=(1,), minval=0, maxval=1000000)[0]
         )
 
         self.initialize(X.shape[1], np.unique(y))

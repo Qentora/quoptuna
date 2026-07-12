@@ -25,6 +25,7 @@ from quoptuna.backend.base.pennylane_models import (
     TreeTensorClassifier,
     WeiNet,
 )
+from quoptuna.backend.base.pennylane_models.ovr import wrap_one_vs_rest
 
 
 # Define a custom exception class
@@ -33,7 +34,31 @@ class UnknownModelTypeError(ValueError):
         super().__init__(f"Unknown model type: {model_type}")
 
 
-def create_model(model_type, **kwargs):
+# Quantum models whose readout is binary by construction (sign of an
+# expectation value, {-1,+1} labels). For K>2 targets these are wrapped in a
+# OneVsRestClassifier; everything else (classical sklearn models and the
+# kernel-head quantum models whose final classifier is an SVC/LogisticRegression)
+# handles multiclass natively.
+VARIATIONAL_BINARY_MODELS = {
+    "CircuitCentricClassifier",
+    "DataReuploadingClassifier",
+    "DataReuploadingClassifierSeparable",
+    "DressedQuantumCircuitClassifier",
+    "DressedQuantumCircuitClassifierSeparable",
+    "QuantumMetricLearner",
+    "QuantumBoltzmannMachine",
+    "QuantumBoltzmannMachineSeparable",
+    "TreeTensorClassifier",
+    "QuanvolutionalNeuralNetwork",
+    "WeiNet",
+    "SeparableVariationalClassifier",
+    "ConvolutionalNeuralNetwork",
+}
+
+BINARY_N_CLASSES = 2
+
+
+def create_model(model_type, n_classes: int = BINARY_N_CLASSES, **kwargs):
     model_constructors = {
         "CircuitCentricClassifier": (
             CircuitCentricClassifier,
@@ -132,16 +157,28 @@ def create_model(model_type, **kwargs):
     params = {key: kwargs.get(key) for key in param_keys}
 
     if model_type == "MLPClassifier":
-        params["hidden_layer_sizes"] = ast.literal_eval(params["hidden_layer_sizes"])
+        hidden_layer_sizes = params["hidden_layer_sizes"]
+        if hidden_layer_sizes is None:
+            msg = "hidden_layer_sizes is required for MLPClassifier"
+            raise ValueError(msg)
+        params["hidden_layer_sizes"] = (
+            ast.literal_eval(hidden_layer_sizes)
+            if isinstance(hidden_layer_sizes, str)
+            else hidden_layer_sizes
+        )
         params["learning_rate_init"] = kwargs.get("learning_rate")
 
     model = model_class(**params)
 
     # Training-budget knobs for the iterative (JAX-trained) models. Applied
-    # post-construction because not every constructor accepts them.
+    # post-construction (and before any OvR wrapping) because not every
+    # constructor accepts them.
     for knob in ("max_steps", "convergence_interval"):
         value = kwargs.get(knob)
         if value is not None and hasattr(model, knob):
             setattr(model, knob, value)
+
+    if n_classes > BINARY_N_CLASSES and model_type in VARIATIONAL_BINARY_MODELS:
+        model = wrap_one_vs_rest(model)
 
     return model

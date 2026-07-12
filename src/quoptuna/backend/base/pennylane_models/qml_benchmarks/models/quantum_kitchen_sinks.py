@@ -162,8 +162,11 @@ class QuantumKitchenSinks(BaseEstimator, ClassifierMixin):
 
         self.classes_ = classes
         self.n_classes_ = len(self.classes_)
-        assert self.n_classes_ == 2
-        assert 1 in self.classes_ and -1 in self.classes_
+        # The quantum circuit only produces random features; the inner
+        # LogisticRegression handles any number of classes (multinomial).
+        assert self.n_classes_ >= 2
+        if self.n_classes_ == 2:
+            assert 1 in self.classes_ and -1 in self.classes_
 
         self.n_features_ = n_features
 

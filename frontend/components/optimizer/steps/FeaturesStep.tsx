@@ -29,10 +29,20 @@ const MAX_ORDINAL_CATEGORIES = 100;
 
 const NONE_VALUE = '__none__';
 
+// Upper bound on target classes for the multiclass path (each variational
+// quantum model trains one sub-model per class under one-vs-rest).
+const MAX_TARGET_CLASSES = 20;
+
 export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const preview = useDatasetPreview(workflowData.dataset?.id ?? null);
-  const { selectedFeatures, targetColumn, labelMapping, sensitiveFeature, categoricalEncoding } =
-    workflowData.features;
+  const {
+    selectedFeatures,
+    targetColumn,
+    labelMapping,
+    favorableClass,
+    sensitiveFeature,
+    categoricalEncoding,
+  } = workflowData.features;
   const [search, setSearch] = useState('');
 
   const columns = workflowData.dataset?.columns ?? [];
@@ -80,7 +90,15 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
         targetColumn: column === NONE_VALUE ? null : column,
         selectedFeatures: prev.features.selectedFeatures.filter((f) => f !== column),
         labelMapping: { neg: null, pos: null },
+        favorableClass: null,
       },
+    }));
+  };
+
+  const setFavorableClass = (value: string) => {
+    setWorkflowData((prev) => ({
+      ...prev,
+      features: { ...prev.features, favorableClass: value === NONE_VALUE ? null : value },
     }));
   };
 
@@ -131,6 +149,10 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
     ? (preview.data?.target_values_by_column[targetColumn] ?? [])
     : [];
   const needsMapping = targetValues.length === 2;
+  // K>2 targets take the multiclass path: labels are encoded to 0..K-1
+  // server-side and the user picks the favorable class instead of neg/pos.
+  const isMulticlass = targetValues.length > 2 && targetValues.length <= MAX_TARGET_CLASSES;
+  const tooManyClasses = targetValues.length > MAX_TARGET_CLASSES;
 
   // Default the binary label mapping so the step is immediately valid: the
   // lower value maps to -1 and the higher to 1 (numeric when both parse as
@@ -162,13 +184,29 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
     (labelMapping.neg !== null &&
       labelMapping.pos !== null &&
       labelMapping.neg !== labelMapping.pos);
+  // Favorable class is NOT needed for training (OvR/OvO handle K classes); it
+  // only defines the fairness binarization (favorable vs rest) and report
+  // framing. Require it only when a protected attribute is selected, since
+  // that's the only path that dead-ends without it.
+  const favorableComplete = !isMulticlass || !sensitiveFeature || favorableClass !== null;
 
-  const canProceed = selectedFeatures.length > 0 && targetColumn !== null && mappingComplete;
+  const canProceed =
+    selectedFeatures.length > 0 &&
+    targetColumn !== null &&
+    mappingComplete &&
+    favorableComplete &&
+    !tooManyClasses;
 
   const missing: string[] = [];
   if (selectedFeatures.length === 0) missing.push('Select at least one feature');
   if (!targetColumn) missing.push('Choose a target column');
   if (needsMapping && !mappingComplete) missing.push('Complete the label mapping');
+  if (isMulticlass && !favorableComplete)
+    missing.push('Select the favorable class (required for the fairness audit)');
+  if (tooManyClasses)
+    missing.push(
+      `Target has ${targetValues.length} classes — the maximum supported is ${MAX_TARGET_CLASSES}`
+    );
 
   useEffect(() => {
     setFooter({ canContinue: canProceed });
@@ -179,7 +217,7 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
       <StepHeader
         step={2}
         title="Feature Selection"
-        subtitle="Select input features, the target column, and map labels for binary classification"
+        subtitle="Select input features and the target column; binary targets are mapped to -1/1, multiclass targets are encoded automatically"
       />
 
       <div className="flex flex-col gap-4">
@@ -349,6 +387,44 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
                   </div>
                 </div>
               )}
+
+              {targetColumn && isMulticlass && (
+                <div className="rounded-md border border-border bg-muted p-3">
+                  <p className="text-xs font-medium">
+                    Multiclass target ({targetValues.length} classes)
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Classes are encoded automatically; quantum models train one-vs-rest. No label
+                    mapping is needed.
+                  </p>
+                  <div className="mt-2 flex flex-wrap gap-1">
+                    {targetValues.map((v) => (
+                      <Badge
+                        key={String(v)}
+                        variant={String(v) === String(favorableClass) ? 'emerald' : 'secondary'}
+                      >
+                        {String(v)}
+                      </Badge>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Fairness auditing compares a favorable class vs the rest — configure it under
+                    Fairness.
+                  </p>
+                </div>
+              )}
+
+              {targetColumn && tooManyClasses && (
+                <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3">
+                  <p className="text-xs font-medium text-destructive">
+                    Target has {targetValues.length} distinct values
+                  </p>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Classification supports up to {MAX_TARGET_CLASSES} classes. This column may be
+                    continuous — pick a categorical target instead.
+                  </p>
+                </div>
+              )}
             </div>
 
             <Field>
@@ -372,28 +448,68 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
               </FieldDescription>
             </Field>
 
-            <Field>
-              <FieldLabel htmlFor="protected-attribute">Protected attribute (optional)</FieldLabel>
-              <Select value={sensitiveFeature ?? NONE_VALUE} onValueChange={setSensitiveFeature}>
-                <SelectTrigger id="protected-attribute" className="w-full">
-                  <SelectValue placeholder="None — skip fairness audit" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE_VALUE}>None — skip fairness audit</SelectItem>
-                  {columns
-                    .filter((c) => c !== targetColumn)
-                    .map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <FieldDescription>
-                A categorical column (e.g. sex, race, age group) used to audit fairness across
-                groups. Never used for training.
-              </FieldDescription>
-            </Field>
+            <div className="space-y-3 rounded-md border border-border bg-muted/50 p-3">
+              <p className="text-xs font-semibold">Fairness (optional)</p>
+              <Field>
+                <FieldLabel htmlFor="protected-attribute">Protected attribute</FieldLabel>
+                <Select value={sensitiveFeature ?? NONE_VALUE} onValueChange={setSensitiveFeature}>
+                  <SelectTrigger id="protected-attribute" className="w-full">
+                    <SelectValue placeholder="None — skip fairness audit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_VALUE}>None — skip fairness audit</SelectItem>
+                    {columns
+                      .filter((c) => c !== targetColumn)
+                      .map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <FieldDescription>
+                  A categorical column (e.g. sex, race, age group) used to audit fairness across
+                  groups. Never used for training.
+                </FieldDescription>
+              </Field>
+
+              {isMulticlass ? (
+                <Field>
+                  <FieldLabel htmlFor="favorable-class">
+                    Favorable class{sensitiveFeature ? '' : ' (optional)'}
+                  </FieldLabel>
+                  <Select
+                    value={favorableClass === null ? NONE_VALUE : String(favorableClass)}
+                    onValueChange={setFavorableClass}
+                    disabled={!sensitiveFeature}
+                  >
+                    <SelectTrigger id="favorable-class" className="w-full">
+                      <SelectValue placeholder="Select…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE_VALUE}>None — choose a class</SelectItem>
+                      {targetValues.map((v) => (
+                        <SelectItem key={String(v)} value={String(v)}>
+                          {String(v)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>
+                    {sensitiveFeature
+                      ? 'The outcome audited as favorable-vs-rest; also frames the report. Not used for training.'
+                      : 'Select a protected attribute to enable the fairness audit. The favorable class defines the outcome audited as favorable-vs-rest.'}
+                  </FieldDescription>
+                </Field>
+              ) : (
+                targetColumn &&
+                needsMapping && (
+                  <p className="text-xs text-muted-foreground">
+                    Binary targets audit the class mapped to +1 as the favorable outcome.
+                  </p>
+                )
+              )}
+            </div>
 
             {/* Selection summary */}
             <div className="space-y-1.5 rounded-md border border-border bg-muted/50 p-3 text-xs">

@@ -46,6 +46,10 @@ class SHAPRequest(BaseModel):
     sample_index: int = 0
     use_proba: bool = True
     subset_size: int = 50
+    # Which class's SHAP values to slice/plot when values are per-class
+    # (multiclass). None keeps the default (positive class for binary,
+    # class 0 for multiclass).
+    class_index: Optional[int] = None
 
 
 class MetricsRequest(BaseModel):
@@ -154,22 +158,61 @@ def _figure_to_data_url(fig) -> str:
     return f"data:image/png;base64,{encoded}"
 
 
-def _plot_class_index(xai) -> int:
+def _plot_class_index(xai, requested: Optional[int] = None) -> int:
     """Class slice to use for SHAP plots when values are per-class (ndim > 2).
 
     Many quantum/classical models emit per-class SHAP values shaped
     ``(samples, features, classes)``; SHAP's plots need a single 2-D slice.
-    Pick the positive (last) class for binary, otherwise the first. Returns -1
-    when values are already 2-D (no slicing needed).
+    An explicit ``requested`` index (from the API) wins; otherwise pick the
+    positive (last) class for binary and the first class for multiclass.
+    Returns -1 when values are already 2-D (no slicing needed).
     """
     try:
         shap_values = xai.shap_values
         if getattr(shap_values, "values", None) is None or shap_values.values.ndim <= 2:
             return -1
         classes = list(xai.get_classes())
+        if requested is not None and 0 <= requested < len(classes):
+            return int(requested)
         return int(classes[-1] if len(classes) <= 2 else classes[0])
     except Exception:
         return -1
+
+
+def _task_spec(opt_result: dict) -> Optional[dict]:
+    """Class-structure spec for this run (see TaskSpec.to_dict), if known.
+
+    Present on the in-process/rehydrated result (threaded through the split
+    node); falls back to the study user_attrs written at optimize time.
+    """
+    spec = opt_result.get("task_spec")
+    if spec:
+        return spec
+    try:
+        from optuna import load_study
+
+        study = load_study(
+            storage=optuna_storage_url(str(opt_result.get("db_name") or DEFAULT_DB_NAME)),
+            study_name=opt_result.get("study_name"),
+        )
+        return study.user_attrs.get("task_spec")
+    except Exception:
+        return None
+
+
+def _spec_display_labels(spec: Optional[dict], encoded: list) -> list[str]:
+    """Original class names for encoded label values, falling back to str()."""
+    if not spec:
+        return [str(v) for v in encoded]
+    labels = [str(c) for c in spec.get("class_labels", [])]
+    if spec.get("kind") == "binary":
+        mapping = {-1: labels[0], 1: labels[1]} if len(labels) == 2 else {}
+        return [mapping.get(int(v), str(v)) for v in encoded]
+    out = []
+    for v in encoded:
+        code = int(v)
+        out.append(labels[code] if 0 <= code < len(labels) else str(v))
+    return out
 
 
 def _positive_proba(proba):
@@ -222,6 +265,39 @@ def _pr_payload(y_test, proba) -> dict[str, Any]:
         "recall": np.asarray(recall)[idx].tolist(),
         "average_precision": avg_prec,
     }
+
+
+def _per_class_curve_payloads(y_test, proba, spec: dict) -> tuple[dict, dict]:
+    """One-vs-rest ROC and PR payloads per class for a multiclass task.
+
+    Binarizes the encoded labels per class and reuses the binary payload
+    helpers on each (indicator, class-probability-column) pair.
+    """
+    from sklearn.preprocessing import label_binarize
+
+    n_classes = int(spec["n_classes"])
+    encoded = list(range(n_classes))
+    names = _spec_display_labels(spec, encoded)
+    proba = np.asarray(proba)
+    y_bin = label_binarize(np.asarray(y_test).ravel(), classes=encoded)
+
+    roc_classes, pr_classes = [], []
+    for k in range(n_classes):
+        try:
+            roc_classes.append({"label": names[k], **_roc_payload(y_bin[:, k], proba[:, k])})
+        except Exception as exc:
+            logger.warning("ROC curve failed for class %s: %s", names[k], exc)
+        try:
+            pr_classes.append({"label": names[k], **_pr_payload(y_bin[:, k], proba[:, k])})
+        except Exception as exc:
+            logger.warning("PR curve failed for class %s: %s", names[k], exc)
+
+    aucs = [c["auc"] for c in roc_classes if c.get("auc") is not None]
+    macro_auc = float(np.mean(aucs)) if len(aucs) == n_classes else None
+    return (
+        {"per_class": roc_classes, "macro_auc": macro_auc},
+        {"per_class": pr_classes},
+    )
 
 
 def _confusion_matrix_payload(matrix, labels) -> dict[str, Any]:
@@ -335,11 +411,15 @@ async def generate_shap_data(request: SHAPRequest):
             use_proba=request.use_proba,
             subset_size=request.subset_size,
         )
-        class_index = _plot_class_index(xai)
+        class_index = _plot_class_index(xai, request.class_index)
         payload = _shap_data_payload(xai.shap_values, class_index)
+        spec = _task_spec(opt_result)
         return {
             "optimization_id": request.optimization_id,
             **payload,
+            "class_index": class_index,
+            "n_classes": int(spec["n_classes"]) if spec else 2,
+            "class_labels": [str(c) for c in spec["class_labels"]] if spec else None,
             "status": "completed",
         }
     except HTTPException:
@@ -362,7 +442,7 @@ async def generate_shap_analysis(request: SHAPRequest):
         )
 
         # Per-class SHAP values (ndim > 2) must be sliced to one class for plotting.
-        class_index = _plot_class_index(xai)
+        class_index = _plot_class_index(xai, request.class_index)
 
         plots: dict[str, str] = {}
         for plot_type in request.plot_types:
@@ -406,6 +486,10 @@ async def generate_metrics(request: MetricsRequest):
         fig = xai.plot_confusion_matrix()
         confusion_plot = _figure_to_data_url(fig)
 
+        spec = _task_spec(opt_result)
+        multiclass = bool(spec and spec.get("kind") == "multiclass")
+        average = "macro" if multiclass else "binary"
+
         metrics: dict[str, Any] = {}
 
         def _safe(name: str, func) -> None:
@@ -415,21 +499,51 @@ async def generate_metrics(request: MetricsRequest):
             except Exception as exc:
                 logger.warning("Metric %s failed: %s", name, exc)
 
-        _safe("f1_score", xai.get_f1_score)
-        _safe("precision", xai.get_precision)
-        _safe("recall", xai.get_recall)
-        # ROC AUC / AP need the 1-D positive-class probability, not the (n, 2) array.
-        _safe(
-            "roc_auc_score",
-            lambda: roc_auc_score(xai.y_test, _positive_proba(xai.predictions_proba)),
-        )
-        _safe(
-            "average_precision_score",
-            lambda: average_precision_score(xai.y_test, _positive_proba(xai.predictions_proba)),
-        )
+        _safe("f1_score", lambda: xai.get_f1_score(average=average))
+        _safe("precision", lambda: xai.get_precision(average=average))
+        _safe("recall", lambda: xai.get_recall(average=average))
+        if multiclass:
+            # Full (n, K) probability matrix with one-vs-rest macro averaging.
+            _safe(
+                "roc_auc_score",
+                lambda: roc_auc_score(
+                    xai.y_test,
+                    np.asarray(xai.predictions_proba),
+                    multi_class="ovr",
+                    average="macro",
+                ),
+            )
+        else:
+            # ROC AUC / AP need the 1-D positive-class probability, not the (n, 2) array.
+            _safe(
+                "roc_auc_score",
+                lambda: roc_auc_score(xai.y_test, _positive_proba(xai.predictions_proba)),
+            )
+            _safe(
+                "average_precision_score",
+                lambda: average_precision_score(xai.y_test, _positive_proba(xai.predictions_proba)),
+            )
         _safe("mcc", xai.get_mcc)
         _safe("cohens_kappa", xai.get_cohens_kappa)
         _safe("log_loss", xai.get_log_loss)
+
+        if multiclass:
+            try:
+                from sklearn.metrics import classification_report
+
+                encoded = sorted(np.unique(np.asarray(xai.y_test)).tolist())
+                names = _spec_display_labels(spec, encoded)
+                report = classification_report(
+                    xai.y_test,
+                    xai.predictions,
+                    labels=encoded,
+                    target_names=names,
+                    output_dict=True,
+                    zero_division=0,
+                )
+                metrics["per_class"] = {name: report[name] for name in names if name in report}
+            except Exception as exc:
+                logger.warning("per_class metrics failed: %s", exc)
 
         try:
             from sklearn.metrics import accuracy_score
@@ -452,6 +566,9 @@ async def generate_metrics(request: MetricsRequest):
             "optimization_id": request.optimization_id,
             "confusion_matrix_plot": confusion_plot,
             "metrics": metrics,
+            "task_type": (spec or {}).get("kind", "binary"),
+            "n_classes": int(spec["n_classes"]) if spec else 2,
+            "class_labels": [str(c) for c in spec["class_labels"]] if spec else None,
             "status": "completed",
         }
     except HTTPException:
@@ -494,9 +611,57 @@ async def generate_curves(request: MetricsRequest):
     roc_auc = None
     avg_prec = None
 
+    spec = _task_spec(opt_result)
+    multiclass_spec = spec if spec is not None and spec.get("kind") == "multiclass" else None
+    y_test = xai.y_test
+
+    if multiclass_spec is not None:
+        # One-vs-rest: one line per class on each plot.
+        roc_data, pr_data = _per_class_curve_payloads(
+            y_test, xai.predictions_proba, multiclass_spec
+        )
+        roc_auc = roc_data.get("macro_auc")
+        try:
+            fig, ax = plt.subplots(figsize=(5, 4))
+            for c in roc_data["per_class"]:
+                lbl = f"{c['label']} (AUC = {c['auc']:.3f})" if c["auc"] is not None else c["label"]
+                ax.plot(c["fpr"], c["tpr"], lw=2, label=lbl)
+            ax.plot([0, 1], [0, 1], color="#9ca3af", lw=1, linestyle="--", label="Chance")
+            ax.set_xlabel("False Positive Rate")
+            ax.set_ylabel("True Positive Rate")
+            title = "ROC Curves (one-vs-rest)"
+            if roc_auc is not None:
+                title += f" — macro AUC = {roc_auc:.3f}"
+            ax.set_title(title)
+            ax.legend(loc="lower right", fontsize=8)
+            roc_plot = _figure_to_data_url(fig)
+        except Exception as exc:
+            logger.warning("Multiclass ROC plot failed: %s", exc)
+        try:
+            fig, ax = plt.subplots(figsize=(5, 4))
+            for c in pr_data["per_class"]:
+                ap = c.get("average_precision")
+                lbl = f"{c['label']} (AP = {ap:.3f})" if ap is not None else c["label"]
+                ax.plot(c["recall"], c["precision"], lw=2, label=lbl)
+            ax.set_xlabel("Recall")
+            ax.set_ylabel("Precision")
+            ax.set_title("Precision-Recall Curves (one-vs-rest)")
+            ax.legend(loc="lower left", fontsize=8)
+            pr_plot = _figure_to_data_url(fig)
+        except Exception as exc:
+            logger.warning("Multiclass PR plot failed: %s", exc)
+        return {
+            "optimization_id": request.optimization_id,
+            "roc_curve_plot": roc_plot,
+            "pr_curve_plot": pr_plot,
+            "roc_auc": roc_auc,
+            "average_precision": None,
+            "task_type": "multiclass",
+            "status": "completed",
+        }
+
     # Per-class proba -> 1-D positive class, as sklearn curve helpers require.
     proba = _positive_proba(xai.predictions_proba)
-    y_test = xai.y_test
 
     try:
         fpr, tpr, _ = roc_curve(y_test, proba)
@@ -539,6 +704,7 @@ async def generate_curves(request: MetricsRequest):
         "pr_curve_plot": pr_plot,
         "roc_auc": roc_auc,
         "average_precision": avg_prec,
+        "task_type": "binary",
         "status": "completed",
     }
 
@@ -566,24 +732,33 @@ async def generate_curves_data(request: MetricsRequest):
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Failed to build XAI: {e!s}")
 
-    proba = _positive_proba(xai.predictions_proba)
     y_test = xai.y_test
+    spec = _task_spec(opt_result)
+    multiclass_spec = spec if spec is not None and spec.get("kind") == "multiclass" else None
 
     roc = None
     pr = None
-    try:
-        roc = _roc_payload(y_test, proba)
-    except Exception as exc:
-        logger.warning("ROC curve data failed: %s", exc)
-    try:
-        pr = _pr_payload(y_test, proba)
-    except Exception as exc:
-        logger.warning("PR curve data failed: %s", exc)
+    if multiclass_spec is not None:
+        try:
+            roc, pr = _per_class_curve_payloads(y_test, xai.predictions_proba, multiclass_spec)
+        except Exception as exc:
+            logger.warning("Multiclass curve data failed: %s", exc)
+    else:
+        proba = _positive_proba(xai.predictions_proba)
+        try:
+            roc = _roc_payload(y_test, proba)
+        except Exception as exc:
+            logger.warning("ROC curve data failed: %s", exc)
+        try:
+            pr = _pr_payload(y_test, proba)
+        except Exception as exc:
+            logger.warning("PR curve data failed: %s", exc)
 
     return {
         "optimization_id": request.optimization_id,
         "roc": roc,
         "pr": pr,
+        "task_type": "multiclass" if multiclass_spec is not None else "binary",
         "status": "completed",
     }
 
@@ -609,6 +784,8 @@ async def generate_confusion_matrix_data(request: MetricsRequest):
             labels = list(xai.get_classes())
         except Exception:
             labels = list(range(len(cm)))
+        # Map encoded label values back to the original class names when known.
+        labels = _spec_display_labels(_task_spec(opt_result), labels)
         return {
             "optimization_id": request.optimization_id,
             **_confusion_matrix_payload(cm, labels),
@@ -740,6 +917,7 @@ def _compute_fairness_payload(
     *,
     mitigate: bool = False,
     constraint: str = "equalized_odds",
+    task_spec: Optional[dict] = None,
 ) -> dict:
     from quoptuna.backend.xai import fairness as fairness_mod
 
@@ -747,11 +925,34 @@ def _compute_fairness_payload(
         optimization_id, sensitive_feature, xai
     )
 
-    metrics = fairness_mod.compute_fairness(xai.y_test, xai.predictions, sens_test)
+    # Multiclass tasks are audited on the favorable-class-vs-rest outcome.
+    multiclass_spec = (
+        task_spec if task_spec is not None and task_spec.get("kind") == "multiclass" else None
+    )
+    favorable = 1
+    favorable_class = None
+    if multiclass_spec is not None:
+        if multiclass_spec.get("favorable_code") is None:
+            raise HTTPException(
+                status_code=400,
+                detail="Fairness on a multiclass target requires a favorable_class "
+                "(selected at optimization setup)",
+            )
+        favorable = int(multiclass_spec["favorable_code"])
+        favorable_class = multiclass_spec.get("favorable_class")
+
+    metrics = fairness_mod.compute_fairness(
+        xai.y_test, xai.predictions, sens_test, favorable=favorable
+    )
     plots = fairness_mod.plot_group_metrics(metrics)
 
     mitigation = None
-    if mitigate:
+    if mitigate and multiclass_spec is not None:
+        # ThresholdOptimizer adjusts a favorable-vs-rest decision threshold,
+        # which cannot be soundly mapped back onto an argmax over K classes.
+        # The audit above remains valid; mitigation is binary-only for now.
+        logger.info("Fairness mitigation skipped: unsupported for multiclass targets")
+    elif mitigate:
         mitigation = fairness_mod.mitigate_with_threshold_optimizer(
             xai.model,
             xai.data.get("x_train"),
@@ -768,6 +969,8 @@ def _compute_fairness_payload(
         "metrics": metrics,
         "plots": plots,
         "mitigation": mitigation,
+        "task_type": "multiclass" if multiclass_spec is not None else "binary",
+        "favorable_class": favorable_class,
     }
 
 
@@ -784,6 +987,7 @@ async def generate_fairness(request: FairnessRequest):
             xai,
             mitigate=request.mitigate,
             constraint=request.constraint,
+            task_spec=_task_spec(opt_result),
         )
         return {
             "optimization_id": request.optimization_id,
@@ -815,6 +1019,7 @@ async def generate_ai_report(request: ReportRequest):
                     request.sensitive_feature,
                     xai,
                     mitigate=True,
+                    task_spec=_task_spec(opt_result),
                 )
             except HTTPException as exc:
                 # No sensitive feature configured (or unusable column) — the
@@ -830,6 +1035,7 @@ async def generate_ai_report(request: ReportRequest):
             model_name=request.model_name,
             provider=request.llm_provider,
             fairness=fairness,
+            task_spec=_task_spec(opt_result),
         )
 
         if request.dataset_description:

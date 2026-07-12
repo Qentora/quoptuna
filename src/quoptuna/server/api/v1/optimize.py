@@ -43,6 +43,10 @@ class OptimizationRequest(BaseModel):
     num_trials: int
     model_name: str = "DataReuploading"
     label_mapping: Optional[LabelMapping] = None
+    # Multiclass targets: the class treated as the favorable outcome for
+    # fairness auditing and report framing (favorable vs rest). Required when
+    # fairness is used on a K>2 target; ignored for binary targets.
+    favorable_class: Optional[Any] = None
     # Protected attribute column (may be outside selected_features) used for
     # fairness auditing; rows are aligned to the split via positional indices.
     sensitive_feature: Optional[str] = None
@@ -146,6 +150,8 @@ def build_workflow(
             "neg": request.label_mapping.neg,
             "pos": request.label_mapping.pos,
         }
+    if request.favorable_class is not None:
+        label_config["favorable_class"] = request.favorable_class
 
     nodes = [
         data_node,
@@ -379,6 +385,22 @@ async def get_optimization_detail(optimization_id: str):
     job = get_job(optimization_id)
     request_data = job.get("request") or {}
     record = dataset_registry.get(request_data.get("dataset_id", ""))
+    # The stored best_value can be stale (e.g. a dev-server reload killed the
+    # background task before its final write). The Optuna study on disk is the
+    # source of truth — recompute the best over finished trials on read.
+    trials = serialize_study_trials(
+        request_data.get("database_name", "results"),
+        request_data.get("study_name", "workflow_study"),
+    )
+    completed = [t for t in trials if t["value"] is not None]
+    if completed:
+        best = max(completed, key=lambda t: t["value"])
+        if job.get("best_value") != best["value"]:
+            job["best_value"] = best["value"]
+            job["best_params"] = best["params"]
+            run_store.update_run(
+                optimization_id, best_value=best["value"], best_params=best["params"]
+            )
     return {
         "id": job["id"],
         "status": job["status"],

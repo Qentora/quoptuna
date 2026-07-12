@@ -121,6 +121,10 @@ export interface OptimizationRequest {
   num_trials: number;
   model_name?: string;
   label_mapping?: LabelMapping;
+  // K>2 targets: the class treated as the favorable outcome for fairness
+  // auditing and report framing. Required when fairness is used on a
+  // multiclass target.
+  favorable_class?: string | number;
   sensitive_feature?: string;
   categorical_encoding?: 'ordinal' | 'onehot';
   // Search strategy: sampler + optional early-stopping pruner (ASHA/Hyperband).
@@ -320,6 +324,8 @@ export interface SHAPRequest {
   sample_index?: number;
   use_proba?: boolean;
   subset_size?: number;
+  // Multiclass: which class's SHAP values to plot (default class 0).
+  class_index?: number;
 }
 
 export async function generateSHAP(body: SHAPRequest): Promise<SHAPResponse> {
@@ -337,6 +343,9 @@ export interface MetricsResponse {
   optimization_id: string;
   confusion_matrix_plot: string | null;
   metrics: Record<string, any>;
+  task_type?: 'binary' | 'multiclass';
+  n_classes?: number;
+  class_labels?: string[] | null;
   status: string;
 }
 
@@ -355,8 +364,10 @@ export interface CurvesResponse {
   optimization_id: string;
   roc_curve_plot: string | null;
   pr_curve_plot: string | null;
+  // Binary: positive-class AUC. Multiclass: macro-averaged one-vs-rest AUC.
   roc_auc: number | null;
   average_precision: number | null;
+  task_type?: 'binary' | 'multiclass';
   status: string;
 }
 
@@ -385,9 +396,27 @@ export interface MetricsRequest {
   subset_size?: number;
 }
 
+// Binary tasks return single curves; multiclass tasks return one-vs-rest
+// per-class curve sets instead.
+export interface RocCurvePoints {
+  fpr: number[];
+  tpr: number[];
+  auc: number | null;
+}
+
+export interface PrCurvePoints {
+  precision: number[];
+  recall: number[];
+  average_precision: number | null;
+}
+
 export interface CurvesData {
-  roc: { fpr: number[]; tpr: number[]; auc: number } | null;
-  pr: { precision: number[]; recall: number[]; average_precision: number } | null;
+  roc:
+    | RocCurvePoints
+    | { per_class: Array<{ label: string } & RocCurvePoints>; macro_auc: number | null }
+    | null;
+  pr: PrCurvePoints | { per_class: Array<{ label: string } & PrCurvePoints> } | null;
+  task_type?: 'binary' | 'multiclass';
 }
 
 export async function getCurvesData(body: MetricsRequest): Promise<CurvesData> {
@@ -432,17 +461,23 @@ export interface ShapDataRequest {
   trial_number?: number;
   subset_size?: number;
   sample_index?: number;
+  // Multiclass: which class's SHAP slice to return (default class 0).
+  class_index?: number;
 }
 
 export interface ShapData {
   optimization_id: string;
   feature_names: string[];
-  /** samples × features SHAP values */
+  /** samples × features SHAP values (one class slice for multiclass) */
   values: number[][];
   /** raw feature values, row-aligned with `values` */
   data: number[][];
   base_value: number;
   n_samples: number;
+  // Which class slice `values`/`base_value` refer to (-1 = single-output).
+  class_index?: number;
+  n_classes?: number;
+  class_labels?: string[] | null;
   status: string;
 }
 

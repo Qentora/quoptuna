@@ -62,8 +62,10 @@ def build_xai(
     else:
         trial = study_best_trial(study)
 
+    task_spec = opt_result.get("task_spec")
+    n_classes = int(task_spec["n_classes"]) if task_spec else 2
     params = {k: v for k, v in trial.params.items() if k != "model_type"}
-    model = create_model(trial.params["model_type"], **params)
+    model = create_model(trial.params["model_type"], n_classes=n_classes, **params)
 
     x_train_df = opt_result["x_train"]
     y_train_df = opt_result["y_train"]
@@ -281,19 +283,31 @@ class WorkflowExecutor:
         x = data["x"]
         y = data["y"]
 
-        # Apply an explicit user label mapping on the ORIGINAL values, before
-        # DataPreparation encodes anything. Doing it downstream (label-encoding
-        # node) is too late: the split already re-encoded y to {-1, 1}, so a
-        # string comparison against the original values maps every row to -1.
-        label_mapping = config.get("label_mapping")
-        if label_mapping:
-            import numpy as np
+        # Derive the task spec (binary vs multiclass) from the ORIGINAL target
+        # values and apply the encoding here, before DataPreparation touches y.
+        # Doing it downstream (label-encoding node) is too late: the split
+        # would already have re-encoded y, so a string comparison against the
+        # original values maps every row to one class.
+        from quoptuna.backend.task_type import TaskSpec
 
-            pos = str(label_mapping.get("pos"))
+        label_mapping = config.get("label_mapping")
+        task_spec = TaskSpec.from_target(
+            y,
+            label_mapping=label_mapping,
+            favorable_class=config.get("favorable_class"),
+        )
+        if label_mapping and task_spec.kind == "binary":
             logger.info(
-                f"Applying label mapping at split: {label_mapping.get('neg')} -> -1, {pos} -> 1"
+                f"Applying label mapping at split: {label_mapping.get('neg')} -> -1, "
+                f"{label_mapping.get('pos')} -> 1"
             )
-            y = pd.Series(np.where(y.astype(str) == pos, 1, -1), name=data["y_column"])
+            y = pd.Series(task_spec.encode(y), name=data["y_column"])
+        elif task_spec.is_multiclass:
+            logger.info(
+                f"Multiclass target ({task_spec.n_classes} classes): encoding "
+                f"{list(task_spec.class_labels)} -> 0..{task_spec.n_classes - 1}"
+            )
+            y = pd.Series(task_spec.encode(y), name=data["y_column"])
 
         # Use DataPreparation class
         data_prep = DataPreparation(
@@ -311,6 +325,7 @@ class WorkflowExecutor:
             "y_test": data_prep.y_test,
             "x_columns": data["x_columns"],
             "y_column": data["y_column"],
+            "task_spec": task_spec.to_dict(),
         }
 
     def _execute_scaler(self, config: Dict, inputs: Dict) -> Dict:
@@ -337,6 +352,24 @@ class WorkflowExecutor:
         def _already_encoded(series) -> bool:
             values = series.values.ravel() if hasattr(series, "values") else np.ravel(series)
             return set(np.unique(values).tolist()) <= {-1, 1}
+
+        # Multiclass targets were already encoded to 0..K-1 at the split node;
+        # validate and pass through (binary {-1,+1} re-encoding does not apply).
+        task_spec = result.get("task_spec")
+        if task_spec and task_spec.get("kind") == "multiclass":
+            n_classes = int(task_spec["n_classes"])
+            valid_codes = set(range(n_classes))
+
+            def _codes(series):
+                values = series.values.ravel() if hasattr(series, "values") else np.ravel(series)
+                return set(np.unique(values).tolist())
+
+            observed = _codes(y_train) | _codes(y_test)
+            if not observed <= valid_codes:
+                raise WorkflowExecutionError(
+                    f"Multiclass labels {sorted(observed)} are not valid codes 0..{n_classes - 1}"
+                )
+            return result
 
         # Explicit user-provided mapping takes precedence (values map to -1/1) —
         # but it was already applied at the split node on the original values;
@@ -397,8 +430,12 @@ class WorkflowExecutor:
                     columns=y_test.columns if hasattr(y_test, "columns") else ["target"],
                 )
         else:
-            logger.warning(
-                f"Multi-class classification detected ({len(unique_classes)} classes). Models may not support this."
+            # K>2 without a task_spec means the split node never derived the
+            # multiclass encoding — failing loudly beats silently feeding
+            # unencoded labels to binary-asserting models.
+            raise WorkflowExecutionError(
+                f"Multi-class target ({len(unique_classes)} classes) reached label "
+                "encoding without a task_spec; the train-test-split node must run first."
             )
 
         return result
@@ -477,9 +514,20 @@ class WorkflowExecutor:
             else y_test_df.ravel(),
         }
 
+        task_spec = opt_config.get("task_spec")
+
         # Fairness-aware search needs the raw sensitive column aligned to the
         # test split (same positional alignment the post-hoc audit uses).
         fairness_mode = opt_config.get("fairness_mode", "off")
+        if (
+            fairness_mode != "off"
+            and task_spec
+            and task_spec.get("kind") == "multiclass"
+            and task_spec.get("favorable_code") is None
+        ):
+            raise WorkflowExecutionError(
+                "Fairness-aware search on a multiclass target requires favorable_class"
+            )
         sensitive_test = None
         if fairness_mode != "off":
             from quoptuna.server.services.sensitive import resolve_sensitive_series
@@ -512,6 +560,7 @@ class WorkflowExecutor:
             fairness_metric=opt_config.get("fairness_metric", "equal_opportunity_difference"),
             fairness_threshold=opt_config.get("fairness_threshold"),
             sensitive_test=sensitive_test,
+            task_spec=task_spec,
         )
 
         # Run optimization
@@ -564,6 +613,7 @@ class WorkflowExecutor:
             "y_test": y_test_df,
             "x_columns": opt_config.get("x_columns"),
             "y_column": opt_config.get("y_column"),
+            "task_spec": task_spec,
         }
 
     def _execute_shap_analysis(self, config: Dict, inputs: Dict) -> Dict:
@@ -599,8 +649,10 @@ class WorkflowExecutor:
 
         # Recreate and fit the best model (model.fit needs numpy arrays)
         # Extract model_type and pass remaining params to avoid duplicate argument error
+        task_spec = opt_result.get("task_spec")
+        n_classes = int(task_spec["n_classes"]) if task_spec else 2
         params = {k: v for k, v in best_trial.params.items() if k != "model_type"}
-        model = create_model(best_trial.params["model_type"], **params)
+        model = create_model(best_trial.params["model_type"], n_classes=n_classes, **params)
 
         # Convert to numpy for model fitting (as shown in notebooks)
         x_train_np = x_train_df.values if hasattr(x_train_df, "values") else x_train_df
