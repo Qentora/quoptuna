@@ -12,6 +12,7 @@ from sklearn.metrics import accuracy_score, f1_score
 from quoptuna.backend.models import create_model
 from quoptuna.backend.utils.data_utils.data import load_data, preprocess_data
 from quoptuna.backend.utils.storage import ensure_db_dir, optuna_db_path
+from quoptuna.backend.xai.fairness import FAIRNESS_METRICS, WORST_DISPARITY, compute_disparity
 
 logging.getLogger().setLevel(logging.INFO)
 logger = logging.getLogger(__name__)
@@ -86,6 +87,10 @@ class Optimizer:
         max_steps: Optional[int] = None,  # noqa: FA100
         convergence_interval: Optional[int] = None,  # noqa: FA100
         max_vmap: Optional[int] = None,  # noqa: FA100
+        fairness_mode: str = "off",
+        fairness_metric: str = "equal_opportunity_difference",
+        fairness_threshold: Optional[float] = None,  # noqa: FA100
+        sensitive_test: Optional[np.ndarray] = None,  # noqa: FA100
     ):
         """Initialize the Optimizer class.
 
@@ -114,6 +119,18 @@ class Optimizer:
             max_vmap: Optional override of the ``max_vmap`` search-space entry
                 (circuit evaluations vectorized per JAX call). Must divide the
                 batch size.
+            fairness_mode: "off" (default), "constrained" (single-objective F1
+                with a TPE feasibility constraint on the disparity), or
+                "multi_objective" (maximize F1, minimize disparity; Pareto
+                front returned via ``study.best_trials``).
+            fairness_metric: Disparity metric driving the search — one of
+                ``FAIRNESS_METRICS``.
+            fairness_threshold: Constraint threshold. For difference metrics a
+                trial is feasible when disparity <= threshold (default 0.1);
+                for ``disparate_impact`` feasible when the DI ratio >=
+                threshold (default 0.8, the four-fifths rule).
+            sensitive_test: Sensitive-attribute values aligned positionally
+                with the test split. Required when ``fairness_mode`` != "off".
 
         Attributes:
             db_name: The name of the database.
@@ -155,13 +172,69 @@ class Optimizer:
         self.intermediate_metric = intermediate_metric
         self.max_steps = max_steps
         self.convergence_interval = convergence_interval
+        self._disparity_threshold: float | None = None
         if max_vmap is not None and "max_vmap" in self.search_space:
             # Override the vectorization width without touching other entries;
             # objective() keeps sampling it like any other hyperparameter.
             self.search_space = {**self.search_space, "max_vmap": [max_vmap]}
+        self.fairness_mode = fairness_mode
+        self.fairness_metric = fairness_metric
+        self.sensitive_test = None if sensitive_test is None else np.asarray(sensitive_test).ravel()
+        self._validate_fairness_config()
+        # Normalize the threshold into disparity space once (0 = parity), so
+        # both modes share `disparity <= threshold` semantics: DI's ratio
+        # threshold r becomes 1 - r; difference thresholds pass through.
+        if self.fairness_mode != "off":
+            if fairness_threshold is None:
+                fairness_threshold = 0.8 if self.fairness_metric == "disparate_impact" else 0.1
+            if self.fairness_metric == "disparate_impact":
+                self._disparity_threshold = 1.0 - fairness_threshold
+            else:
+                self._disparity_threshold = fairness_threshold
+        else:
+            self._disparity_threshold = None
+
+    def _validate_fairness_config(self):
+        if self.fairness_mode not in ("off", "constrained", "multi_objective"):
+            msg = (
+                f"Unknown fairness_mode: {self.fairness_mode!r} "
+                "(expected 'off', 'constrained' or 'multi_objective')"
+            )
+            raise ValueError(msg)
+        if self.fairness_mode == "off":
+            return
+        if self.fairness_metric not in FAIRNESS_METRICS:
+            msg = (
+                f"Unknown fairness_metric: {self.fairness_metric!r} "
+                f"(expected one of {FAIRNESS_METRICS})"
+            )
+            raise ValueError(msg)
+        if self.sensitive_test is None:
+            msg = f"fairness_mode={self.fairness_mode!r} requires sensitive_test"
+            raise ValueError(msg)
+        if self.fairness_mode == "constrained" and self.sampler != "tpe":
+            # Random/Grid samplers silently ignore constraints_func; an
+            # experiment must not silently degrade to an unconstrained search.
+            msg = "fairness_mode='constrained' requires sampler='tpe'"
+            raise ValueError(msg)
+        if self.fairness_mode == "multi_objective" and self.pruner != "none":
+            # Optuna raises at trial.report()/should_prune() time for
+            # multi-objective studies; fail at config time instead.
+            msg = "fairness_mode='multi_objective' does not support pruning; set pruner='none'"
+            raise ValueError(msg)
+
+    @staticmethod
+    def _fairness_constraints(trial) -> tuple:
+        # Consulted by TPE for completed trials only; a trial that failed
+        # before recording the attr is treated as maximally infeasible.
+        return tuple(trial.user_attrs.get("fairness_constraint", (WORST_DISPARITY,)))
 
     def _build_sampler(self):
         if self.sampler == "tpe":
+            if self.fairness_mode == "constrained":
+                return TPESampler(
+                    seed=self.sampler_seed, constraints_func=self._fairness_constraints
+                )
             return TPESampler(seed=self.sampler_seed)
         if self.sampler == "random":
             return RandomSampler(seed=self.sampler_seed)
@@ -231,8 +304,9 @@ class Optimizer:
                 trial.set_user_attr(key="converged", value=False)
             score = model.score(self.test_x, self.test_y)
 
-            f_score_ = f1_score(self.test_y, model.predict(self.test_x))
-            acc_ = accuracy_score(self.test_y, model.predict(self.test_x))
+            y_pred = model.predict(self.test_x)
+            f_score_ = f1_score(self.test_y, y_pred)
+            acc_ = accuracy_score(self.test_y, y_pred)
 
             self.log_user_attributes(
                 model_type,
@@ -240,6 +314,27 @@ class Optimizer:
                 trial,
             )
             self._log_resource_attributes(trial, model)
+
+            if self.fairness_mode != "off":
+                try:
+                    disparity = compute_disparity(
+                        self.test_y, y_pred, self.sensitive_test, self.fairness_metric
+                    )
+                except Exception:  # noqa: BLE001 - any metric failure means "maximally unfair"
+                    # e.g. a group with a single class in this trial's
+                    # predictions — score it as maximally unfair, not failed.
+                    logger.warning("Trial %s: fairness computation failed", trial.number)
+                    disparity = WORST_DISPARITY
+                trial.set_user_attr("fairness_disparity", float(disparity))
+                trial.set_user_attr("fairness_metric", self.fairness_metric)
+                if self.fairness_mode == "constrained":
+                    threshold = self._require_disparity_threshold()
+                    trial.set_user_attr(
+                        "fairness_constraint",
+                        (float(disparity - threshold),),
+                    )
+                if self.fairness_mode == "multi_objective":
+                    return f_score_, float(disparity)
 
             return f_score_  # noqa: TRY300
         except TrialPruned:
@@ -298,6 +393,13 @@ class Optimizer:
 
         return callback
 
+    def _require_disparity_threshold(self) -> float:
+        threshold = self._disparity_threshold
+        if threshold is None:
+            msg = "Constrained fairness mode requires a disparity threshold"
+            raise RuntimeError(msg)
+        return threshold
+
     def _log_resource_attributes(
         self,
         trial: Trial,
@@ -353,6 +455,9 @@ class Optimizer:
         """
         sampler = self._build_sampler()
         pruner = self._build_pruner()
+        directions = (
+            ["maximize", "minimize"] if self.fairness_mode == "multi_objective" else ["maximize"]
+        )
         last_exc: Exception | None = None
         for attempt in range(retries):
             try:
@@ -360,7 +465,7 @@ class Optimizer:
                     storage=self.storage_location,
                     sampler=sampler,
                     pruner=pruner,
-                    directions=["maximize"],
+                    directions=directions,
                     study_name=self.study_name,
                     load_if_exists=True,
                 )

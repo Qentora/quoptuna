@@ -7,8 +7,18 @@
 // frontend/.env.local (e.g. http://localhost:8000) to point at a separate backend.
 const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '';
 
+/** Thrown on 401 so callers can distinguish "not logged in" from other errors. */
+export class UnauthorizedError extends Error {
+  constructor(detail: string) {
+    super(detail);
+    this.name = 'UnauthorizedError';
+  }
+}
+
 async function request<T>(path: string, init?: RequestInit): Promise<T> {
-  const response = await fetch(`${API_BASE_URL}${path}`, init);
+  // credentials: 'include' sends the Auth0 session cookie cross-origin in dev
+  // (UI on :3000, API on :8000); it's a no-op for the co-served production build.
+  const response = await fetch(`${API_BASE_URL}${path}`, { credentials: 'include', ...init });
   if (!response.ok) {
     let detail = response.statusText;
     try {
@@ -16,6 +26,9 @@ async function request<T>(path: string, init?: RequestInit): Promise<T> {
       detail = error.detail || detail;
     } catch {
       // response had no JSON body
+    }
+    if (response.status === 401) {
+      throw new UnauthorizedError(detail);
     }
     throw new Error(detail);
   }
@@ -117,6 +130,21 @@ export interface OptimizationRequest {
   max_steps?: number;
   convergence_interval?: number;
   max_vmap?: number;
+  // Fairness-aware search. 'constrained' requires sampler 'tpe';
+  // 'multi_objective' requires pruner 'none'; both require sensitive_feature.
+  fairness_mode?: 'off' | 'constrained' | 'multi_objective';
+  fairness_metric?:
+    | 'equal_opportunity_difference'
+    | 'disparate_impact'
+    | 'demographic_parity_difference';
+  fairness_threshold?: number;
+}
+
+// Pareto-front entry of a multi-objective run; values = [f1, disparity].
+export interface ParetoTrial {
+  trial: number;
+  values: number[];
+  params: Record<string, any>;
 }
 
 export type RunStatus =
@@ -150,6 +178,8 @@ export interface OptimizationTrial {
   trial: number;
   // null for FAILED/PRUNED/RUNNING trials; user_attrs.error records failures.
   value: number | null;
+  // Multi-objective runs: [f1, disparity] for COMPLETE trials.
+  values?: number[] | null;
   params: Record<string, any>;
   state: string;
   user_attrs?: Record<string, any>;
@@ -161,6 +191,7 @@ export interface OptimizationTrial {
 export interface OptimizationTrials {
   trials: OptimizationTrial[];
   best_trial: { value: number; params: Record<string, any> } | null;
+  pareto_trials?: ParetoTrial[] | null;
 }
 
 export async function startOptimization(
@@ -516,4 +547,52 @@ export interface SystemInfo {
 
 export async function getSystemInfo(): Promise<SystemInfo> {
   return request<SystemInfo>('/api/v1/info');
+}
+
+export async function getHealth(): Promise<{ status: string }> {
+  return request<{ status: string }>('/api/v1/health');
+}
+
+// ---------------------------------------------------------------------------
+// Auth (server-side Auth0 flow on the backend; see /auth routes)
+// ---------------------------------------------------------------------------
+
+export interface AuthUser {
+  sub: string;
+  name?: string;
+  nickname?: string;
+  email?: string;
+  picture?: string;
+  [claim: string]: unknown;
+}
+
+export interface AuthProfile {
+  user: AuthUser | null;
+  auth_enabled: boolean;
+}
+
+/** Resolves to { user: null } when logged out or when auth is disabled. */
+export async function getAuthProfile(): Promise<AuthProfile> {
+  try {
+    return await request<AuthProfile>('/auth/profile');
+  } catch (error) {
+    if (error instanceof UnauthorizedError) {
+      return { user: null, auth_enabled: true };
+    }
+    throw error;
+  }
+}
+
+/** Full-page navigation targets — the backend drives the Auth0 redirects. */
+export function loginUrl(screenHint?: 'signup'): string {
+  const returnTo = typeof window !== 'undefined' ? window.location.href : '/';
+  const params = new URLSearchParams({ returnTo });
+  if (screenHint) params.set('screen_hint', screenHint);
+  return `${API_BASE_URL}/auth/login?${params}`;
+}
+
+export function logoutUrl(): string {
+  // Origin only — Auth0 matches return_to against Allowed Logout URLs exactly.
+  const returnTo = typeof window !== 'undefined' ? window.location.origin : '/';
+  return `${API_BASE_URL}/auth/logout?${new URLSearchParams({ returnTo })}`;
 }

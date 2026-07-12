@@ -22,6 +22,17 @@ class WorkflowExecutionError(Exception):
     """Raised when workflow execution fails"""
 
 
+def study_best_trial(study):
+    """Best trial for single- or multi-objective studies.
+
+    ``study.best_trial`` raises for multi-objective studies; there we pick the
+    Pareto-front point with the highest F1 (objective 0 in all modes).
+    """
+    if len(study.directions) > 1:
+        return max(study.best_trials, key=lambda t: t.values[0])
+    return study.best_trial
+
+
 def build_xai(
     opt_result: Dict[str, Any],
     trial_number: int | None = None,
@@ -49,7 +60,7 @@ def build_xai(
         if trial is None:
             raise WorkflowExecutionError(f"Trial {trial_number} not found in study")
     else:
-        trial = study.best_trial
+        trial = study_best_trial(study)
 
     params = {k: v for k, v in trial.params.items() if k != "model_type"}
     model = create_model(trial.params["model_type"], **params)
@@ -428,6 +439,11 @@ class WorkflowExecutor:
             "max_steps": config.get("max_steps"),
             "convergence_interval": config.get("convergence_interval"),
             "max_vmap": config.get("max_vmap"),
+            "fairness_mode": config.get("fairness_mode", "off"),
+            "fairness_metric": config.get("fairness_metric", "equal_opportunity_difference"),
+            "fairness_threshold": config.get("fairness_threshold"),
+            "sensitive_feature": config.get("sensitive_feature"),
+            "dataset_id": config.get("dataset_id"),
         }
 
         # Merge input data if available
@@ -461,6 +477,21 @@ class WorkflowExecutor:
             else y_test_df.ravel(),
         }
 
+        # Fairness-aware search needs the raw sensitive column aligned to the
+        # test split (same positional alignment the post-hoc audit uses).
+        fairness_mode = opt_config.get("fairness_mode", "off")
+        sensitive_test = None
+        if fairness_mode != "off":
+            from quoptuna.server.services.sensitive import resolve_sensitive_series
+
+            column = opt_config.get("sensitive_feature")
+            if not column:
+                raise WorkflowExecutionError("Fairness-aware search requires a sensitive_feature")
+            _, sens_test = resolve_sensitive_series(
+                opt_config.get("dataset_id", ""), column, x_train_df, x_test_df
+            )
+            sensitive_test = sens_test.to_numpy()
+
         # Create optimizer (optional reduced search space, e.g. for tests)
         optimizer = Optimizer(
             db_name=opt_config.get("db_name", "workflow_optimization.db"),
@@ -477,6 +508,10 @@ class WorkflowExecutor:
             max_steps=opt_config.get("max_steps"),
             convergence_interval=opt_config.get("convergence_interval"),
             max_vmap=opt_config.get("max_vmap"),
+            fairness_mode=fairness_mode,
+            fairness_metric=opt_config.get("fairness_metric", "equal_opportunity_difference"),
+            fairness_threshold=opt_config.get("fairness_threshold"),
+            sensitive_test=sensitive_test,
         )
 
         # Run optimization
@@ -499,13 +534,25 @@ class WorkflowExecutor:
             raise WorkflowExecutionError(
                 f"All {len(optimizer.study.trials)} trials failed. Last error: {reason}"
             )
-        best_trial = optimizer.study.best_trial
+        best_trial = study_best_trial(optimizer.study)
+
+        pareto_trials = None
+        if len(optimizer.study.directions) > 1:
+            pareto_trials = [
+                {
+                    "trial": t.number,
+                    "values": list(t.values),
+                    "params": t.params,
+                }
+                for t in optimizer.study.best_trials
+            ]
 
         return {
             "type": "optimization_result",
-            "best_value": best_trial.value,
+            "best_value": best_trial.values[0],
             "best_params": best_trial.params,
             "best_trial_number": best_trial.number,
+            "pareto_trials": pareto_trials,
             "study_name": opt_config.get("study_name"),
             "db_name": opt_config.get("db_name"),
             "n_trials": n_trials,
@@ -542,7 +589,7 @@ class WorkflowExecutor:
 
         storage_location = optuna_storage_url(db_name)
         study = load_study(storage=storage_location, study_name=study_name)
-        best_trial = study.best_trial
+        best_trial = study_best_trial(study)
 
         # Get DataFrames from opt_result
         x_train_df = opt_result["x_train"]

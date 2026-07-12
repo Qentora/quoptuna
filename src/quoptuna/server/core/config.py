@@ -46,9 +46,27 @@ class Settings(BaseSettings):
     ANTHROPIC_API_KEY: str = ""
     GOOGLE_API_KEY: str = ""
 
+    # Auth0 (auth is enforced only when these are configured)
+    AUTH0_DOMAIN: str = ""
+    AUTH0_CLIENT_ID: str = ""
+    AUTH0_CLIENT_SECRET: str = ""
+    AUTH0_SECRET: str = ""  # 64-char hex, generate with: openssl rand -hex 32
+    APP_BASE_URL: str = "http://localhost:8000"
+
+    @property
+    def AUTH_ENABLED(self) -> bool:  # noqa: N802 - matches env-style settings naming
+        return bool(
+            self.AUTH0_DOMAIN
+            and self.AUTH0_CLIENT_ID
+            and self.AUTH0_CLIENT_SECRET
+            and self.AUTH0_SECRET
+        )
+
     class Config:
         env_file = ".env"
         case_sensitive = True
+        # .env may hold keys for other tools (e.g. PORT); don't crash on them.
+        extra = "ignore"
 
 
 settings = Settings()

@@ -26,6 +26,8 @@ const PRESETS = [
 
 export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const { configuration } = workflowData;
+  const sensitiveFeature = workflowData.features.sensitiveFeature;
+  const fairnessOn = configuration.fairnessMode !== 'off';
 
   const hasStudyName = configuration.studyName.trim().length > 0;
 
@@ -33,11 +35,26 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
     setFooter({ canContinue: hasStudyName });
   }, [hasStudyName, setFooter]);
 
-  const update = (field: keyof typeof configuration, value: string | number) =>
+  const update = (field: keyof typeof configuration, value: string | number | null) =>
     setWorkflowData((prev) => ({
       ...prev,
       configuration: { ...prev.configuration, [field]: value },
     }));
+
+  // The backend rejects incompatible combinations; keep them impossible here:
+  // constraints are TPE-only, multi-objective studies cannot prune.
+  const setFairnessMode = (mode: string) =>
+    setWorkflowData((prev) => ({
+      ...prev,
+      configuration: {
+        ...prev.configuration,
+        fairnessMode: mode as typeof prev.configuration.fairnessMode,
+        sampler: mode === 'constrained' ? 'tpe' : prev.configuration.sampler,
+        pruner: mode === 'multi_objective' ? 'none' : prev.configuration.pruner,
+      },
+    }));
+
+  const defaultThreshold = configuration.fairnessMetric === 'disparate_impact' ? 0.8 : 0.1;
 
   return (
     <div className="space-y-4">
@@ -126,7 +143,11 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
             <Field>
               <FieldLabel htmlFor="sampler">Sampler</FieldLabel>
               <Select value={configuration.sampler} onValueChange={(v) => update('sampler', v)}>
-                <SelectTrigger id="sampler" className="w-full max-w-xs">
+                <SelectTrigger
+                  id="sampler"
+                  className="w-full max-w-xs"
+                  disabled={configuration.fairnessMode === 'constrained'}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -144,7 +165,11 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
             <Field>
               <FieldLabel htmlFor="pruner">Pruner</FieldLabel>
               <Select value={configuration.pruner} onValueChange={(v) => update('pruner', v)}>
-                <SelectTrigger id="pruner" className="w-full max-w-xs">
+                <SelectTrigger
+                  id="pruner"
+                  className="w-full max-w-xs"
+                  disabled={configuration.fairnessMode === 'multi_objective'}
+                >
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -156,6 +181,89 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
               <FieldDescription>
                 Early-stops unpromising quantum model trainings to save compute. Kernel and
                 classical models always train to completion.
+              </FieldDescription>
+            </Field>
+          </CardContent>
+        </Card>
+
+        {/* Fairness-aware search */}
+        <Card>
+          <CardHeader>
+            <CardTitle>Fairness-aware search</CardTitle>
+          </CardHeader>
+          <CardContent className="grid items-start gap-x-6 gap-y-4 lg:grid-cols-3">
+            <Field>
+              <FieldLabel htmlFor="fairness-mode">Mode</FieldLabel>
+              <Select
+                value={configuration.fairnessMode}
+                onValueChange={setFairnessMode}
+                disabled={!sensitiveFeature}
+              >
+                <SelectTrigger id="fairness-mode" className="w-full max-w-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="off">Off</SelectItem>
+                  <SelectItem value="constrained">Constrained (threshold)</SelectItem>
+                  <SelectItem value="multi_objective">Multi-objective (Pareto)</SelectItem>
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                {sensitiveFeature
+                  ? configuration.fairnessMode === 'constrained'
+                    ? 'Deprioritizes trials whose disparity exceeds the threshold (forces the TPE sampler).'
+                    : configuration.fairnessMode === 'multi_objective'
+                      ? 'Searches the F1-vs-disparity Pareto front (disables pruning).'
+                      : `Feeds fairness on "${sensitiveFeature}" back into the search.`
+                  : 'Select a protected attribute in the Features step to enable.'}
+              </FieldDescription>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="fairness-metric">Disparity metric</FieldLabel>
+              <Select
+                value={configuration.fairnessMetric}
+                onValueChange={(v) => update('fairnessMetric', v)}
+                disabled={!fairnessOn}
+              >
+                <SelectTrigger id="fairness-metric" className="w-full max-w-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="equal_opportunity_difference">
+                    Equal opportunity difference
+                  </SelectItem>
+                  <SelectItem value="disparate_impact">Disparate impact</SelectItem>
+                  <SelectItem value="demographic_parity_difference">
+                    Demographic parity difference
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                What the search minimizes (multi-objective) or constrains (constrained mode).
+              </FieldDescription>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="fairness-threshold">Threshold</FieldLabel>
+              <Input
+                id="fairness-threshold"
+                type="number"
+                min={0}
+                max={1}
+                step={0.05}
+                disabled={configuration.fairnessMode !== 'constrained'}
+                placeholder={String(defaultThreshold)}
+                value={configuration.fairnessThreshold ?? ''}
+                onChange={(e) =>
+                  update('fairnessThreshold', e.target.value === '' ? null : Number(e.target.value))
+                }
+                className="max-w-xs"
+              />
+              <FieldDescription>
+                {configuration.fairnessMetric === 'disparate_impact'
+                  ? 'Feasible when the DI ratio is at least this (default 0.8, four-fifths rule).'
+                  : 'Feasible when the disparity is at most this (default 0.1).'}
               </FieldDescription>
             </Field>
           </CardContent>

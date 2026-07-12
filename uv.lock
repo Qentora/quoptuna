@@ -258,6 +258,36 @@ wheels = [
 ]
 
 [[package]]
+name = "auth0-server-python"
+version = "1.0.0b12"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "authlib" },
+    { name = "cryptography" },
+    { name = "httpx" },
+    { name = "jwcrypto" },
+    { name = "pydantic" },
+    { name = "pyjwt" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/4e/c0/349c379d11c3aad4535d589c21e663692441a503780e0d809c24acf935a0/auth0_server_python-1.0.0b12.tar.gz", hash = "sha256:53ecd96cf2535a5004c265528c235e97556e840f4c988b560403cd2fa629bf52", size = 73022 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/22/37/f2e94cbc5b618a39393b19b7e347796f86db837c1ad7f5b4bf01679c40df/auth0_server_python-1.0.0b12-py3-none-any.whl", hash = "sha256:fbd9dd0072597535ce88e1bad9646bc5311c27f0c0d2ca02a3c10a19cca83397", size = 79015 },
+]
+
+[[package]]
+name = "authlib"
+version = "1.7.2"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "joserfc" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/36/98/7d93f30d029643c0275dbc0bd6d5a6f670661ee6c9a94d93af7ab4887600/authlib-1.7.2.tar.gz", hash = "sha256:2cea25fefcd4e7173bdf1372c0afc265c8034b23a8cd5dcb6a9164b826c64231", size = 176511 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/fb/95/adcb68e20c34162e9135f370d6e31737719c2b6f94bc953fe7ed1f10fe21/authlib-1.7.2-py2.py3-none-any.whl", hash = "sha256:3e1faedc9d87e7d56a164eca3ccb6ace0d61b94abe83e92242f8dc8bba9b4a9f", size = 259548 },
+]
+
+[[package]]
 name = "autograd"
 version = "1.8.0"
 source = { registry = "https://pypi.org/simple" }
@@ -1515,6 +1545,18 @@ wheels = [
 ]
 
 [[package]]
+name = "joserfc"
+version = "1.7.3"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/d4/c6/b1cac0280f8efc57626ea8804866b37099f23cae11b1485a42b213245e31/joserfc-1.7.3.tar.gz", hash = "sha256:116955c2587139dba20621fd0bd7fc9255fa960c9fe7f43c43ebef2e801dcfcf", size = 233821 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/7d/f5/650b59d1b74f5befb7a7a7e7d7c92a26b94256df3541e2b4914152cd177a/joserfc-1.7.3-py3-none-any.whl", hash = "sha256:7c39f3f2c943dbc03122747fa8ebbd8e156e54904cf25651b452f4d2634a6075", size = 70982 },
+]
+
+[[package]]
 name = "jsonpatch"
 version = "1.33"
 source = { registry = "https://pypi.org/simple" }
@@ -1569,6 +1611,19 @@ source = { registry = "https://pypi.org/simple" }
 sdist = { url = "https://files.pythonhosted.org/packages/26/61/1685f940545177c553683c10114f5bb5bc093996fe651b29b8bee07f63e9/junitparser-5.0.0.tar.gz", hash = "sha256:f15e292877258d7c5755d672ce86f82c3622c7ea4c2f44f55de44ed7518484d3", size = 26259 }
 wheels = [
     { url = "https://files.pythonhosted.org/packages/31/e6/54c543336cc49aadc50fea1b66835903afbdcff9eeb8a9d26a475b2d9c47/junitparser-5.0.0-py3-none-any.whl", hash = "sha256:9e279f2214dc74b6a86b22db757abda2e8e66e819fe882dad5b392d57024cd26", size = 14801 },
+]
+
+[[package]]
+name = "jwcrypto"
+version = "1.5.8"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "cryptography" },
+    { name = "typing-extensions" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/de/7e/53c14813521693e931e420d9db00efe317419ff194495903bce03402275e/jwcrypto-1.5.8.tar.gz", hash = "sha256:c3d7114b6f6e65b52f6b7da817eb8cb8423e1da31e1ef13508447c81ecbdcc34", size = 90772 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/6e/7c/f87c5db042c4f7b4476346fc0d22f1025a777fee08eebde3720d3b9c4eb5/jwcrypto-1.5.8-py3-none-any.whl", hash = "sha256:85aeb475f808d56bbc2f2ed1f6f73e6a317c4011a4321505f02f0aed695a3742", size = 96133 },
 ]
 
 [[package]]
@@ -3328,9 +3383,10 @@ wheels = [
 
 [[package]]
 name = "quoptuna"
-version = "0.1.1"
+version = "0.1.2"
 source = { editable = "." }
 dependencies = [
+    { name = "auth0-server-python" },
     { name = "cairosvg" },
     { name = "codeflash" },
     { name = "fairlearn" },
@@ -3382,6 +3438,7 @@ dependencies = [
 
 [package.metadata]
 requires-dist = [
+    { name = "auth0-server-python", specifier = ">=1.0.0b1,<2" },
     { name = "cairosvg", specifier = ">=2.7.1" },
     { name = "codeflash", specifier = ">=0.8.3" },
     { name = "fairlearn", specifier = ">=0.11.0" },

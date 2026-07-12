@@ -1,5 +1,6 @@
 'use client';
 
+import { UserMenu } from '@/components/UserMenu';
 import {
   SidebarContent,
   SidebarFooter,
@@ -78,6 +79,7 @@ export function Sidebar() {
             </span>
           )}
         </div>
+        <UserMenu expanded={expanded} />
         <ThemeToggle expanded={expanded} />
       </SidebarFooter>
 
