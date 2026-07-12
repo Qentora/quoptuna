@@ -27,7 +27,7 @@ TRANSACTION_COOKIE = "_a0_tx"
 class CookieStore(AbstractDataStore):
     """Store SDK state in an encrypted, httponly cookie."""
 
-    def __init__(self, secret: str, cookie_name: str, max_age: int, model: type):
+    def __init__(self, secret: str, cookie_name: str, max_age: int, model: Any):
         super().__init__({"secret": secret})
         self.cookie_name = cookie_name
         self.max_age = max_age

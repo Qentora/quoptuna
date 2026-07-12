@@ -172,6 +172,7 @@ class Optimizer:
         self.intermediate_metric = intermediate_metric
         self.max_steps = max_steps
         self.convergence_interval = convergence_interval
+        self._disparity_threshold: float | None = None
         if max_vmap is not None and "max_vmap" in self.search_space:
             # Override the vectorization width without touching other entries;
             # objective() keeps sampling it like any other hyperparameter.
@@ -327,9 +328,10 @@ class Optimizer:
                 trial.set_user_attr("fairness_disparity", float(disparity))
                 trial.set_user_attr("fairness_metric", self.fairness_metric)
                 if self.fairness_mode == "constrained":
+                    threshold = self._require_disparity_threshold()
                     trial.set_user_attr(
                         "fairness_constraint",
-                        (float(disparity - self._disparity_threshold),),
+                        (float(disparity - threshold),),
                     )
                 if self.fairness_mode == "multi_objective":
                     return f_score_, float(disparity)
@@ -390,6 +392,13 @@ class Optimizer:
                 raise TrialPruned(msg)
 
         return callback
+
+    def _require_disparity_threshold(self) -> float:
+        threshold = self._disparity_threshold
+        if threshold is None:
+            msg = "Constrained fairness mode requires a disparity threshold"
+            raise RuntimeError(msg)
+        return threshold
 
     def _log_resource_attributes(
         self,
