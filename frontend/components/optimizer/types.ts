@@ -87,6 +87,16 @@ export interface WorkflowData {
     }> | null;
   };
   analysis: {
+    snapshotId: string | null;
+    snapshotRevision: number | null;
+    status: 'idle' | 'pending' | 'running' | 'completed' | 'failed';
+    config: {
+      trialNumber: number | null;
+      useProba: boolean;
+      subsetSize: number;
+      classIndex: number;
+      sampleIndex: number;
+    } | null;
     featureImportance: Array<{ feature: string; importance: number }> | null;
     // SHAP plots plus reserved keys: rocCurve, prCurve.
     plots: Record<string, string>;
@@ -132,6 +142,10 @@ export const initialWorkflowData: WorkflowData = {
     paretoTrials: null,
   },
   analysis: {
+    snapshotId: null,
+    snapshotRevision: null,
+    status: 'idle',
+    config: null,
     featureImportance: null,
     plots: {},
     studyPlots: null,

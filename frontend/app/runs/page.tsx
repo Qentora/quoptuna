@@ -21,6 +21,7 @@ import {
   type RunStatus,
   deleteOptimization,
   getOptimizationDetail,
+  listAnalysisSnapshots,
   listOptimizations,
 } from '@/lib/api';
 import { saveWizardState } from '@/lib/wizardStorage';
@@ -71,6 +72,8 @@ export default function RunsPage() {
     setOpeningId(run.id);
     try {
       const detail = await getOptimizationDetail(run.id);
+      const snapshots = await listAnalysisSnapshots(run.id).catch(() => []);
+      const latestAnalysis = snapshots[0] ?? null;
       const req = detail.request ?? {};
       const workflowData: WorkflowData = {
         ...initialWorkflowData,
@@ -117,10 +120,24 @@ export default function RunsPage() {
           bestValue: detail.best_value,
           bestParams: detail.best_params,
           trials: [],
-          selectedTrial: null,
+          selectedTrial: latestAnalysis?.config.trial_number ?? null,
           paretoTrials: null,
         },
-        analysis: { ...initialWorkflowData.analysis },
+        analysis: latestAnalysis
+          ? {
+              ...initialWorkflowData.analysis,
+              snapshotId: latestAnalysis.id,
+              snapshotRevision: latestAnalysis.revision,
+              status: 'completed',
+              config: {
+                trialNumber: latestAnalysis.config.trial_number,
+                useProba: latestAnalysis.config.use_proba,
+                subsetSize: latestAnalysis.config.subset_size,
+                classIndex: latestAnalysis.config.class_index,
+                sampleIndex: latestAnalysis.config.sample_index,
+              },
+            }
+          : { ...initialWorkflowData.analysis },
         report: { markdown: null },
       };
 

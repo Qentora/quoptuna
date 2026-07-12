@@ -5,6 +5,8 @@ Analysis endpoints (SHAP, metrics, AI reports).
 import base64
 import io
 import logging
+from contextvars import ContextVar
+from datetime import datetime
 from typing import Any, List, Optional, cast
 
 import matplotlib as mpl
@@ -14,7 +16,7 @@ import matplotlib as mpl
 mpl.use("Agg")
 
 import numpy as np
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, BackgroundTasks, HTTPException
 from pydantic import BaseModel, ConfigDict
 
 from quoptuna.backend.utils.storage import DEFAULT_DB_NAME
@@ -25,6 +27,7 @@ from quoptuna.server.api.v1.optimize import (
     build_workflow,
     get_job,
 )
+from quoptuna.server.services import analysis_store
 from quoptuna.server.services.storage import optuna_storage_url
 from quoptuna.server.services.workflow_service import (
     WorkflowExecutor,
@@ -37,6 +40,12 @@ logger = logging.getLogger(__name__)
 router = APIRouter()
 
 NON_CLASS_PLOTS = {"bar", "beeswarm", "violin", "heatmap"}
+_job_xai: ContextVar[Any | None] = ContextVar("analysis_job_xai", default=None)
+
+
+def _analysis_xai(opt_result: dict, **kwargs):
+    """Reuse the single XAI instance while a durable analysis job is running."""
+    return _job_xai.get() or build_xai(opt_result, **kwargs)
 
 
 class SHAPRequest(BaseModel):
@@ -64,6 +73,8 @@ class ReportRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     optimization_id: str
+    analysis_snapshot_id: str
+    analysis_revision: int
     trial_number: Optional[int] = None
     llm_provider: str = "google"
     api_key: str
@@ -73,6 +84,21 @@ class ReportRequest(BaseModel):
     # available (stored with the run or given here).
     sensitive_feature: Optional[str] = None
     include_fairness: bool = True
+
+
+class AnalysisJobRequest(BaseModel):
+    optimization_id: str
+    trial_number: Optional[int] = None
+    use_proba: bool = True
+    subset_size: int = 50
+    class_index: int = 0
+    sample_index: int = 0
+
+
+class SnapshotFairnessRequest(BaseModel):
+    sensitive_feature: Optional[str] = None
+    mitigate: bool = False
+    constraint: str = "equalized_odds"
 
 
 class StudyPlotsRequest(BaseModel):
@@ -424,6 +450,187 @@ def _shap_data_payload(
     }
 
 
+async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
+    """Compute and persist one complete analysis bundle."""
+    config = analysis_store.normalize_config(request.model_dump(exclude={"optimization_id"}))
+    trial = config["trial_number"]
+    metrics_request = MetricsRequest(
+        optimization_id=request.optimization_id,
+        trial_number=trial,
+        use_proba=config["use_proba"],
+        subset_size=config["subset_size"],
+    )
+    shap_request = SHAPRequest(
+        optimization_id=request.optimization_id,
+        trial_number=trial,
+        sample_index=config["sample_index"],
+        use_proba=config["use_proba"],
+        subset_size=config["subset_size"],
+        class_index=config["class_index"],
+    )
+    warnings: dict[str, str] = {}
+
+    async def optional(section: str, call):
+        analysis_store.update_job(job_id, current_section=section)
+        try:
+            return await call
+        except Exception as exc:  # optional visual sections must not discard core results
+            detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
+            warnings[section] = str(detail)
+            logger.warning("Analysis section %s failed: %s", section, detail)
+            return None
+
+    token = None
+    try:
+        analysis_store.update_job(job_id, status="running", current_section="shap")
+        opt_result = _get_completed_result(request.optimization_id)
+        shared_xai = build_xai(
+            opt_result,
+            trial_number=trial,
+            use_proba=config["use_proba"],
+            subset_size=config["subset_size"],
+        )
+        token = _job_xai.set(shared_xai)
+        # SHAP and metrics are the required core sections. Existing endpoint
+        # functions remain the compatibility implementation for now; this job
+        # owns orchestration and persistence.
+        shap = await generate_shap_analysis(shap_request)
+        metrics = await generate_metrics(metrics_request)
+        curves = await optional("curves", generate_curves(metrics_request))
+        curves_data = await optional("curves_data", generate_curves_data(metrics_request))
+        confusion_data = await optional(
+            "confusion_matrix_data", generate_confusion_matrix_data(metrics_request)
+        )
+        importance_data = await optional(
+            "feature_importance_data", generate_feature_importance_data(metrics_request)
+        )
+        shap_data = await optional("shap_data", generate_shap_data(shap_request))
+        study = await optional(
+            "study_plots",
+            generate_study_plots(StudyPlotsRequest(optimization_id=request.optimization_id)),
+        )
+        fairness = None
+        job = get_job(request.optimization_id)
+        sensitive = (job.get("request") or {}).get("sensitive_feature")
+        if sensitive:
+            fairness = await optional(
+                "fairness",
+                generate_fairness(
+                    FairnessRequest(
+                        optimization_id=request.optimization_id,
+                        trial_number=trial,
+                        sensitive_feature=sensitive,
+                    )
+                ),
+            )
+
+        plots = dict(shap.get("plots") or {})
+        if curves and curves.get("roc_curve_plot"):
+            plots["rocCurve"] = curves["roc_curve_plot"]
+        if curves and curves.get("pr_curve_plot"):
+            plots["prCurve"] = curves["pr_curve_plot"]
+        payload = {
+            "feature_importance": shap.get("feature_importance"),
+            "plots": plots,
+            "study_plots": (study or {}).get("plots"),
+            "metrics": metrics.get("metrics"),
+            "confusion_matrix_plot": metrics.get("confusion_matrix_plot"),
+            "roc_auc": (curves or {}).get("roc_auc"),
+            "average_precision": (curves or {}).get("average_precision"),
+            "fairness": fairness,
+            "curves_data": curves_data,
+            "confusion_data": confusion_data,
+            "importance_data": importance_data,
+            "shap_data": shap_data,
+            "task_type": metrics.get("task_type"),
+            "class_labels": metrics.get("class_labels"),
+            "warnings": warnings,
+        }
+        analysis_store.complete_job(job_id, payload)
+    except Exception as exc:
+        logger.exception("Analysis job %s failed", job_id)
+        detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
+        analysis_store.update_job(
+            job_id, status="failed", error=str(detail), completed_at=datetime.now().isoformat()
+        )
+    finally:
+        if token is not None:
+            _job_xai.reset(token)
+
+
+@router.post("/jobs")
+async def start_analysis_job(request: AnalysisJobRequest, background_tasks: BackgroundTasks):
+    """Start analysis only after an explicit client request."""
+    _get_completed_result(request.optimization_id)
+    job = analysis_store.create_job(request.optimization_id, request.model_dump())
+    if job.pop("created"):
+        background_tasks.add_task(_run_analysis_job, job["id"], request)
+    return job
+
+
+@router.get("/jobs/{job_id}")
+async def get_analysis_job(job_id: str):
+    job = analysis_store.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Analysis job not found")
+    return job
+
+
+@router.get("/snapshots")
+async def list_analysis_snapshots(optimization_id: str):
+    get_job(optimization_id)
+    snapshots = analysis_store.list_snapshots(optimization_id)
+    return {"snapshots": snapshots}
+
+
+@router.get("/snapshots/{snapshot_id}")
+async def get_analysis_snapshot(snapshot_id: str):
+    snapshot = analysis_store.get_snapshot(snapshot_id)
+    if not snapshot or snapshot["revision"] < 1:
+        raise HTTPException(status_code=404, detail="Completed analysis snapshot not found")
+    return snapshot
+
+
+@router.get("/snapshots/{snapshot_id}/reports")
+async def list_snapshot_reports(snapshot_id: str):
+    if not analysis_store.get_snapshot(snapshot_id, hydrate=False):
+        raise HTTPException(status_code=404, detail="Analysis snapshot not found")
+    return {"reports": analysis_store.list_reports(snapshot_id)}
+
+
+@router.post("/snapshots/{snapshot_id}/fairness")
+async def update_snapshot_fairness(snapshot_id: str, request: SnapshotFairnessRequest):
+    """Explicitly compute and persist a fairness audit or mitigation revision."""
+    snapshot = analysis_store.get_snapshot(snapshot_id)
+    if not snapshot or not snapshot.get("payload"):
+        raise HTTPException(status_code=404, detail="Completed analysis snapshot not found")
+    config = snapshot["config"]
+    opt_result = _get_completed_result(snapshot["optimization_id"])
+    try:
+        xai = _analysis_xai(opt_result, trial_number=config.get("trial_number"))
+        fairness = _compute_fairness_payload(
+            snapshot["optimization_id"],
+            request.sensitive_feature,
+            xai,
+            mitigate=request.mitigate,
+            constraint=request.constraint,
+            task_spec=_task_spec(opt_result),
+        )
+        payload = dict(snapshot["payload"])
+        payload["fairness"] = {
+            "optimization_id": snapshot["optimization_id"],
+            "status": "completed",
+            **fairness,
+        }
+        job = analysis_store.create_revision_job(snapshot_id)
+        completed = analysis_store.complete_job(job["id"], payload)
+        return {"fairness": payload["fairness"], **completed}
+    except HTTPException:
+        raise
+    except Exception as exc:
+        raise HTTPException(status_code=500, detail=f"Failed to update fairness: {exc!s}")
+
+
 @router.post("/shap/data")
 async def generate_shap_data(request: SHAPRequest):
     """Raw SHAP values/data as JSON (for frontend charting).
@@ -434,7 +641,7 @@ async def generate_shap_data(request: SHAPRequest):
     opt_result = _get_completed_result(request.optimization_id)
 
     try:
-        xai = build_xai(
+        xai = _analysis_xai(
             opt_result,
             trial_number=request.trial_number,
             use_proba=request.use_proba,
@@ -463,7 +670,7 @@ async def generate_shap_analysis(request: SHAPRequest):
     opt_result = _get_completed_result(request.optimization_id)
 
     try:
-        xai = build_xai(
+        xai = _analysis_xai(
             opt_result,
             trial_number=request.trial_number,
             use_proba=request.use_proba,
@@ -503,7 +710,7 @@ async def generate_metrics(request: MetricsRequest):
     opt_result = _get_completed_result(request.optimization_id)
 
     try:
-        xai = build_xai(
+        xai = _analysis_xai(
             opt_result,
             trial_number=request.trial_number,
             use_proba=request.use_proba,
@@ -616,7 +823,7 @@ async def generate_curves(request: MetricsRequest):
     opt_result = _get_completed_result(request.optimization_id)
 
     try:
-        xai = build_xai(
+        xai = _analysis_xai(
             opt_result,
             trial_number=request.trial_number,
             use_proba=request.use_proba,
@@ -753,7 +960,7 @@ async def generate_curves_data(request: MetricsRequest):
     opt_result = _get_completed_result(request.optimization_id)
 
     try:
-        xai = build_xai(
+        xai = _analysis_xai(
             opt_result,
             trial_number=request.trial_number,
             use_proba=request.use_proba,
@@ -810,7 +1017,7 @@ async def generate_confusion_matrix_data(request: MetricsRequest):
     opt_result = _get_completed_result(request.optimization_id)
 
     try:
-        xai = build_xai(
+        xai = _analysis_xai(
             opt_result,
             trial_number=request.trial_number,
             use_proba=request.use_proba,
@@ -844,7 +1051,7 @@ async def generate_feature_importance_data(request: MetricsRequest):
     opt_result = _get_completed_result(request.optimization_id)
 
     try:
-        xai = build_xai(
+        xai = _analysis_xai(
             opt_result,
             trial_number=request.trial_number,
             use_proba=request.use_proba,
@@ -1017,7 +1224,7 @@ async def generate_fairness(request: FairnessRequest):
     opt_result = _get_completed_result(request.optimization_id)
 
     try:
-        xai = build_xai(opt_result, trial_number=request.trial_number)
+        xai = _analysis_xai(opt_result, trial_number=request.trial_number)
         payload = _compute_fairness_payload(
             request.optimization_id,
             request.sensitive_feature,
@@ -1039,51 +1246,76 @@ async def generate_fairness(request: FairnessRequest):
 
 @router.post("/report")
 async def generate_ai_report(request: ReportRequest):
-    """Generate a Markdown report using a multimodal LLM (real call)."""
-    opt_result = _get_completed_result(request.optimization_id)
-
+    """Generate and persist a report strictly from a completed snapshot."""
     if not request.api_key:
         raise HTTPException(status_code=400, detail="An LLM api_key is required")
 
+    snapshot = analysis_store.get_snapshot(request.analysis_snapshot_id)
+    if not snapshot or snapshot["optimization_id"] != request.optimization_id:
+        raise HTTPException(status_code=409, detail="A completed analysis snapshot is required")
+    if snapshot["revision"] != request.analysis_revision:
+        raise HTTPException(
+            status_code=409,
+            detail="The analysis snapshot changed; reload it before generating the report",
+        )
+    payload = snapshot.get("payload") or {}
+    if not payload.get("metrics"):
+        raise HTTPException(status_code=409, detail="The analysis snapshot is incomplete")
+
+    report_id = analysis_store.create_report(
+        snapshot, request.llm_provider, request.model_name, request.dataset_description
+    )
+
     try:
-        xai = build_xai(opt_result, trial_number=request.trial_number)
+        from quoptuna.backend.xai import report_agent
 
-        fairness = None
+        evidence: dict[str, Any] = {
+            "metrics": payload["metrics"],
+            "feature_importance": payload.get("feature_importance"),
+            "confusion_matrix": payload.get("confusion_data"),
+            "curves": payload.get("curves_data"),
+            "task_type": payload.get("task_type"),
+            "class_labels": payload.get("class_labels"),
+        }
+        if request.include_fairness and payload.get("fairness"):
+            fairness = payload["fairness"]
+            evidence["fairness_metrics"] = fairness.get("metrics")
+            evidence["fairness_mitigation"] = fairness.get("mitigation")
+
+        images = dict(payload.get("plots") or {})
+        if payload.get("confusion_matrix_plot"):
+            images["confusion_matrix"] = payload["confusion_matrix_plot"]
+        fairness = payload.get("fairness") or {}
         if request.include_fairness:
-            try:
-                fairness = _compute_fairness_payload(
-                    request.optimization_id,
-                    request.sensitive_feature,
-                    xai,
-                    mitigate=True,
-                    task_spec=_task_spec(opt_result),
-                )
-            except HTTPException as exc:
-                # No sensitive feature configured (or unusable column) — the
-                # report simply proceeds without a fairness section.
-                logger.info("Report fairness section skipped: %s", exc.detail)
-            except Exception:
-                # A fairness/mitigation failure must not take down the whole
-                # report; generate it without the fairness section instead.
-                logger.exception("Report fairness section failed; continuing without it")
+            images.update(
+                {f"fairness_{name}": value for name, value in (fairness.get("plots") or {}).items()}
+            )
+            mitigation = fairness.get("mitigation") or {}
+            if mitigation.get("comparison_plot"):
+                images["fairness_mitigation_comparison"] = mitigation["comparison_plot"]
 
-        markdown = await xai.generate_report_with_llm(
+        markdown = await report_agent.generate_report(
+            report=evidence,
+            images=images,
             api_key=request.api_key,
             model_name=request.model_name,
             provider=request.llm_provider,
-            fairness=fairness,
-            task_spec=_task_spec(opt_result),
         )
 
         if request.dataset_description:
             markdown = f"> Dataset: {request.dataset_description}\n\n{markdown}"
 
+        analysis_store.complete_report(report_id, markdown)
+
         return {
             "optimization_id": request.optimization_id,
+            "report_id": report_id,
             "status": "completed",
             "report_markdown": markdown,
         }
-    except HTTPException:
+    except HTTPException as exc:
+        analysis_store.fail_report(report_id, str(exc.detail))
         raise
     except Exception as e:
+        analysis_store.fail_report(report_id, str(e))
         raise HTTPException(status_code=500, detail=f"Failed to generate report: {e!s}")

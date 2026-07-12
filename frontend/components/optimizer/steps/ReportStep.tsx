@@ -13,12 +13,13 @@ import {
 } from '@/components/ui/select';
 import { StatusDot } from '@/components/ui/status-dot';
 import { Textarea } from '@/components/ui/textarea';
-import { generateReport } from '@/lib/api';
+import { generateReport, listSnapshotReports } from '@/lib/api';
 import { type ApiKeys, loadApiKeys } from '@/lib/settings';
 import { Check, Copy, Download, FileText, Loader2 } from 'lucide-react';
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { ErrorBanner } from '../NavButtons';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
@@ -55,12 +56,27 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
       .catch(() => undefined);
   }, []);
 
-  const { optimization, report } = workflowData;
+  const { optimization, analysis, report } = workflowData;
   const apiKey = keys[provider];
   // Guard against a non-string payload (e.g. structured LLM content blocks) —
   // ReactMarkdown throws on non-string children and would crash the whole app.
   const hasReport = typeof report.markdown === 'string' && report.markdown.length > 0;
   const effectiveModel = modelName === '__custom__' ? customModel.trim() : modelName;
+
+  useEffect(() => {
+    if (!analysis.snapshotId || report.markdown) return;
+    void listSnapshotReports(analysis.snapshotId)
+      .then((reports) => {
+        const latest = reports.find(
+          (item) =>
+            item.status === 'completed' && item.snapshot_revision === analysis.snapshotRevision
+        );
+        if (latest?.markdown) {
+          setWorkflowData((prev) => ({ ...prev, report: { markdown: latest.markdown } }));
+        }
+      })
+      .catch(() => undefined);
+  }, [analysis.snapshotId, analysis.snapshotRevision, report.markdown, setWorkflowData]);
 
   useEffect(() => {
     setFooter({ canContinue: false, hideNext: true, backDisabled: isGenerating });
@@ -76,6 +92,14 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
       setError('No optimization results available');
       return;
     }
+    if (
+      !analysis.snapshotId ||
+      analysis.snapshotRevision === null ||
+      analysis.status !== 'completed'
+    ) {
+      setError('Run and complete analysis before generating a report.');
+      return;
+    }
     if (!apiKey) {
       setError(`No ${provider} API key configured. Add one on the Settings page.`);
       return;
@@ -85,6 +109,8 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
     try {
       const result = await generateReport({
         optimization_id: optimization.executionId,
+        analysis_snapshot_id: analysis.snapshotId,
+        analysis_revision: analysis.snapshotRevision,
         trial_number: optimization.selectedTrial ?? undefined,
         llm_provider: provider,
         api_key: apiKey,
@@ -157,7 +183,28 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
           <CardContent>
             {hasReport && report.markdown ? (
               <div className="prose prose-sm max-w-none dark:prose-invert">
-                <ReactMarkdown>{report.markdown}</ReactMarkdown>
+                <ReactMarkdown
+                  remarkPlugins={[remarkGfm]}
+                  components={{
+                    table: ({ children }) => (
+                      <div className="my-4 overflow-x-auto rounded-md border border-border">
+                        <table className="m-0 w-full border-collapse text-sm">{children}</table>
+                      </div>
+                    ),
+                    th: ({ children }) => (
+                      <th className="border-b border-border bg-muted px-3 py-2 text-left font-semibold">
+                        {children}
+                      </th>
+                    ),
+                    td: ({ children }) => (
+                      <td className="border-b border-border px-3 py-2 align-top last:border-r-0">
+                        {children}
+                      </td>
+                    ),
+                  }}
+                >
+                  {report.markdown}
+                </ReactMarkdown>
               </div>
             ) : isGenerating ? (
               <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
@@ -167,8 +214,9 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
               <div className="flex flex-col items-center justify-center gap-2 py-16 text-center">
                 <FileText className="h-8 w-8 text-muted-foreground" />
                 <p className="text-sm text-muted-foreground">
-                  Generate a report to see an AI-written summary of the best trial, metrics and SHAP
-                  findings.
+                  {analysis.status === 'completed'
+                    ? 'Generate a report from the persisted metrics and analysis artifacts.'
+                    : 'Run and complete analysis before generating a report.'}
                 </p>
               </div>
             )}
@@ -249,7 +297,7 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
                 variant="brand"
                 className="w-full"
                 onClick={run}
-                disabled={isGenerating || !apiKey}
+                disabled={isGenerating || !apiKey || analysis.status !== 'completed'}
               >
                 {isGenerating ? (
                   <Loader2 className="h-4 w-4 animate-spin" />
