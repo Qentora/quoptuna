@@ -428,7 +428,7 @@ class XAI:
     def __str__(self):
         return str(self.get_report())
 
-    async def generate_report_with_llm(
+    async def generate_report_with_llm(  # noqa: PLR0913
         self,
         api_key: str,
         model_name: str = "gpt-4o",

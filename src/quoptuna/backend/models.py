@@ -25,6 +25,7 @@ from quoptuna.backend.base.pennylane_models import (
     TreeTensorClassifier,
     WeiNet,
 )
+from quoptuna.backend.base.pennylane_models.ovr import wrap_one_vs_rest
 
 
 # Define a custom exception class
@@ -156,7 +157,15 @@ def create_model(model_type, n_classes: int = BINARY_N_CLASSES, **kwargs):
     params = {key: kwargs.get(key) for key in param_keys}
 
     if model_type == "MLPClassifier":
-        params["hidden_layer_sizes"] = ast.literal_eval(params["hidden_layer_sizes"])
+        hidden_layer_sizes = params["hidden_layer_sizes"]
+        if hidden_layer_sizes is None:
+            msg = "hidden_layer_sizes is required for MLPClassifier"
+            raise ValueError(msg)
+        params["hidden_layer_sizes"] = (
+            ast.literal_eval(hidden_layer_sizes)
+            if isinstance(hidden_layer_sizes, str)
+            else hidden_layer_sizes
+        )
         params["learning_rate_init"] = kwargs.get("learning_rate")
 
     model = model_class(**params)
@@ -170,8 +179,6 @@ def create_model(model_type, n_classes: int = BINARY_N_CLASSES, **kwargs):
             setattr(model, knob, value)
 
     if n_classes > BINARY_N_CLASSES and model_type in VARIATIONAL_BINARY_MODELS:
-        from quoptuna.backend.base.pennylane_models.ovr import wrap_one_vs_rest
-
         model = wrap_one_vs_rest(model)
 
     return model
