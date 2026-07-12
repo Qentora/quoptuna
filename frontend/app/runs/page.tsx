@@ -98,6 +98,7 @@ export default function RunsPage() {
             neg: req.label_mapping?.neg ?? null,
             pos: req.label_mapping?.pos ?? null,
           },
+          favorableClass: req.favorable_class != null ? String(req.favorable_class) : null,
           sensitiveFeature: req.sensitive_feature ?? null,
           categoricalEncoding: req.categorical_encoding ?? 'ordinal',
         },

@@ -277,6 +277,114 @@ def run(
     )
 
 
+@app.command()
+def optimize(  # noqa: PLR0913
+    uci_id: str = typer.Option(
+        None, "--uci-id", help="UCI dataset id (e.g. 53 for Iris). Mutually exclusive with --csv."
+    ),
+    csv: str = typer.Option(None, "--csv", help="Path to a local CSV dataset."),
+    target: str = typer.Option(
+        None, "--target", help="Target column (default: the dataset's target / last column)."
+    ),
+    features: str = typer.Option(
+        None, "--features", help="Comma-separated feature columns (default: all non-target)."
+    ),
+    trials: int = typer.Option(3, "--trials", min=1, help="Number of Optuna trials."),
+    models: str = typer.Option(
+        "SVC",
+        "--models",
+        help="Comma-separated model types, e.g. 'SVC,IQPKernelClassifier'.",
+    ),
+    label_neg: str = typer.Option(None, "--label-neg", help="Binary targets: label mapped to -1."),
+    label_pos: str = typer.Option(None, "--label-pos", help="Binary targets: label mapped to +1."),
+    favorable_class: str = typer.Option(
+        None,
+        "--favorable-class",
+        help="Multiclass: favorable outcome for fairness auditing (only needed with fairness).",
+    ),
+    sensitive_feature: str = typer.Option(
+        None, "--sensitive-feature", help="Protected attribute column for fairness auditing."
+    ),
+    fairness_mode: str = typer.Option(
+        "off", "--fairness-mode", help="off | constrained | multi_objective."
+    ),
+    fairness_metric: str = typer.Option(
+        "equal_opportunity_difference", "--fairness-metric", help="Disparity metric."
+    ),
+    fairness_threshold: float = typer.Option(
+        None, "--fairness-threshold", help="Constrained-mode disparity threshold."
+    ),
+    sampler: str = typer.Option("random", "--sampler", help="tpe | random | grid."),
+    sampler_seed: int = typer.Option(0, "--seed", help="Sampler seed (reproducible runs)."),
+    pruner: str = typer.Option("none", "--pruner", help="none | asha | hyperband."),
+    max_steps: int = typer.Option(
+        20, "--max-steps", help="Training-step cap for iterative quantum models."
+    ),
+    convergence_interval: int = typer.Option(
+        5, "--convergence-interval", help="Flat-loss convergence window."
+    ),
+    max_vmap: int = typer.Option(None, "--max-vmap", help="Circuit vectorization width."),
+    categorical_encoding: str = typer.Option(
+        "ordinal", "--categorical-encoding", help="ordinal | onehot."
+    ),
+    study_name: str = typer.Option(None, "--study-name", help="Optuna study name."),
+    db_name: str = typer.Option("cli_runs", "--db-name", help="Optuna storage database name."),
+    subset_size: int = typer.Option(30, "--subset-size", help="Analysis subset size."),
+    no_analyze: bool = typer.Option(
+        False, "--no-analyze", help="Skip the post-run analysis summary."
+    ),
+) -> None:
+    """Run one optimization through the exact UI pipeline, headless.
+
+    Examples:
+        quoptuna optimize --uci-id 53 --trials 2 --models SVC,IQPKernelClassifier
+        quoptuna optimize --csv data.csv --target label --trials 3
+    """
+    import json  # noqa: PLC0415
+
+    if bool(uci_id) == bool(csv):
+        console.print("[red]Provide exactly one of --uci-id or --csv.[/red]")
+        raise typer.Exit(2)
+
+    # Imported lazily: pulls in the whole server/JAX stack.
+    from quoptuna.server.services.headless import run_headless_optimization  # noqa: PLC0415
+
+    print_logo()
+    console.print(f"[bold {_BRAND_COLOR}]Running optimization[/] ({trials} trials)")
+    try:
+        summary = run_headless_optimization(
+            csv_path=csv,
+            uci_id=uci_id,
+            target=target,
+            features=[f.strip() for f in features.split(",")] if features else None,
+            n_trials=trials,
+            model_types=[m.strip() for m in models.split(",")] if models else None,
+            label_neg=label_neg,
+            label_pos=label_pos,
+            favorable_class=favorable_class,
+            sensitive_feature=sensitive_feature,
+            categorical_encoding=categorical_encoding,
+            sampler=sampler,
+            sampler_seed=sampler_seed,
+            pruner=pruner,
+            fairness_mode=fairness_mode,
+            fairness_metric=fairness_metric,
+            fairness_threshold=fairness_threshold,
+            max_steps=max_steps,
+            convergence_interval=convergence_interval,
+            max_vmap=max_vmap,
+            study_name=study_name,
+            db_name=db_name,
+            analyze=not no_analyze,
+            subset_size=subset_size,
+        )
+    except Exception as exc:
+        console.print(f"[red]Optimization failed:[/red] {exc}")
+        raise typer.Exit(1) from exc
+
+    console.print_json(json.dumps(summary, default=str))
+
+
 def main() -> None:
     app()
 

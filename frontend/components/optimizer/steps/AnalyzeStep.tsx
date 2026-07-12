@@ -99,6 +99,8 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
   const [confusionData, setConfusionData] = useState<ConfusionMatrixData | null>(null);
   const [importanceData, setImportanceData] = useState<FeatureImportanceData | null>(null);
   const [shapData, setShapData] = useState<ShapData | null>(null);
+  // Multiclass: which class's SHAP slice is displayed.
+  const [shapClassIndex, setShapClassIndex] = useState(0);
 
   // biome-ignore lint/correctness/useExhaustiveDependencies: useProba/subsetSize are read at fetch time only.
   useEffect(() => {
@@ -110,7 +112,9 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
       getCurvesData({ ...body, use_proba: useProba, subset_size: subsetSize }).catch(() => null),
       getConfusionMatrixData(body).catch(() => null),
       getFeatureImportanceData(body).catch(() => null),
-      getShapData({ ...body, subset_size: subsetSize }).catch(() => null),
+      getShapData({ ...body, subset_size: subsetSize, class_index: shapClassIndex }).catch(
+        () => null
+      ),
     ]).then(([curves, cm, fi, shap]) => {
       if (cancelled) return;
       setCurvesData(curves);
@@ -121,7 +125,7 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
     return () => {
       cancelled = true;
     };
-  }, [optimization.executionId, optimization.selectedTrial]);
+  }, [optimization.executionId, optimization.selectedTrial, shapClassIndex]);
 
   useEffect(() => {
     setFooter({ canContinue: hasSHAP, nextBusy: isGenerating, backDisabled: isGenerating });
@@ -145,6 +149,7 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
           sample_index: sampleIndex,
           use_proba: useProba,
           subset_size: subsetSize,
+          class_index: shapClassIndex,
         }),
         getMetrics(id, trial).catch(() => null),
         getCurves(id, trial, useProba, subsetSize).catch(() => null),
@@ -384,7 +389,26 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
           </TabsContent>
 
           {/* SHAP */}
-          <TabsContent value="shap">
+          <TabsContent value="shap" className="space-y-4">
+            {shapData && (shapData.n_classes ?? 2) > 2 && shapData.class_labels && (
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-sm text-muted-foreground">Explaining class:</span>
+                {shapData.class_labels.map((label, i) => (
+                  <Button
+                    key={label}
+                    type="button"
+                    size="sm"
+                    variant={i === shapClassIndex ? 'default' : 'outline'}
+                    onClick={() => setShapClassIndex(i)}
+                  >
+                    {label}
+                  </Button>
+                ))}
+                <span className="text-xs text-muted-foreground">
+                  SHAP attributions are per class (one-vs-rest).
+                </span>
+              </div>
+            )}
             {shapData || Object.keys(analysis.plots).length > 0 ? (
               <div className="grid gap-4 md:grid-cols-2">
                 {shapData ? (
@@ -481,7 +505,7 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
                 )}
               </div>
             ) : (
-              <EmptyState message="Curves unavailable for this model (needs binary probabilities)." />
+              <EmptyState message="Curves unavailable for this model (needs prediction probabilities)." />
             )}
           </TabsContent>
 
@@ -529,8 +553,25 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
                       {analysis.fairness.sensitive_feature}
                     </span>{' '}
                     (fairlearn)
+                    {analysis.fairness.task_type === 'multiclass' &&
+                      analysis.fairness.favorable_class && (
+                        <>
+                          {' · '}favorable class{' '}
+                          <span className="font-medium text-accent-emerald-foreground">
+                            {analysis.fairness.favorable_class}
+                          </span>{' '}
+                          vs rest
+                        </>
+                      )}
                   </p>
-                  {!analysis.fairness.mitigation && (
+                  {analysis.fairness.task_type === 'multiclass' ? (
+                    <p
+                      className="text-xs text-muted-foreground"
+                      title="ThresholdOptimizer adjusts a favorable-vs-rest decision threshold, which cannot be mapped back onto an argmax over K classes."
+                    >
+                      Mitigation (ThresholdOptimizer) is available for binary targets only.
+                    </p>
+                  ) : !analysis.fairness.mitigation && (
                     <Button type="button" size="sm" onClick={runMitigation} disabled={isMitigating}>
                       {isMitigating ? (
                         <Loader2 className="h-4 w-4 animate-spin" />
@@ -753,17 +794,59 @@ function PlotCard({
 const axisTick = { fontSize: 12 } as const;
 const pct = (v: number) => v.toFixed(1);
 
+const CLASS_CHART_COLORS = [
+  'var(--chart-1)',
+  'var(--chart-2)',
+  'var(--chart-3)',
+  'var(--chart-4)',
+  'var(--chart-5)',
+];
+
+const classColor = (i: number) => CLASS_CHART_COLORS[i % CLASS_CHART_COLORS.length];
+
+function isPerClassRoc(
+  roc: NonNullable<CurvesData['roc']>
+): roc is { per_class: Array<{ label: string; fpr: number[]; tpr: number[]; auc: number | null }>; macro_auc: number | null } {
+  return 'per_class' in roc;
+}
+
+function isPerClassPr(
+  pr: NonNullable<CurvesData['pr']>
+): pr is { per_class: Array<{ label: string; precision: number[]; recall: number[]; average_precision: number | null }> } {
+  return 'per_class' in pr;
+}
+
 function RocCurveCard({ roc }: { roc: NonNullable<CurvesData['roc']> }) {
-  const data = roc.fpr.map((fpr, i) => ({ fpr, tpr: roc.tpr[i] }));
+  // Multiclass: one line per class (one-vs-rest); binary keeps a single line.
+  const series = isPerClassRoc(roc)
+    ? roc.per_class.map((c) => ({ label: c.label, auc: c.auc, fpr: c.fpr, tpr: c.tpr }))
+    : [{ label: 'ROC', auc: roc.auc, fpr: roc.fpr, tpr: roc.tpr }];
+  const multi = isPerClassRoc(roc);
+  const description = multi
+    ? `One-vs-rest per class${
+        roc.macro_auc !== null && roc.macro_auc !== undefined
+          ? ` · macro AUC ${roc.macro_auc.toFixed(3)}`
+          : ''
+      }`
+    : `True vs false positive rate${series[0].auc !== null ? ` · AUC ${series[0].auc?.toFixed(3)}` : ''}`;
+  const config = Object.fromEntries(
+    series.map((s, i) => [
+      `s${i}`,
+      {
+        label: multi && s.auc != null ? `${s.label} (AUC ${s.auc.toFixed(3)})` : s.label,
+        color: classColor(i),
+      },
+    ])
+  );
   return (
     <Card>
       <CardHeader>
-        <CardTitle>ROC curve</CardTitle>
-        <CardDescription>True vs false positive rate · AUC {roc.auc.toFixed(3)}</CardDescription>
+        <CardTitle>{multi ? 'ROC curves' : 'ROC curve'}</CardTitle>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={{ tpr: { label: 'TPR', color: 'var(--chart-1)' } }}>
-          <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+        <ChartContainer config={config}>
+          <LineChart margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="fpr"
@@ -775,6 +858,7 @@ function RocCurveCard({ roc }: { roc: NonNullable<CurvesData['roc']> }) {
               tickFormatter={pct}
             />
             <YAxis
+              dataKey="tpr"
               type="number"
               domain={[0, 1]}
               width={34}
@@ -801,14 +885,20 @@ function RocCurveCard({ roc }: { roc: NonNullable<CurvesData['roc']> }) {
                 />
               }
             />
-            <Line
-              dataKey="tpr"
-              type="monotone"
-              stroke="var(--color-tpr)"
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-            />
+            {multi && <ChartLegend content={<ChartLegendContent />} />}
+            {series.map((s, i) => (
+              <Line
+                key={s.label}
+                data={s.fpr.map((fpr, j) => ({ fpr, tpr: s.tpr[j] }))}
+                dataKey="tpr"
+                name={config[`s${i}`].label as string}
+                type="monotone"
+                stroke={classColor(i)}
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+              />
+            ))}
           </LineChart>
         </ChartContainer>
       </CardContent>
@@ -817,20 +907,46 @@ function RocCurveCard({ roc }: { roc: NonNullable<CurvesData['roc']> }) {
 }
 
 function PrCurveCard({ pr }: { pr: NonNullable<CurvesData['pr']> }) {
-  const data = pr.recall
-    .map((recall, i) => ({ recall, precision: pr.precision[i] }))
-    .sort((a, b) => a.recall - b.recall);
+  // Multiclass: one line per class (one-vs-rest); binary keeps a single line.
+  const series = isPerClassPr(pr)
+    ? pr.per_class.map((c) => ({
+        label: c.label,
+        ap: c.average_precision,
+        data: c.recall
+          .map((recall, i) => ({ recall, precision: c.precision[i] }))
+          .sort((a, b) => a.recall - b.recall),
+      }))
+    : [
+        {
+          label: 'PR',
+          ap: pr.average_precision,
+          data: pr.recall
+            .map((recall, i) => ({ recall, precision: pr.precision[i] }))
+            .sort((a, b) => a.recall - b.recall),
+        },
+      ];
+  const multi = isPerClassPr(pr);
+  const description = multi
+    ? 'One-vs-rest per class'
+    : `Precision vs recall${series[0].ap != null ? ` · AP ${series[0].ap.toFixed(3)}` : ''}`;
+  const config = Object.fromEntries(
+    series.map((s, i) => [
+      `s${i}`,
+      {
+        label: multi && s.ap != null ? `${s.label} (AP ${s.ap.toFixed(3)})` : s.label,
+        color: classColor(i + 1),
+      },
+    ])
+  );
   return (
     <Card>
       <CardHeader>
-        <CardTitle>Precision-recall curve</CardTitle>
-        <CardDescription>
-          Precision vs recall · AP {pr.average_precision.toFixed(3)}
-        </CardDescription>
+        <CardTitle>{multi ? 'Precision-recall curves' : 'Precision-recall curve'}</CardTitle>
+        <CardDescription>{description}</CardDescription>
       </CardHeader>
       <CardContent>
-        <ChartContainer config={{ precision: { label: 'Precision', color: 'var(--chart-2)' } }}>
-          <LineChart data={data} margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
+        <ChartContainer config={config}>
+          <LineChart margin={{ top: 8, right: 12, left: 0, bottom: 0 }}>
             <CartesianGrid vertical={false} />
             <XAxis
               dataKey="recall"
@@ -842,6 +958,7 @@ function PrCurveCard({ pr }: { pr: NonNullable<CurvesData['pr']> }) {
               tickFormatter={pct}
             />
             <YAxis
+              dataKey="precision"
               type="number"
               domain={[0, 1]}
               width={34}
@@ -860,14 +977,20 @@ function PrCurveCard({ pr }: { pr: NonNullable<CurvesData['pr']> }) {
                 />
               }
             />
-            <Line
-              dataKey="precision"
-              type="monotone"
-              stroke="var(--color-precision)"
-              strokeWidth={2}
-              dot={false}
-              isAnimationActive={false}
-            />
+            {multi && <ChartLegend content={<ChartLegendContent />} />}
+            {series.map((s, i) => (
+              <Line
+                key={s.label}
+                data={s.data}
+                dataKey="precision"
+                name={config[`s${i}`].label as string}
+                type="monotone"
+                stroke={classColor(i + 1)}
+                strokeWidth={2}
+                dot={false}
+                isAnimationActive={false}
+              />
+            ))}
           </LineChart>
         </ChartContainer>
       </CardContent>

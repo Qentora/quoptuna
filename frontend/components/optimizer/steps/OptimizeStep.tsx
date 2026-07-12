@@ -140,6 +140,7 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         database_name: getDatabaseName(),
         num_trials: configuration.numTrials,
         label_mapping: labelMapping,
+        favorable_class: features.favorableClass ?? undefined,
         sensitive_feature: features.sensitiveFeature ?? undefined,
         categorical_encoding: features.categoricalEncoding,
         sampler: configuration.sampler,

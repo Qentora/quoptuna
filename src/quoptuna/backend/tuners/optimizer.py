@@ -91,6 +91,7 @@ class Optimizer:
         fairness_metric: str = "equal_opportunity_difference",
         fairness_threshold: Optional[float] = None,  # noqa: FA100
         sensitive_test: Optional[np.ndarray] = None,  # noqa: FA100
+        task_spec: Optional[dict] = None,  # noqa: FA100
     ):
         """Initialize the Optimizer class.
 
@@ -177,6 +178,17 @@ class Optimizer:
             # Override the vectorization width without touching other entries;
             # objective() keeps sampling it like any other hyperparameter.
             self.search_space = {**self.search_space, "max_vmap": [max_vmap]}
+        # Task spec (see backend.task_type.TaskSpec.to_dict): binary targets
+        # use the {-1,+1} convention and binary F1; multiclass targets use
+        # integer codes 0..K-1, OvR-wrapped variational models and macro-F1.
+        self.task_spec = task_spec
+        self.n_classes = int(task_spec["n_classes"]) if task_spec else 2
+        self.f1_average = "macro" if self.n_classes > 2 else "binary"  # noqa: PLR2004
+        self.favorable_label = (
+            int(task_spec["favorable_code"])
+            if task_spec and task_spec.get("favorable_code") is not None
+            else 1
+        )
         self.fairness_mode = fairness_mode
         self.fairness_metric = fairness_metric
         self.sensitive_test = None if sensitive_test is None else np.asarray(sensitive_test).ravel()
@@ -282,6 +294,7 @@ class Optimizer:
 
             model = create_model(
                 model_type,
+                n_classes=self.n_classes,
                 max_steps=self.max_steps,
                 convergence_interval=self.convergence_interval,
                 **params,
@@ -305,7 +318,7 @@ class Optimizer:
             score = model.score(self.test_x, self.test_y)
 
             y_pred = model.predict(self.test_x)
-            f_score_ = f1_score(self.test_y, y_pred)
+            f_score_ = f1_score(self.test_y, y_pred, average=self.f1_average)
             acc_ = accuracy_score(self.test_y, y_pred)
 
             self.log_user_attributes(
@@ -318,7 +331,11 @@ class Optimizer:
             if self.fairness_mode != "off":
                 try:
                     disparity = compute_disparity(
-                        self.test_y, y_pred, self.sensitive_test, self.fairness_metric
+                        self.test_y,
+                        y_pred,
+                        self.sensitive_test,
+                        self.fairness_metric,
+                        favorable=self.favorable_label,
                     )
                 except Exception:  # noqa: BLE001 - any metric failure means "maximally unfair"
                     # e.g. a group with a single class in this trial's
@@ -507,6 +524,10 @@ class Optimizer:
 
         study = self._create_or_load_study()
         self.study = study
+        if self.task_spec:
+            # Persisted so analysis endpoints can recover the class structure
+            # (kind, labels, favorable class) after a backend restart.
+            study.set_user_attr("task_spec", self.task_spec)
         # `catch` turns objective exceptions into FAILED trials (with the error
         # recorded as a user attr) instead of aborting the whole study.
         study.optimize(self.objective, n_trials=n_trials, catch=(Exception,))

@@ -43,6 +43,10 @@ class OptimizationRequest(BaseModel):
     num_trials: int
     model_name: str = "DataReuploading"
     label_mapping: Optional[LabelMapping] = None
+    # Multiclass targets: the class treated as the favorable outcome for
+    # fairness auditing and report framing (favorable vs rest). Required when
+    # fairness is used on a K>2 target; ignored for binary targets.
+    favorable_class: Optional[Any] = None
     # Protected attribute column (may be outside selected_features) used for
     # fairness auditing; rows are aligned to the split via positional indices.
     sensitive_feature: Optional[str] = None
@@ -146,6 +150,8 @@ def build_workflow(
             "neg": request.label_mapping.neg,
             "pos": request.label_mapping.pos,
         }
+    if request.favorable_class is not None:
+        label_config["favorable_class"] = request.favorable_class
 
     nodes = [
         data_node,

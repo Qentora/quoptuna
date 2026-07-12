@@ -45,9 +45,20 @@ WORST_DISPARITY = 1.0
 _POS_LABEL = 1
 
 
-def _to_binary(y) -> np.ndarray:
+def binarize_favorable(y, favorable: int = _POS_LABEL) -> np.ndarray:
+    """Indicator of the favorable outcome, for fairlearn's binary rate metrics.
+
+    Binary tasks keep the default (+1 is the positive class). Multiclass tasks
+    pass the encoded favorable class code, reducing the audit to
+    "favorable class vs rest" — selection rates and TPRs of the favorable
+    outcome per group remain well-defined for any K.
+    """
     arr = np.ravel(np.asarray(y))
-    return (arr == _POS_LABEL).astype(int)
+    return (arr == favorable).astype(int)
+
+
+def _to_binary(y, favorable: int = _POS_LABEL) -> np.ndarray:
+    return binarize_favorable(y, favorable)
 
 
 def _figure_to_data_url(fig) -> str:
@@ -59,7 +70,9 @@ def _figure_to_data_url(fig) -> str:
     return f"data:image/png;base64,{encoded}"
 
 
-def _build_metric_frame(y_true, y_pred, sensitive: pd.Series) -> MetricFrame:
+def _build_metric_frame(
+    y_true, y_pred, sensitive: pd.Series, favorable: int = _POS_LABEL
+) -> MetricFrame:
     metrics = {
         "accuracy": accuracy_score,
         "precision": lambda yt, yp: precision_score(yt, yp, zero_division=0),
@@ -72,15 +85,19 @@ def _build_metric_frame(y_true, y_pred, sensitive: pd.Series) -> MetricFrame:
     }
     return MetricFrame(
         metrics=metrics,
-        y_true=_to_binary(y_true),
-        y_pred=_to_binary(y_pred),
+        y_true=_to_binary(y_true, favorable),
+        y_pred=_to_binary(y_pred, favorable),
         sensitive_features=np.asarray(sensitive).ravel(),
     )
 
 
-def compute_fairness(y_true, y_pred, sensitive: pd.Series) -> dict:
-    """Group fairness metrics + disparity summary for one set of predictions."""
-    yt, yp = _to_binary(y_true), _to_binary(y_pred)
+def compute_fairness(y_true, y_pred, sensitive: pd.Series, favorable: int = _POS_LABEL) -> dict:
+    """Group fairness metrics + disparity summary for one set of predictions.
+
+    For multiclass tasks pass ``favorable`` (the encoded favorable-class code);
+    the audit is then computed on the binarized favorable-vs-rest outcome.
+    """
+    yt, yp = _to_binary(y_true, favorable), _to_binary(y_pred, favorable)
     sf = np.asarray(sensitive).ravel()
     frame = _build_metric_frame(yt, yp, pd.Series(sf))
 
@@ -107,7 +124,9 @@ def compute_fairness(y_true, y_pred, sensitive: pd.Series) -> dict:
     return {"by_group": by_group, "overall": overall, "disparities": disparities}
 
 
-def compute_disparity(y_true, y_pred, sensitive, metric: str) -> float:
+def compute_disparity(
+    y_true, y_pred, sensitive, metric: str, favorable: int = _POS_LABEL
+) -> float:
     """Scalar disparity to MINIMIZE during search; 0.0 means perfect parity.
 
     ``disparate_impact`` (a ratio where 1.0 is parity) is mapped to
@@ -115,7 +134,7 @@ def compute_disparity(y_true, y_pred, sensitive, metric: str) -> float:
     difference metrics are returned as-is (fairlearn guarantees them
     non-negative).
     """
-    yt, yp = _to_binary(y_true), _to_binary(y_pred)
+    yt, yp = _to_binary(y_true, favorable), _to_binary(y_pred, favorable)
     sf = np.asarray(sensitive).ravel()
     if metric == "equal_opportunity_difference":
         return float(equal_opportunity_difference(yt, yp, sensitive_features=sf))

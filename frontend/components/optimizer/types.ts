@@ -13,6 +13,10 @@ export interface FairnessResult {
   sensitive_feature: string;
   metrics: FairnessMetrics;
   plots: Record<string, string>;
+  // Multiclass runs audit "favorable class vs rest"; mitigation is
+  // binary-only, so it stays null for multiclass.
+  task_type?: 'binary' | 'multiclass';
+  favorable_class?: string | null;
   mitigation: {
     constraint: string;
     before: FairnessMetrics;
@@ -33,6 +37,9 @@ export interface WorkflowData {
     selectedFeatures: string[];
     targetColumn: string | null;
     labelMapping: { neg: string | number | null; pos: string | number | null };
+    // K>2 targets: the class treated as the favorable outcome for fairness
+    // auditing and report framing (favorable vs rest). Unused for binary.
+    favorableClass: string | null;
     // Protected attribute used for fairness auditing (may be a column that is
     // not among the selected model features).
     sensitiveFeature: string | null;
@@ -102,6 +109,7 @@ export const initialWorkflowData: WorkflowData = {
     selectedFeatures: [],
     targetColumn: null,
     labelMapping: { neg: null, pos: null },
+    favorableClass: null,
     sensitiveFeature: null,
     categoricalEncoding: 'ordinal',
   },

@@ -240,7 +240,8 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
                 </SelectContent>
               </Select>
               <FieldDescription>
-                What the search minimizes (multi-objective) or constrains (constrained mode).
+                What the search minimizes (multi-objective) or constrains (constrained mode). For
+                multiclass targets the disparity is computed on the favorable class vs the rest.
               </FieldDescription>
             </Field>
 

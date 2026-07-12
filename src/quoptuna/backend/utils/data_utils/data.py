@@ -30,7 +30,10 @@ def preprocess_data(x, y):
     scaler = StandardScaler()
     x = scaler.fit_transform(x)
     classes = np.unique(y)
-    y = np.where(y == classes[0], 1, -1)
+    # Binary targets are encoded to {-1, +1}; multiclass targets pass through
+    # (they are expected to arrive as integer codes 0..K-1).
+    if len(classes) == 2:  # noqa: PLR2004
+        y = np.where(y == classes[0], 1, -1)
     return train_test_split(x, y, random_state=42)
 
 
