@@ -740,9 +740,7 @@ async def generate_curves_data(request: MetricsRequest):
     pr = None
     if multiclass_spec is not None:
         try:
-            roc, pr = _per_class_curve_payloads(
-                y_test, xai.predictions_proba, multiclass_spec
-            )
+            roc, pr = _per_class_curve_payloads(y_test, xai.predictions_proba, multiclass_spec)
         except Exception as exc:
             logger.warning("Multiclass curve data failed: %s", exc)
     else:
@@ -929,9 +927,7 @@ def _compute_fairness_payload(
 
     # Multiclass tasks are audited on the favorable-class-vs-rest outcome.
     multiclass_spec = (
-        task_spec
-        if task_spec is not None and task_spec.get("kind") == "multiclass"
-        else None
+        task_spec if task_spec is not None and task_spec.get("kind") == "multiclass" else None
     )
     favorable = 1
     favorable_class = None
