@@ -192,7 +192,10 @@ def run_headless_optimization(
         if multiclass:
             try:
                 roc, pr = analysis_mod._per_class_curve_payloads(  # noqa: SLF001
-                    xai.y_test, xai.predictions_proba, spec
+                    xai.y_test,
+                    xai.predictions_proba,
+                    spec,
+                    model_classes=getattr(xai.model, "classes_", None),
                 )
                 curves = {
                     "per_class_auc": {c["label"]: c["auc"] for c in roc["per_class"]},
@@ -216,13 +219,28 @@ def run_headless_optimization(
                 _, sens_test = resolve_sensitive_series(
                     dataset_id, sensitive_feature, xai.data.get("x_train"), xai.x_test
                 )
-                favorable = (
-                    int(spec["favorable_code"])
-                    if multiclass and spec and spec.get("favorable_code") is not None
-                    else 1
-                )
-                fair = compute_fairness(xai.y_test, pred, sens_test, favorable=favorable)
-                summary["analysis"]["fairness_disparities"] = fair["disparities"]
+                # Mirror the API guard (_compute_fairness_payload): a multiclass
+                # audit is meaningless without a designated favorable class —
+                # falling back to code 1 would silently audit an arbitrary class.
+                if multiclass and (not spec or spec.get("favorable_code") is None):
+                    summary["analysis"]["fairness_disparities"] = (
+                        "skipped: multiclass fairness requires --favorable-class"
+                    )
+                else:
+                    favorable = (
+                        int(spec["favorable_code"])
+                        if multiclass and spec and spec.get("favorable_code") is not None
+                        else 1
+                    )
+                    fair = compute_fairness(xai.y_test, pred, sens_test, favorable=favorable)
+                    summary["analysis"]["fairness_disparities"] = fair["disparities"]
+                    if spec:
+                        # Disclose which class was audited as the favorable outcome.
+                        labels_list = [str(c) for c in spec.get("class_labels", [])]
+                        if multiclass and 0 <= favorable < len(labels_list):
+                            summary["analysis"]["fairness_favorable_class"] = labels_list[favorable]
+                        elif not multiclass and len(labels_list) == 2:
+                            summary["analysis"]["fairness_favorable_class"] = labels_list[1]
             except Exception as exc:
                 summary["analysis"]["fairness_disparities"] = f"failed: {exc}"
 

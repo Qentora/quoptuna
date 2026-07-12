@@ -172,7 +172,10 @@ def _plot_class_index(xai, requested: Optional[int] = None) -> int:
         if getattr(shap_values, "values", None) is None or shap_values.values.ndim <= 2:
             return -1
         classes = list(xai.get_classes())
-        if requested is not None and 0 <= requested < len(classes):
+        # Honor an explicit class only for multiclass: the UI always sends
+        # class_index=0 and hides the picker for binary, so honoring it there
+        # would silently flip binary SHAP plots to the negative class.
+        if len(classes) > 2 and requested is not None and 0 <= requested < len(classes):
             return int(requested)
         return int(classes[-1] if len(classes) <= 2 else classes[0])
     except Exception:
@@ -238,14 +241,22 @@ def _roc_payload(y_test, proba) -> dict[str, Any]:
     from sklearn.metrics import roc_auc_score, roc_curve
 
     fpr, tpr, _ = roc_curve(y_test, proba)
+    # roc_curve on a single-class y returns NaN arrays with only a warning;
+    # NaN in the payload would 500 the whole response (json allow_nan=False).
+    fpr, tpr = np.asarray(fpr), np.asarray(tpr)
+    finite = np.isfinite(fpr) & np.isfinite(tpr)
+    if not finite.any():
+        msg = "ROC curve undefined (evaluation labels contain a single class)"
+        raise ValueError(msg)
+    fpr, tpr = fpr[finite], tpr[finite]
     idx = _downsample_indices(len(fpr))
     try:
         auc = float(roc_auc_score(y_test, proba))
     except Exception:
         auc = None
     return {
-        "fpr": np.asarray(fpr)[idx].tolist(),
-        "tpr": np.asarray(tpr)[idx].tolist(),
+        "fpr": fpr[idx].tolist(),
+        "tpr": tpr[idx].tolist(),
         "auc": auc,
     }
 
@@ -267,11 +278,16 @@ def _pr_payload(y_test, proba) -> dict[str, Any]:
     }
 
 
-def _per_class_curve_payloads(y_test, proba, spec: dict) -> tuple[dict, dict]:
+def _per_class_curve_payloads(y_test, proba, spec: dict, model_classes=None) -> tuple[dict, dict]:
     """One-vs-rest ROC and PR payloads per class for a multiclass task.
 
     Binarizes the encoded labels per class and reuses the binary payload
     helpers on each (indicator, class-probability-column) pair.
+
+    ``model_classes`` (the fitted model's ``classes_``) maps encoded class
+    codes to probability columns: models fit their class list from y_train,
+    so a class absent from the (unstratified) train split shifts every later
+    proba column. Without the mapping we'd attribute curves to wrong names.
     """
     from sklearn.preprocessing import label_binarize
 
@@ -280,15 +296,28 @@ def _per_class_curve_payloads(y_test, proba, spec: dict) -> tuple[dict, dict]:
     names = _spec_display_labels(spec, encoded)
     proba = np.asarray(proba)
     y_bin = label_binarize(np.asarray(y_test).ravel(), classes=encoded)
+    col_of = {int(c): i for i, c in enumerate(model_classes)} if model_classes is not None else None
 
     roc_classes, pr_classes = [], []
     for k in range(n_classes):
+        col = col_of.get(k) if col_of is not None else k
+        if col is None or col >= proba.shape[1]:
+            logger.warning(
+                "No probability column for class %s (absent from training data); skipping",
+                names[k],
+            )
+            continue
+        if len(np.unique(y_bin[:, k])) < 2:
+            logger.warning(
+                "Class %s absent from the evaluation subset; skipping its curves", names[k]
+            )
+            continue
         try:
-            roc_classes.append({"label": names[k], **_roc_payload(y_bin[:, k], proba[:, k])})
+            roc_classes.append({"label": names[k], **_roc_payload(y_bin[:, k], proba[:, col])})
         except Exception as exc:
             logger.warning("ROC curve failed for class %s: %s", names[k], exc)
         try:
-            pr_classes.append({"label": names[k], **_pr_payload(y_bin[:, k], proba[:, k])})
+            pr_classes.append({"label": names[k], **_pr_payload(y_bin[:, k], proba[:, col])})
         except Exception as exc:
             logger.warning("PR curve failed for class %s: %s", names[k], exc)
 
@@ -618,7 +647,10 @@ async def generate_curves(request: MetricsRequest):
     if multiclass_spec is not None:
         # One-vs-rest: one line per class on each plot.
         roc_data, pr_data = _per_class_curve_payloads(
-            y_test, xai.predictions_proba, multiclass_spec
+            y_test,
+            xai.predictions_proba,
+            multiclass_spec,
+            model_classes=getattr(xai.model, "classes_", None),
         )
         roc_auc = roc_data.get("macro_auc")
         try:
@@ -740,7 +772,12 @@ async def generate_curves_data(request: MetricsRequest):
     pr = None
     if multiclass_spec is not None:
         try:
-            roc, pr = _per_class_curve_payloads(y_test, xai.predictions_proba, multiclass_spec)
+            roc, pr = _per_class_curve_payloads(
+                y_test,
+                xai.predictions_proba,
+                multiclass_spec,
+                model_classes=getattr(xai.model, "classes_", None),
+            )
         except Exception as exc:
             logger.warning("Multiclass curve data failed: %s", exc)
     else:

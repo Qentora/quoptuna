@@ -296,18 +296,23 @@ class WorkflowExecutor:
             label_mapping=label_mapping,
             favorable_class=config.get("favorable_class"),
         )
-        if label_mapping and task_spec.kind == "binary":
+        # ALWAYS encode via the spec — binary with or without an explicit
+        # mapping, and multiclass. Leaving unmapped binary targets to
+        # DataPreparation's legacy encoder (classes[0] -> +1) inverts the
+        # sign convention relative to the stored spec (class_labels[0] -> -1),
+        # silently swapping class names in every downstream consumer.
+        if task_spec.kind == "binary":
+            derived = "" if label_mapping else " (derived; no explicit mapping)"
             logger.info(
-                f"Applying label mapping at split: {label_mapping.get('neg')} -> -1, "
-                f"{label_mapping.get('pos')} -> 1"
+                f"Encoding binary target at split: {task_spec.class_labels[0]} -> -1, "
+                f"{task_spec.class_labels[1]} -> 1{derived}"
             )
-            y = pd.Series(task_spec.encode(y), name=data["y_column"])
-        elif task_spec.is_multiclass:
+        else:
             logger.info(
                 f"Multiclass target ({task_spec.n_classes} classes): encoding "
                 f"{list(task_spec.class_labels)} -> 0..{task_spec.n_classes - 1}"
             )
-            y = pd.Series(task_spec.encode(y), name=data["y_column"])
+        y = pd.Series(task_spec.encode(y), name=data["y_column"])
 
         # Use DataPreparation class
         data_prep = DataPreparation(
