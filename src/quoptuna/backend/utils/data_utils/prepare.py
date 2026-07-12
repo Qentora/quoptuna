@@ -176,6 +176,7 @@ class DataPreparation:
         # upstream) must pass through unchanged — re-encoding would invert them.
         # Multiclass targets (K>2) also pass through: they arrive pre-encoded to
         # 0..K-1 codes, and the binary re-encode would silently collapse them.
+        y_values: np.ndarray
         if set(classes.tolist()) <= {-1, 1} or len(classes) != 2:  # noqa: PLR2004
             y_values = np.asarray(y).ravel()
         else:

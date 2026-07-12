@@ -612,12 +612,14 @@ async def generate_curves(request: MetricsRequest):
     avg_prec = None
 
     spec = _task_spec(opt_result)
-    multiclass = bool(spec and spec.get("kind") == "multiclass")
+    multiclass_spec = spec if spec is not None and spec.get("kind") == "multiclass" else None
     y_test = xai.y_test
 
-    if multiclass:
+    if multiclass_spec is not None:
         # One-vs-rest: one line per class on each plot.
-        roc_data, pr_data = _per_class_curve_payloads(y_test, xai.predictions_proba, spec)
+        roc_data, pr_data = _per_class_curve_payloads(
+            y_test, xai.predictions_proba, multiclass_spec
+        )
         roc_auc = roc_data.get("macro_auc")
         try:
             fig, ax = plt.subplots(figsize=(5, 4))
@@ -732,13 +734,15 @@ async def generate_curves_data(request: MetricsRequest):
 
     y_test = xai.y_test
     spec = _task_spec(opt_result)
-    multiclass = bool(spec and spec.get("kind") == "multiclass")
+    multiclass_spec = spec if spec is not None and spec.get("kind") == "multiclass" else None
 
     roc = None
     pr = None
-    if multiclass:
+    if multiclass_spec is not None:
         try:
-            roc, pr = _per_class_curve_payloads(y_test, xai.predictions_proba, spec)
+            roc, pr = _per_class_curve_payloads(
+                y_test, xai.predictions_proba, multiclass_spec
+            )
         except Exception as exc:
             logger.warning("Multiclass curve data failed: %s", exc)
     else:
@@ -756,7 +760,7 @@ async def generate_curves_data(request: MetricsRequest):
         "optimization_id": request.optimization_id,
         "roc": roc,
         "pr": pr,
-        "task_type": "multiclass" if multiclass else "binary",
+        "task_type": "multiclass" if multiclass_spec is not None else "binary",
         "status": "completed",
     }
 
@@ -924,18 +928,22 @@ def _compute_fairness_payload(
     )
 
     # Multiclass tasks are audited on the favorable-class-vs-rest outcome.
-    multiclass = bool(task_spec and task_spec.get("kind") == "multiclass")
+    multiclass_spec = (
+        task_spec
+        if task_spec is not None and task_spec.get("kind") == "multiclass"
+        else None
+    )
     favorable = 1
     favorable_class = None
-    if multiclass:
-        if task_spec.get("favorable_code") is None:
+    if multiclass_spec is not None:
+        if multiclass_spec.get("favorable_code") is None:
             raise HTTPException(
                 status_code=400,
                 detail="Fairness on a multiclass target requires a favorable_class "
                 "(selected at optimization setup)",
             )
-        favorable = int(task_spec["favorable_code"])
-        favorable_class = task_spec.get("favorable_class")
+        favorable = int(multiclass_spec["favorable_code"])
+        favorable_class = multiclass_spec.get("favorable_class")
 
     metrics = fairness_mod.compute_fairness(
         xai.y_test, xai.predictions, sens_test, favorable=favorable
@@ -943,7 +951,7 @@ def _compute_fairness_payload(
     plots = fairness_mod.plot_group_metrics(metrics)
 
     mitigation = None
-    if mitigate and multiclass:
+    if mitigate and multiclass_spec is not None:
         # ThresholdOptimizer adjusts a favorable-vs-rest decision threshold,
         # which cannot be soundly mapped back onto an argmax over K classes.
         # The audit above remains valid; mitigation is binary-only for now.
@@ -965,7 +973,7 @@ def _compute_fairness_payload(
         "metrics": metrics,
         "plots": plots,
         "mitigation": mitigation,
-        "task_type": "multiclass" if multiclass else "binary",
+        "task_type": "multiclass" if multiclass_spec is not None else "binary",
         "favorable_class": favorable_class,
     }
 
