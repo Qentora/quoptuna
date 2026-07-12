@@ -90,18 +90,22 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         ? liveTrialsData.trials
         : (finalStatus.trials ?? []);
       const succeeded = trials.filter((t) => t.value !== null);
-      const bestTrialNumber =
+      // Derive the best from the trial list itself so the header chip, stat
+      // card and table can never disagree (the job's stored best_value can be
+      // stale, e.g. after a backend restart mid-run).
+      const bestTrial =
         succeeded.length > 0
-          ? succeeded.reduce((best, t) => ((t.value ?? 0) > (best.value ?? 0) ? t : best)).trial
+          ? succeeded.reduce((best, t) => ((t.value ?? 0) > (best.value ?? 0) ? t : best))
           : null;
+      const bestTrialNumber = bestTrial?.trial ?? null;
 
       setWorkflowData((prev) => ({
         ...prev,
         optimization: {
           executionId: id,
           status: 'completed',
-          bestValue: finalStatus.best_value,
-          bestParams: finalStatus.best_params,
+          bestValue: bestTrial?.value ?? finalStatus.best_value,
+          bestParams: bestTrial?.params ?? finalStatus.best_params,
           trials,
           selectedTrial: prev.optimization.selectedTrial ?? bestTrialNumber,
           paretoTrials: liveTrialsData?.pareto_trials ?? null,
@@ -187,18 +191,20 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         .then((trialsData) => {
           const trials = trialsData.trials ?? [];
           const succeeded = trials.filter((t) => t.value !== null);
-          const bestTrialNumber =
+          // Same trials-derived best as track(): the stored best_value can
+          // be stale, the trial list on disk cannot.
+          const bestTrial =
             succeeded.length > 0
-              ? succeeded.reduce((best, t) => ((t.value ?? 0) > (best.value ?? 0) ? t : best)).trial
+              ? succeeded.reduce((best, t) => ((t.value ?? 0) > (best.value ?? 0) ? t : best))
               : null;
           setWorkflowData((prev) => ({
             ...prev,
             optimization: {
               ...prev.optimization,
               trials,
-              bestValue: trialsData.best_trial?.value ?? prev.optimization.bestValue,
-              bestParams: trialsData.best_trial?.params ?? prev.optimization.bestParams,
-              selectedTrial: prev.optimization.selectedTrial ?? bestTrialNumber,
+              bestValue: bestTrial?.value ?? prev.optimization.bestValue,
+              bestParams: bestTrial?.params ?? prev.optimization.bestParams,
+              selectedTrial: prev.optimization.selectedTrial ?? bestTrial?.trial ?? null,
               paretoTrials: trialsData.pareto_trials ?? prev.optimization.paretoTrials,
             },
           }));

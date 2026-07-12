@@ -12,6 +12,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Slider } from '@/components/ui/slider';
+import { useDatasetPreview } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
 import Link from 'next/link';
 import { useEffect } from 'react';
@@ -26,14 +27,34 @@ const PRESETS = [
 
 export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: StepProps) {
   const { configuration } = workflowData;
-  const sensitiveFeature = workflowData.features.sensitiveFeature;
+  const { sensitiveFeature, favorableClass, targetColumn } = workflowData.features;
   const fairnessOn = configuration.fairnessMode !== 'off';
+
+  // Multiclass targets need a favorable class before fairness-aware search
+  // can run (the backend rejects fairness_mode != off without one).
+  const preview = useDatasetPreview(workflowData.dataset?.id ?? null);
+  const targetValues = targetColumn
+    ? (preview.data?.target_values_by_column[targetColumn] ?? [])
+    : [];
+  const isMulticlass = targetValues.length > 2;
+  const fairnessBlockedByFavorable = isMulticlass && !favorableClass;
 
   const hasStudyName = configuration.studyName.trim().length > 0;
 
   useEffect(() => {
     setFooter({ canContinue: hasStudyName });
   }, [hasStudyName, setFooter]);
+
+  // A fairness mode left on after the favorable class was cleared would be
+  // stuck (select disabled) and rejected by the backend — reset it.
+  useEffect(() => {
+    if (fairnessOn && fairnessBlockedByFavorable) {
+      setWorkflowData((prev) => ({
+        ...prev,
+        configuration: { ...prev.configuration, fairnessMode: 'off' },
+      }));
+    }
+  }, [fairnessOn, fairnessBlockedByFavorable, setWorkflowData]);
 
   const update = (field: keyof typeof configuration, value: string | number | null) =>
     setWorkflowData((prev) => ({
@@ -157,8 +178,9 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
                 </SelectContent>
               </Select>
               <FieldDescription>
-                How hyperparameter configurations are proposed. Grid search may finish before the
-                trial budget if it exhausts all combinations.
+                {configuration.fairnessMode === 'constrained'
+                  ? 'Locked to TPE — constrained mode expresses the fairness threshold as a TPE feasibility constraint; the other samplers silently ignore constraints.'
+                  : 'How hyperparameter configurations are proposed. Grid search may finish before the trial budget if it exhausts all combinations.'}
               </FieldDescription>
             </Field>
 
@@ -179,8 +201,9 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
                 </SelectContent>
               </Select>
               <FieldDescription>
-                Early-stops unpromising quantum model trainings to save compute. Kernel and
-                classical models always train to completion.
+                {configuration.fairnessMode === 'multi_objective'
+                  ? 'Disabled for the Pareto search — pruning ranks trials by a single intermediate metric, but here a trial weak on F1 may still be Pareto-optimal on fairness, and Optuna rejects intermediate reports on multi-objective studies.'
+                  : 'Early-stops unpromising quantum model trainings to save compute. Kernel and classical models always train to completion.'}
               </FieldDescription>
             </Field>
           </CardContent>
@@ -197,7 +220,7 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
               <Select
                 value={configuration.fairnessMode}
                 onValueChange={setFairnessMode}
-                disabled={!sensitiveFeature}
+                disabled={!sensitiveFeature || fairnessBlockedByFavorable}
               >
                 <SelectTrigger id="fairness-mode" className="w-full max-w-xs">
                   <SelectValue />
@@ -209,14 +232,22 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
                 </SelectContent>
               </Select>
               <FieldDescription>
-                {sensitiveFeature
-                  ? configuration.fairnessMode === 'constrained'
-                    ? 'Deprioritizes trials whose disparity exceeds the threshold (forces the TPE sampler).'
-                    : configuration.fairnessMode === 'multi_objective'
-                      ? 'Searches the F1-vs-disparity Pareto front (disables pruning).'
-                      : `Feeds fairness on "${sensitiveFeature}" back into the search.`
-                  : 'Select a protected attribute in the Features step to enable.'}
+                {!sensitiveFeature
+                  ? 'Select a protected attribute in the Features step to enable.'
+                  : fairnessBlockedByFavorable
+                    ? undefined
+                    : configuration.fairnessMode === 'constrained'
+                      ? 'Deprioritizes trials whose disparity exceeds the threshold (forces the TPE sampler).'
+                      : configuration.fairnessMode === 'multi_objective'
+                        ? 'Searches the F1-vs-disparity Pareto front (disables pruning).'
+                        : `Feeds fairness on "${sensitiveFeature}" back into the search.`}
               </FieldDescription>
+              {sensitiveFeature && fairnessBlockedByFavorable && (
+                <p className="text-xs text-accent-amber-foreground">
+                  Multiclass target: select a favorable class in the Features step before enabling
+                  fairness-aware search (the disparity is computed on favorable vs rest).
+                </p>
+              )}
             </Field>
 
             <Field>
@@ -240,8 +271,9 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
                 </SelectContent>
               </Select>
               <FieldDescription>
-                What the search minimizes (multi-objective) or constrains (constrained mode). For
-                multiclass targets the disparity is computed on the favorable class vs the rest.
+                {fairnessOn
+                  ? 'What the search minimizes (multi-objective) or constrains (constrained mode). For multiclass targets the disparity is computed on the favorable class vs the rest.'
+                  : 'Enable a fairness mode to configure the disparity metric.'}
               </FieldDescription>
             </Field>
 
@@ -262,9 +294,11 @@ export function ConfigureStep({ workflowData, setWorkflowData, setFooter }: Step
                 className="max-w-xs"
               />
               <FieldDescription>
-                {configuration.fairnessMetric === 'disparate_impact'
-                  ? 'Feasible when the DI ratio is at least this (default 0.8, four-fifths rule).'
-                  : 'Feasible when the disparity is at most this (default 0.1).'}
+                {configuration.fairnessMode !== 'constrained'
+                  ? 'Used by constrained mode only — multi-objective explores the whole trade-off instead of enforcing a cutoff.'
+                  : configuration.fairnessMetric === 'disparate_impact'
+                    ? 'Feasible when the DI ratio is at least this (default 0.8, four-fifths rule).'
+                    : 'Feasible when the disparity is at most this (default 0.1).'}
               </FieldDescription>
             </Field>
           </CardContent>

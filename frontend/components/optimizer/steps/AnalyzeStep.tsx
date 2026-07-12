@@ -243,6 +243,10 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
   };
 
   const metrics = analysis.metrics ?? {};
+  // Multiclass fairness needs a favorable class (audited favorable-vs-rest);
+  // without one the audit endpoint rejects the request — gate the button.
+  const multiclassNeedsFavorable =
+    curvesData?.task_type === 'multiclass' && !features.favorableClass;
   const hasCurves =
     !!curvesData?.roc || !!curvesData?.pr || !!analysis.plots.rocCurve || !!analysis.plots.prCurve;
 
@@ -642,12 +646,14 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
                   message={
                     fairnessError
                       ? `Fairness audit failed: ${fairnessError}`
-                      : features.sensitiveFeature
-                        ? `Protected attribute "${features.sensitiveFeature}" selected — run the audit below.`
-                        : 'No fairness audit available. Select a protected attribute in the Features step, then run the audit.'
+                      : multiclassNeedsFavorable
+                        ? 'This run has a multiclass target without a favorable class. Select a favorable class in the Features step and re-run to audit fairness (the audit compares favorable vs rest).'
+                        : features.sensitiveFeature
+                          ? `Protected attribute "${features.sensitiveFeature}" selected — run the audit below.`
+                          : 'No fairness audit available. Select a protected attribute in the Features step, then run the audit.'
                   }
                 />
-                {features.sensitiveFeature && (
+                {features.sensitiveFeature && !multiclassNeedsFavorable && (
                   <div className="text-center">
                     <Button type="button" size="sm" onClick={runFairness} disabled={isMitigating}>
                       {isMitigating ? (

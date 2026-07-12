@@ -394,7 +394,8 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
                     Multiclass target ({targetValues.length} classes)
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Classes are encoded automatically; quantum models train one-vs-rest.
+                    Classes are encoded automatically; quantum models train one-vs-rest. No label
+                    mapping is needed.
                   </p>
                   <div className="mt-2 flex flex-wrap gap-1">
                     {targetValues.map((v) => (
@@ -406,33 +407,10 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
                       </Badge>
                     ))}
                   </div>
-                  <div className="mt-3">
-                    <Field>
-                      <FieldLabel htmlFor="favorable-class">
-                        Favorable class{sensitiveFeature ? '' : ' (optional)'}
-                      </FieldLabel>
-                      <Select
-                        value={favorableClass === null ? NONE_VALUE : String(favorableClass)}
-                        onValueChange={setFavorableClass}
-                      >
-                        <SelectTrigger id="favorable-class" className="w-full">
-                          <SelectValue placeholder="Select…" />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value={NONE_VALUE}>None — choose a class</SelectItem>
-                          {targetValues.map((v) => (
-                            <SelectItem key={String(v)} value={String(v)}>
-                              {String(v)}
-                            </SelectItem>
-                          ))}
-                        </SelectContent>
-                      </Select>
-                      <FieldDescription>
-                        The outcome treated as favorable for fairness auditing (favorable vs rest)
-                        and report framing.
-                      </FieldDescription>
-                    </Field>
-                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Fairness auditing compares a favorable class vs the rest — configure it under
+                    Fairness.
+                  </p>
                 </div>
               )}
 
@@ -470,28 +448,68 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
               </FieldDescription>
             </Field>
 
-            <Field>
-              <FieldLabel htmlFor="protected-attribute">Protected attribute (optional)</FieldLabel>
-              <Select value={sensitiveFeature ?? NONE_VALUE} onValueChange={setSensitiveFeature}>
-                <SelectTrigger id="protected-attribute" className="w-full">
-                  <SelectValue placeholder="None — skip fairness audit" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value={NONE_VALUE}>None — skip fairness audit</SelectItem>
-                  {columns
-                    .filter((c) => c !== targetColumn)
-                    .map((c) => (
-                      <SelectItem key={c} value={c}>
-                        {c}
-                      </SelectItem>
-                    ))}
-                </SelectContent>
-              </Select>
-              <FieldDescription>
-                A categorical column (e.g. sex, race, age group) used to audit fairness across
-                groups. Never used for training.
-              </FieldDescription>
-            </Field>
+            <div className="space-y-3 rounded-md border border-border bg-muted/50 p-3">
+              <p className="text-xs font-semibold">Fairness (optional)</p>
+              <Field>
+                <FieldLabel htmlFor="protected-attribute">Protected attribute</FieldLabel>
+                <Select value={sensitiveFeature ?? NONE_VALUE} onValueChange={setSensitiveFeature}>
+                  <SelectTrigger id="protected-attribute" className="w-full">
+                    <SelectValue placeholder="None — skip fairness audit" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value={NONE_VALUE}>None — skip fairness audit</SelectItem>
+                    {columns
+                      .filter((c) => c !== targetColumn)
+                      .map((c) => (
+                        <SelectItem key={c} value={c}>
+                          {c}
+                        </SelectItem>
+                      ))}
+                  </SelectContent>
+                </Select>
+                <FieldDescription>
+                  A categorical column (e.g. sex, race, age group) used to audit fairness across
+                  groups. Never used for training.
+                </FieldDescription>
+              </Field>
+
+              {isMulticlass ? (
+                <Field>
+                  <FieldLabel htmlFor="favorable-class">
+                    Favorable class{sensitiveFeature ? '' : ' (optional)'}
+                  </FieldLabel>
+                  <Select
+                    value={favorableClass === null ? NONE_VALUE : String(favorableClass)}
+                    onValueChange={setFavorableClass}
+                    disabled={!sensitiveFeature}
+                  >
+                    <SelectTrigger id="favorable-class" className="w-full">
+                      <SelectValue placeholder="Select…" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value={NONE_VALUE}>None — choose a class</SelectItem>
+                      {targetValues.map((v) => (
+                        <SelectItem key={String(v)} value={String(v)}>
+                          {String(v)}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                  <FieldDescription>
+                    {sensitiveFeature
+                      ? 'The outcome audited as favorable-vs-rest; also frames the report. Not used for training.'
+                      : 'Select a protected attribute to enable the fairness audit. The favorable class defines the outcome audited as favorable-vs-rest.'}
+                  </FieldDescription>
+                </Field>
+              ) : (
+                targetColumn &&
+                needsMapping && (
+                  <p className="text-xs text-muted-foreground">
+                    Binary targets audit the class mapped to +1 as the favorable outcome.
+                  </p>
+                )
+              )}
+            </div>
 
             {/* Selection summary */}
             <div className="space-y-1.5 rounded-md border border-border bg-muted/50 p-3 text-xs">

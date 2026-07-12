@@ -385,6 +385,22 @@ async def get_optimization_detail(optimization_id: str):
     job = get_job(optimization_id)
     request_data = job.get("request") or {}
     record = dataset_registry.get(request_data.get("dataset_id", ""))
+    # The stored best_value can be stale (e.g. a dev-server reload killed the
+    # background task before its final write). The Optuna study on disk is the
+    # source of truth — recompute the best over finished trials on read.
+    trials = serialize_study_trials(
+        request_data.get("database_name", "results"),
+        request_data.get("study_name", "workflow_study"),
+    )
+    completed = [t for t in trials if t["value"] is not None]
+    if completed:
+        best = max(completed, key=lambda t: t["value"])
+        if job.get("best_value") != best["value"]:
+            job["best_value"] = best["value"]
+            job["best_params"] = best["params"]
+            run_store.update_run(
+                optimization_id, best_value=best["value"], best_params=best["params"]
+            )
     return {
         "id": job["id"],
         "status": job["status"],
