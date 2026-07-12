@@ -311,33 +311,8 @@ class Optimizer:
                 **params,
             )
 
-            # Iterative (JAX-trained) models report intermediate values so the
-            # pruner can stop unpromising trials early. Kernel/sklearn models
-            # (and OvR wrappers, whose K interleaved loss series are not
-            # comparable) have no per-step hook and run to completion.
-            if self.pruner != "none":
-                if hasattr(model, "max_steps"):
-                    model.training_callback = self._make_pruning_callback(trial, model)
-                elif self.n_classes > 2 and not self._warned_pruner_noop:  # noqa: PLR2004
-                    self._warned_pruner_noop = True
-                    logger.warning(
-                        "Pruner %r has no effect on OvR-wrapped multiclass models: "
-                        "each trial trains all %d sub-models to completion.",
-                        self.pruner,
-                        self.n_classes,
-                    )
-
-            try:
-                model.fit(self.train_x, self.train_y)
-                # OvR wrappers swallow per-class ConvergenceWarnings and expose
-                # an aggregated flag instead; unwrapped models raise directly.
-                trial.set_user_attr(key="converged", value=bool(getattr(model, "converged_", True)))
-            except ConvergenceWarning:
-                # The training loop hit max_steps without meeting the flat-loss
-                # criterion. The partially-trained parameters are still valid —
-                # score the model instead of discarding max_steps of compute.
-                logger.warning("Trial %s did not converge; scoring anyway", trial.number)
-                trial.set_user_attr(key="converged", value=False)
+            self._attach_pruning_callback(trial, model)
+            self._fit_and_record_convergence(trial, model)
 
             # Single inference pass: quantum predicts are expensive (K circuit
             # sweeps per pass for OvR); score/accuracy derive from the same
@@ -355,29 +330,9 @@ class Optimizer:
             self._log_resource_attributes(trial, model)
 
             if self.fairness_mode != "off":
-                try:
-                    disparity = compute_disparity(
-                        self.test_y,
-                        y_pred,
-                        self.sensitive_test,
-                        self.fairness_metric,
-                        favorable=self.favorable_label,
-                    )
-                except Exception:  # noqa: BLE001 - any metric failure means "maximally unfair"
-                    # e.g. a group with a single class in this trial's
-                    # predictions — score it as maximally unfair, not failed.
-                    logger.warning("Trial %s: fairness computation failed", trial.number)
-                    disparity = WORST_DISPARITY
-                trial.set_user_attr("fairness_disparity", float(disparity))
-                trial.set_user_attr("fairness_metric", self.fairness_metric)
-                if self.fairness_mode == "constrained":
-                    threshold = self._require_disparity_threshold()
-                    trial.set_user_attr(
-                        "fairness_constraint",
-                        (float(disparity - threshold),),
-                    )
+                disparity = self._record_fairness(trial, y_pred)
                 if self.fairness_mode == "multi_objective":
-                    return f_score_, float(disparity)
+                    return f_score_, disparity
 
             return f_score_  # noqa: TRY300
         except TrialPruned:
@@ -395,6 +350,63 @@ class Optimizer:
             trial.set_user_attr("error", f"{type(e).__name__}: {e}")
             self._log_resource_attributes(trial, model)
             raise
+
+    def _attach_pruning_callback(self, trial: Trial, model) -> None:
+        """Attach the per-step pruning hook where the model supports it.
+
+        Iterative (JAX-trained) models report intermediate values so the
+        pruner can stop unpromising trials early. Kernel/sklearn models (and
+        OvR wrappers, whose K interleaved loss series are not comparable)
+        have no per-step hook and run to completion.
+        """
+        if self.pruner == "none":
+            return
+        if hasattr(model, "max_steps"):
+            model.training_callback = self._make_pruning_callback(trial, model)
+        elif self.n_classes > 2 and not self._warned_pruner_noop:  # noqa: PLR2004
+            self._warned_pruner_noop = True
+            logger.warning(
+                "Pruner %r has no effect on OvR-wrapped multiclass models: "
+                "each trial trains all %d sub-models to completion.",
+                self.pruner,
+                self.n_classes,
+            )
+
+    def _fit_and_record_convergence(self, trial: Trial, model) -> None:
+        """Fit the model, tolerating non-convergence, and record the outcome."""
+        try:
+            model.fit(self.train_x, self.train_y)
+            # OvR wrappers swallow per-class ConvergenceWarnings and expose an
+            # aggregated flag instead; unwrapped models raise directly.
+            trial.set_user_attr(key="converged", value=bool(getattr(model, "converged_", True)))
+        except ConvergenceWarning:
+            # The training loop hit max_steps without meeting the flat-loss
+            # criterion. The partially-trained parameters are still valid —
+            # score the model instead of discarding max_steps of compute.
+            logger.warning("Trial %s did not converge; scoring anyway", trial.number)
+            trial.set_user_attr(key="converged", value=False)
+
+    def _record_fairness(self, trial: Trial, y_pred) -> float:
+        """Compute and record the trial's fairness disparity; return it."""
+        try:
+            disparity = compute_disparity(
+                self.test_y,
+                y_pred,
+                self.sensitive_test,
+                self.fairness_metric,
+                favorable=self.favorable_label,
+            )
+        except Exception:  # noqa: BLE001 - any metric failure means "maximally unfair"
+            # e.g. a group with a single class in this trial's predictions —
+            # score it as maximally unfair, not failed.
+            logger.warning("Trial %s: fairness computation failed", trial.number)
+            disparity = WORST_DISPARITY
+        trial.set_user_attr("fairness_disparity", float(disparity))
+        trial.set_user_attr("fairness_metric", self.fairness_metric)
+        if self.fairness_mode == "constrained":
+            threshold = self._require_disparity_threshold()
+            trial.set_user_attr("fairness_constraint", (float(disparity - threshold),))
+        return float(disparity)
 
     # Validation subset cap for the "accuracy" intermediate metric. Quantum
     # predicts run in max_vmap-sized chunks, so evaluating the full test set at

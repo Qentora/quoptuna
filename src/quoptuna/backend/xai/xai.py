@@ -393,11 +393,14 @@ class XAI:
 
         # Per-metric isolation: one failing metric (e.g. roc_curve on a
         # multiclass proba matrix) must not abort the remaining metrics.
-        for key, func in metrics.items():
+        def compute_or_error(func):
             try:
-                report[key] = func()
+                return func()
             except (ValueError, TypeError) as e:
-                report[key] = str(e)
+                return str(e)
+
+        for key, func in metrics.items():
+            report[key] = compute_or_error(func)
         return report
 
     def plot_confusion_matrix(self, plot_config: dict | None = None):

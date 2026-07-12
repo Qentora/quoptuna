@@ -9,6 +9,8 @@ from optuna_dashboard import wsgi
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
+from quoptuna.backend.task_type import TaskSpec
+
 """
 Data utils for loading and preprocessing the data.
 """
@@ -28,8 +30,6 @@ def preprocess_data(x, y):
     """
     Preprocess the data.
     """
-    from quoptuna.backend.task_type import TaskSpec
-
     scaler = StandardScaler()
     x = scaler.fit_transform(x)
     # Encode via TaskSpec so the label convention matches the rest of the
