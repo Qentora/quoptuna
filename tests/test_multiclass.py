@@ -81,18 +81,26 @@ def _run_split(y_values, config=None):
 class TestSplitEncoding:
     def test_multiclass_encodes_integer_codes(self):
         result = _run_split(["a", "b", "c"] * 8)
-        codes = set(np.unique(np.concatenate([
-            result["y_train"].to_numpy().ravel(), result["y_test"].to_numpy().ravel()
-        ])))
+        codes = set(
+            np.unique(
+                np.concatenate(
+                    [result["y_train"].to_numpy().ravel(), result["y_test"].to_numpy().ravel()]
+                )
+            )
+        )
         assert codes == {0, 1, 2}
         assert result["task_spec"]["kind"] == "multiclass"
         assert result["task_spec"]["class_labels"] == ["a", "b", "c"]
 
     def test_binary_regression_unchanged(self):
         result = _run_split([0, 1] * 12, config={"label_mapping": {"neg": 0, "pos": 1}})
-        codes = set(np.unique(np.concatenate([
-            result["y_train"].to_numpy().ravel(), result["y_test"].to_numpy().ravel()
-        ])))
+        codes = set(
+            np.unique(
+                np.concatenate(
+                    [result["y_train"].to_numpy().ravel(), result["y_test"].to_numpy().ravel()]
+                )
+            )
+        )
         assert codes == {-1, 1}
         assert result["task_spec"]["kind"] == "binary"
 
