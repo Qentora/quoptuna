@@ -3,6 +3,13 @@
 Metrics are computed per sensitive-feature group with ``MetricFrame`` and the
 group plots reuse the same base64 PNG data-URL convention as the SHAP plots so
 they can be surfaced by the API and fed to the LLM report unchanged.
+
+Multiclass targets are audited via the favorable-class framing: predictions
+and labels are binarized to "favorable class vs rest" before any metric is
+computed. Note that ``ThresholdOptimizer`` mitigation is binary-only by
+construction (fairlearn post-processing thresholds a single score); for
+multiclass runs mitigation therefore operates on the binarized favorable
+outcome, not on the full K-class prediction.
 """
 
 from __future__ import annotations

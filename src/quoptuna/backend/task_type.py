@@ -21,6 +21,12 @@ import numpy as np
 
 BINARY_N_CLASSES = 2
 
+# Upper bound on classes for classification. OvR trains one quantum sub-model
+# per class per trial, so an unbounded K (e.g. a continuous column picked as
+# target) would silently burn hours of compute. Keep in sync with the frontend
+# guard (MAX_TARGET_CLASSES in FeaturesStep.tsx).
+MAX_N_CLASSES = 20
+
 
 @dataclass(frozen=True)
 class TaskSpec:
@@ -83,6 +89,12 @@ class TaskSpec:
 
         if n_classes < BINARY_N_CLASSES:
             msg = f"Target must have at least 2 classes, found {n_classes}"
+            raise ValueError(msg)
+        if n_classes > MAX_N_CLASSES:
+            msg = (
+                f"Target has {n_classes} distinct values (max {MAX_N_CLASSES} classes). "
+                "This is likely a continuous column; pick a categorical target."
+            )
             raise ValueError(msg)
 
         if n_classes == BINARY_N_CLASSES:

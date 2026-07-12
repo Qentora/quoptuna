@@ -172,15 +172,20 @@ class DataPreparation:
         # Index is a fresh RangeIndex either way, so split indices remain
         # positional row numbers into the raw dataframe.
         classes = np.unique(y)
-        # Labels already encoded to {-1, 1} (e.g. an explicit user mapping applied
-        # upstream) must pass through unchanged — re-encoding would invert them.
-        # Multiclass targets (K>2) also pass through: they arrive pre-encoded to
-        # 0..K-1 codes, and the binary re-encode would silently collapse them.
+        # Labels already encoded to {-1, 1} (e.g. TaskSpec.encode applied
+        # upstream at the split node) must pass through unchanged — re-encoding
+        # would invert them. Multiclass targets (K>2) also pass through: they
+        # arrive pre-encoded to 0..K-1 codes.
         y_values: np.ndarray
         if set(classes.tolist()) <= {-1, 1} or len(classes) != 2:  # noqa: PLR2004
             y_values = np.asarray(y).ravel()
         else:
-            y_values = np.where(np.asarray(y).ravel() == classes[0], 1, -1)
+            # Fallback for direct callers: encode with the SAME convention as
+            # TaskSpec (class_labels[0] -> -1), not the old classes[0] -> +1,
+            # so class naming never inverts relative to a stored spec.
+            from quoptuna.backend.task_type import TaskSpec  # noqa: PLC0415
+
+            y_values = TaskSpec.from_target(y).encode(y)
         y = pd.DataFrame(
             y_values,
             columns=[self.y_col] if not isinstance(self.y_col, list) else self.y_col,

@@ -9,6 +9,8 @@ from optuna_dashboard import wsgi
 from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
+from quoptuna.backend.task_type import TaskSpec
+
 """
 Data utils for loading and preprocessing the data.
 """
@@ -30,11 +32,17 @@ def preprocess_data(x, y):
     """
     scaler = StandardScaler()
     x = scaler.fit_transform(x)
+    # Encode via TaskSpec so the label convention matches the rest of the
+    # system: binary class_labels[0] -> -1 / class_labels[1] -> +1, multiclass
+    # -> integer codes 0..K-1 (raw string labels included). Already-encoded
+    # targets ({-1,+1} binary or 0..K-1 codes) pass through unchanged.
     classes = np.unique(y)
-    # Binary targets are encoded to {-1, +1}; multiclass targets pass through
-    # (they are expected to arrive as integer codes 0..K-1).
-    if len(classes) == 2:  # noqa: PLR2004
-        y = np.where(y == classes[0], 1, -1)
+    already_pm = set(np.asarray(classes).tolist()) <= {-1, 1}
+    already_codes = len(classes) > 2 and np.array_equal(  # noqa: PLR2004
+        np.sort(np.asarray(classes)), np.arange(len(classes))
+    )
+    if not (already_pm or already_codes):
+        y = TaskSpec.from_target(y).encode(y)
     return train_test_split(x, y, random_state=42)
 
 

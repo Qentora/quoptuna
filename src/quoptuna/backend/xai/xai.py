@@ -391,11 +391,16 @@ class XAI:
             "recall": self.get_recall,
         }
 
-        try:
-            for key, func in metrics.items():
-                report[key] = func()
-        except (ValueError, TypeError) as e:
-            report[key] = str(e)
+        # Per-metric isolation: one failing metric (e.g. roc_curve on a
+        # multiclass proba matrix) must not abort the remaining metrics.
+        def compute_or_error(func):
+            try:
+                return func()
+            except (ValueError, TypeError) as e:
+                return str(e)
+
+        for key, func in metrics.items():
+            report[key] = compute_or_error(func)
         return report
 
     def plot_confusion_matrix(self, plot_config: dict | None = None):

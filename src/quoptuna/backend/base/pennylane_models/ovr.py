@@ -49,6 +49,22 @@ class PlusMinusAdapter(BaseEstimator, ClassifierMixin):
         return (np.asarray(self.estimator_.predict(X)) == 1).astype(int)
 
 
+class ConvergenceAwareOvR(OneVsRestClassifier):
+    """OneVsRestClassifier exposing an aggregated convergence flag.
+
+    Each PlusMinusAdapter swallows its sub-fit's ConvergenceWarning (raising
+    would abort the sibling class fits); ``converged_`` surfaces whether ALL
+    sub-models met the convergence criterion so trial bookkeeping stays honest.
+    """
+
+    @property
+    def converged_(self) -> bool:
+        estimators = getattr(self, "estimators_", None)
+        if not estimators:
+            return True
+        return all(getattr(e, "converged_", True) for e in estimators)
+
+
 def wrap_one_vs_rest(model) -> OneVsRestClassifier:
     """OvR-wrap a {-1,+1} binary estimator for a K>2 target.
 
@@ -59,4 +75,4 @@ def wrap_one_vs_rest(model) -> OneVsRestClassifier:
     from attaching to a wrapper whose K interleaved loss series would not be
     comparable.
     """
-    return OneVsRestClassifier(PlusMinusAdapter(model), n_jobs=1)
+    return ConvergenceAwareOvR(PlusMinusAdapter(model), n_jobs=1)

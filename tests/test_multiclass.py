@@ -149,7 +149,9 @@ class TestCreateModelMulticlass:
             max_steps=10,
             convergence_interval=5,
         )
-        assert type(model).__name__ == "OneVsRestClassifier"
+        from sklearn.multiclass import OneVsRestClassifier  # noqa: PLC0415
+
+        assert isinstance(model, OneVsRestClassifier)
         # Pruning callback gate: the wrapper must not expose max_steps.
         assert not hasattr(model, "max_steps")
 
@@ -252,3 +254,115 @@ class TestFavorableBinarization:
             y_true, y_pred, sensitive, "demographic_parity_difference", favorable=2
         )
         assert disparity == pytest.approx(1.0)
+
+
+class TestReviewFixes:
+    """Regression tests for the multi-class review findings."""
+
+    def test_task_spec_rejects_high_cardinality_target(self):
+        from quoptuna.backend.task_type import MAX_N_CLASSES  # noqa: PLC0415
+
+        with pytest.raises(ValueError, match="max"):
+            TaskSpec.from_target(np.arange(MAX_N_CLASSES + 1))
+
+    def test_preprocess_data_binary_matches_taskspec_convention(self):
+        """classes[0] must map to -1 (TaskSpec convention), not +1."""
+        rng = np.random.default_rng(0)
+        x = rng.normal(size=(40, 3))
+        y = np.array(["no", "yes"] * 20)
+        _, _, train_y, test_y = preprocess_data(x, y)
+        all_y = np.concatenate([np.ravel(train_y), np.ravel(test_y)])
+        # 'no' (sorted first) -> -1, 'yes' -> +1; balanced input stays balanced.
+        assert set(all_y.tolist()) == {-1, 1}
+        assert (all_y == 1).sum() == 20  # noqa: PLR2004
+
+    def test_preprocess_data_multiclass_encodes_raw_labels(self):
+        rng = np.random.default_rng(0)
+        x = rng.normal(size=(30, 3))
+        y = np.array(["a", "b", "c"] * 10)
+        _, _, train_y, test_y = preprocess_data(x, y)
+        all_y = np.concatenate([np.ravel(train_y), np.ravel(test_y)])
+        assert set(all_y.tolist()) == {0, 1, 2}
+
+    def test_data_preparation_binary_matches_taskspec_convention(self):
+        from quoptuna.backend.utils.data_utils.prepare import DataPreparation  # noqa: PLC0415
+
+        df_x = pd.DataFrame({"f": np.linspace(0, 1, 20)})
+        df_y = pd.Series(["neg_class", "pos_class"] * 10, name="t")
+        prep = DataPreparation(dataset={"x": df_x, "y": df_y}, x_cols=["f"], y_col="t")
+        _, _, y_train, y_test = prep.prepare_data()
+        all_y = np.concatenate([np.ravel(y_train), np.ravel(y_test)])
+        assert (all_y == 1).sum() == 10  # noqa: PLR2004  # 'pos_class' (sorted second) -> +1
+
+    def test_ovr_wrapper_exposes_aggregated_converged_flag(self):
+        from sklearn.linear_model import Perceptron  # noqa: PLC0415
+
+        from quoptuna.backend.base.pennylane_models.ovr import wrap_one_vs_rest  # noqa: PLC0415
+
+        rng = np.random.default_rng(0)
+        x = rng.normal(size=(30, 3))
+        y = np.array([0, 1, 2] * 10)
+        model = wrap_one_vs_rest(Perceptron())
+        # Perceptron never raises ConvergenceWarning as exception -> converged
+        # (adapters default converged_=True when no warning fired).
+        model.fit(x, y)
+        assert model.converged_ is True
+
+    def test_get_report_isolates_metric_failures(self):
+        """One failing metric must not abort later metrics (multiclass report)."""
+        from unittest.mock import MagicMock  # noqa: PLC0415
+
+        from quoptuna.backend.xai.xai import XAI  # noqa: PLC0415
+
+        xai = MagicMock(spec=XAI)
+        xai.get_confusion_matrix.side_effect = ValueError("boom")
+        xai.get_classification_report.return_value = "ok"
+        xai.get_roc_curve.side_effect = ValueError("multiclass not supported")
+        xai.get_mcc.return_value = 0.5
+        for name in (
+            "get_roc_auc_score",
+            "get_precision_recall_curve",
+            "get_average_precision_score",
+            "get_f1_score",
+            "get_log_loss",
+            "get_cohens_kappa",
+            "get_precision",
+            "get_recall",
+        ):
+            getattr(xai, name).return_value = 0.1
+        report = XAI.get_report(xai)
+        assert report["mcc"] == 0.5  # noqa: PLR2004  # computed despite earlier failures
+        assert report["confusion_matrix"] == "boom"
+
+    def test_per_class_curves_skip_absent_class_without_nan(self):
+        from quoptuna.server.api.v1.analysis import _per_class_curve_payloads  # noqa: PLC0415
+
+        rng = np.random.default_rng(0)
+        # Class 2 never appears in y_test; proba has only 2 columns (model
+        # trained without class 2), model_classes maps codes 0 and 1.
+        y_test = np.array([0, 1] * 15)
+        proba = rng.uniform(size=(30, 2))
+        proba = proba / proba.sum(axis=1, keepdims=True)
+        spec = {"kind": "multiclass", "n_classes": 3, "class_labels": ["a", "b", "c"]}
+        roc, _pr = _per_class_curve_payloads(y_test, proba, spec, model_classes=[0, 1])
+        labels = [c["label"] for c in roc["per_class"]]
+        assert "c" not in labels  # absent class skipped, not misattributed
+        for c in roc["per_class"]:
+            assert all(np.isfinite(c["fpr"])), "NaN leaked into ROC payload"
+        assert roc["macro_auc"] is None  # incomplete class coverage -> no macro
+
+    def test_plot_class_index_ignores_requested_for_binary(self):
+        from unittest.mock import MagicMock  # noqa: PLC0415
+
+        from quoptuna.server.api.v1.analysis import _plot_class_index  # noqa: PLC0415
+
+        xai = MagicMock()
+        values = MagicMock()
+        values.values = np.zeros((5, 3, 2))  # per-class SHAP, binary
+        xai.shap_values = values
+        xai.get_classes.return_value = [0, 1]
+        # UI always sends 0; binary must keep the positive class regardless.
+        assert _plot_class_index(xai, requested=0) == 1
+        xai.get_classes.return_value = [0, 1, 2]
+        values.values = np.zeros((5, 3, 3))
+        assert _plot_class_index(xai, requested=2) == 2  # noqa: PLR2004
