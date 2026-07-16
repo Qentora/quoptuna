@@ -1,0 +1,107 @@
+/* ==========================================================================
+   QuOptuna brand theme for Starlight.
+   Grounded in the product's real tokens (frontend/app/globals.css):
+   quantum = purple hsl(262 83% 58%), classical = orange hsl(21 90% 48%).
+   Maps our palette onto Starlight's --sl-* accent + gray scales, and defines
+   shared tokens used by the custom landing-page components.
+   ========================================================================== */
+
+:root {
+  /* --- Starlight purple accent scale (light defaults; Starlight recolors for dark) --- */
+  --sl-color-accent-low: #ede7fe;
+  --sl-color-accent: #7c3aed;
+  --sl-color-accent-high: #4c1d95;
+
+  /* violet-biased gray scale so neutrals read as chosen, not default */
+  --sl-color-white: #171226;
+  --sl-color-gray-1: #241f33;
+  --sl-color-gray-2: #4a4360;
+  --sl-color-gray-3: #6f6788;
+  --sl-color-gray-4: #9a93b0;
+  --sl-color-gray-5: #d3cde8;
+  --sl-color-gray-6: #ece9f6;
+  --sl-color-gray-7: #f2f0fa;
+  --sl-color-black: #ffffff;
+
+  /* shared brand tokens for landing components */
+  --qo-quantum: #7c3aed;
+  --qo-quantum-deep: #5b21b6;
+  --qo-quantum-soft: #ede7fe;
+  --qo-classical: #e8590c;
+  --qo-classical-soft: #fdeadf;
+  --qo-ground: #faf9fe;
+  --qo-surface: #ffffff;
+  --qo-line: #e4e0f0;
+  --qo-line-2: #d3cde8;
+  --qo-ink: #171226;
+  --qo-ink-2: #4a4360;
+  --qo-ink-3: #6f6788;
+  --qo-good: #059669;
+  --qo-display: "Archivo", var(--__sl-font, system-ui), sans-serif;
+  --qo-mono: var(--__sl-font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+}
+
+:root[data-theme="dark"] {
+  --sl-color-accent-low: #241a3d;
+  --sl-color-accent: #a78bfa;
+  --sl-color-accent-high: #ddd6fe;
+
+  --sl-color-white: #f3f0fb;
+  --sl-color-gray-1: #e5e0f3;
+  --sl-color-gray-2: #b9b1d0;
+  --sl-color-gray-3: #8a82a3;
+  --sl-color-gray-4: #4f4766;
+  --sl-color-gray-5: #372c50;
+  --sl-color-gray-6: #211a33;
+  --sl-color-gray-7: #171223;
+  --sl-color-black: #0d0a16;
+
+  --qo-quantum: #a78bfa;
+  --qo-quantum-deep: #c4b5fd;
+  --qo-quantum-soft: #241a3d;
+  --qo-classical: #fb923c;
+  --qo-classical-soft: #2e1a0f;
+  --qo-ground: #0d0a16;
+  --qo-surface: #171223;
+  --qo-line: #271f3a;
+  --qo-line-2: #372c50;
+  --qo-ink: #f3f0fb;
+  --qo-ink-2: #b9b1d0;
+  --qo-ink-3: #8a82a3;
+  --qo-good: #34d399;
+}
+
+/* Slightly tighter, more editorial headings to match the prototype. */
+.sl-markdown-content h1,
+.sl-markdown-content h2,
+.sl-markdown-content h3 {
+  letter-spacing: -0.02em;
+}
+
+/* Brandable inline code + accents inside docs content. */
+.sl-markdown-content code:not(pre code) {
+  color: var(--qo-quantum-deep);
+  background: var(--qo-quantum-soft);
+}
+
+/* Hero site-title tweak. */
+.site-title span {
+  font-weight: 800;
+  letter-spacing: -0.02em;
+}
+
+/* -- Custom landing page: let <Landing /> own the whole splash canvas. --
+   The splash template still emits an <h1> from the page title; hide it and
+   drop the content padding so our full-bleed sections start at the top. */
+body:has(.qo-hero) .sl-markdown-content > h1:first-child {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0 0 0 0);
+  white-space: nowrap;
+}
+body:has(.qo-hero) main .sl-container > .sl-markdown-content {
+  margin-top: 0;
+}
+

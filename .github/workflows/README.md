@@ -1,69 +1,41 @@
 # GitHub Actions Workflows
 
-## Documentation Deployment
+## Documentation
 
-### docs-versioned.yml (Recommended)
+The documentation site lives in [`docs-site/`](../../docs-site) and is built
+with **[Astro](https://astro.build) + [Starlight](https://starlight.astro.build)**.
+It deploys to GitHub Pages at `https://Qentora.github.io/quoptuna/`.
+
+### docs.yml — Deploy Documentation
 
 **Triggers:**
-- Push to `main`, `master`, or `development` branches
-- Changes to `docs/**`, `mkdocs.yml`, or the workflow file itself
+- Push to `main` or `master`
+- Changes to `docs-site/**` or the workflow file
 - Manual trigger via `workflow_dispatch`
-
-**Features:**
-- Versioned documentation using [mike](https://github.com/jimporter/mike)
-- Separate versions for stable and development
-- Version selector in documentation
-- Automatic version management
-
-**URLs:**
-- Stable: `https://qentora.github.io/quoptuna/latest/`
-- Development: `https://qentora.github.io/quoptuna/dev/`
 
 **How it works:**
-1. Detects branch and assigns version:
-   - `main/master` → version: "latest"
-   - `development` → version: "dev"
-2. Builds documentation with mkdocs
-3. Deploys to `gh-pages` branch using mike
-4. Updates version selector
+1. `npm ci` in `docs-site/`
+2. `npm run build` (Astro produces static output in `docs-site/dist/`)
+3. Publishes `dist/` to GitHub Pages via `actions/deploy-pages`
 
-### docs.yml
+### docs-preview.yml — Docs Preview
 
 **Triggers:**
-- Push to `main` or `master` branch only
-- Changes to `docs/**`, `mkdocs.yml`, or the workflow file
-- Manual trigger via `workflow_dispatch`
+- Pull requests touching `docs-site/**` (or the docs workflows)
 
-**Features:**
-- Simple single-version deployment
-- No versioning support
-- Faster deployment (no version management overhead)
+**How it works:**
+1. Builds the site (catching broken links / build breaks on every PR)
+2. Deploys a per-PR preview and posts the URL as a sticky PR comment
 
-**URL:**
-- `https://qentora.github.io/quoptuna/`
+:::note
+The preview **deploy host is intentionally pluggable** — fill in the
+`TODO(host)` block in `docs-preview.yml` (Cloudflare Pages / Netlify / Vercel /
+GitHub Pages subpath) and add the matching repo secrets. Until then the workflow
+still builds the site and comments that no preview host is configured.
+:::
 
-**Use case:**
-- Simple documentation without version history
-- Quick setup for single-branch projects
-
-### docs-dev.yml
-
-**Triggers:**
-- Push to `development` branch
-- Pull requests targeting `development` branch
-- Changes to `docs/**`, `mkdocs.yml`, or the workflow file
-
-**Features:**
-- Builds on PR to catch errors early
-- Only deploys on push (not on PR)
-- Separate environment for development docs
-
-**URL:**
-- `https://qentora.github.io/quoptuna/` (when used alone)
-
-**Use case:**
-- Testing documentation changes before merging
-- Separate deployment pipeline for development
+The `docs` job in `test.yml` also runs `npm run build` on every PR as a fast
+build check.
 
 ## Other Workflows
 
@@ -105,29 +77,7 @@ Code optimization checks.
 ### cookiecutter.yml
 Template updates for the project.
 
-## Choosing a Workflow
-
-**For most projects, use `docs-versioned.yml` because:**
-- ✅ Supports multiple versions
-- ✅ Easy to maintain documentation history
-- ✅ Users can access both stable and development docs
-- ✅ Version selector for easy navigation
-
-**Use `docs.yml` if:**
-- You only need single-version documentation
-- You don't need to support multiple branches
-- You want simpler setup
-
-**Use `docs-dev.yml` if:**
-- You want separate deployment for development
-- You need PR previews
-- You want isolated development documentation
-
 ## Setup Instructions
-
-See [GITHUB_PAGES_SETUP.md](../../GITHUB_PAGES_SETUP.md) for detailed setup instructions.
-
-## Quick Start
 
 1. **Enable GitHub Pages:**
    - Go to repository **Settings** → **Pages**
@@ -135,66 +85,39 @@ See [GITHUB_PAGES_SETUP.md](../../GITHUB_PAGES_SETUP.md) for detailed setup inst
 
 2. **Push to trigger deployment:**
    ```bash
-   git add docs/
+   git add docs-site/
    git commit -m "Update documentation"
-   git push origin development  # or main/master
+   git push origin main
    ```
 
 3. **Check deployment:**
-   - Go to **Actions** tab
-   - Monitor the workflow run
-   - Visit the deployed URL once complete
+   - Go to the **Actions** tab and monitor the *Deploy Documentation* run
+   - Visit `https://Qentora.github.io/quoptuna/` once complete
+
+## Local Testing
+
+Build and preview the docs locally before pushing:
+
+```bash
+cd docs-site
+npm install
+npm run build      # static output in dist/ (mirrors CI)
+npm run dev        # live preview at http://localhost:4321/quoptuna/
+```
 
 ## Troubleshooting
 
 ### Build Fails
-
-Check the workflow logs:
-1. **Actions** tab → Click failed workflow
-2. Review error messages
-3. Fix issues locally:
-   ```bash
-   mkdocs build --strict
-   ```
-
-### Permissions Error
-
-1. **Settings** → **Actions** → **General**
-2. Set Workflow permissions to "Read and write permissions"
+1. **Actions** tab → click the failed workflow and review the logs
+2. Reproduce locally with `cd docs-site && npm run build`
 
 ### Pages Not Deploying
-
-1. Ensure GitHub Pages is enabled
-2. Check that source is set to "GitHub Actions"
-3. Verify workflow completed successfully
-
-## Local Testing
-
-Test documentation locally before pushing:
-
-```bash
-# Install dependencies
-pip install -r requirements.txt
-
-# Or install with project
-pip install -e ".[dev]"
-
-# Build documentation
-mkdocs build --strict
-
-# Serve locally
-mkdocs serve
-# Visit http://127.0.0.1:8000
-
-# Test versioned deployment
-mike deploy test
-mike serve
-```
+1. Ensure GitHub Pages is enabled with source **GitHub Actions**
+2. Verify the *Deploy Documentation* workflow completed successfully
 
 ## Resources
 
-- [MkDocs](https://www.mkdocs.org/)
-- [Material for MkDocs](https://squidfunk.github.io/mkdocs-material/)
-- [Mike](https://github.com/jimporter/mike)
+- [Astro](https://astro.build/)
+- [Starlight](https://starlight.astro.build/)
 - [GitHub Actions](https://docs.github.com/en/actions)
 - [GitHub Pages](https://docs.github.com/en/pages)

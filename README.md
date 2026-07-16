@@ -75,26 +75,28 @@ uv pip install -e ".[dev]"
 
 ## 🚀 Quick Start
 
-Get up and running in minutes with this simple example:
+Get up and running in minutes. QuOptuna searches quantum and classical
+classifiers for you — you provide data, it finds the best model and
+hyperparameters:
 
 ```python
-import quoptuna as qo
+from quoptuna import DataPreparation, Optimizer
 
-# Define your objective function
-def objective(trial):
-    """
-    Example: Minimize a simple quadratic function
-    """
-    x = trial.suggest_float('x', -10, 10)
-    return x ** 2
+# Load and prepare a CSV (binary targets use the {-1, +1} convention)
+data_prep = DataPreparation(
+    file_path="your_data.csv",
+    x_cols=["feature_1", "feature_2", "feature_3"],
+    y_col="target",
+)
+data_dict = data_prep.get_data(output_type="2")
 
-# Create and run optimization study
-study = qo.create_study(direction='minimize')
-study.optimize(objective, n_trials=100)
+# Run the hyperparameter search across quantum + classical models
+optimizer = Optimizer(db_name="experiment", study_name="trial_1", data=data_dict)
+study, best_trials = optimizer.optimize(n_trials=100)
 
 # Display results
-print(f"Best value: {study.best_value}")
-print(f"Best parameters: {study.best_params}")
+print(f"Best F1 score: {best_trials[0].value:.4f}")
+print(f"Best model:    {best_trials[0].params['model_type']}")
 ```
 
 ### 🖥️ Launch the Application

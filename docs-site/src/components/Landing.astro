@@ -1,0 +1,245 @@
+---
+// Full marketing landing page for QuOptuna docs.
+// Reproduces the approved design prototype; scoped with the .qo- prefix so it
+// never affects Starlight doc pages. Rendered by src/content/docs/index.mdx.
+import "./landing.css";
+
+const base = import.meta.env.BASE_URL.replace(/\/$/, "");
+const href = (p: string) => `${base}/${p.replace(/^\//, "")}`;
+
+const features = [
+  {
+    title: "Guided 6-step wizard",
+    body: "Dataset → Features → Configure → Optimize → Analyze → Report. State persists across navigation and restarts.",
+    icon: '<path d="M4 6h16M4 12h10M4 18h7"/>',
+  },
+  {
+    title: "Samplers & pruners",
+    body: "TPE, random, and grid samplers with ASHA / Hyperband pruning. Iterative quantum models report intermediate scores for early stopping.",
+    icon: '<circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 3"/>',
+  },
+  {
+    title: "Fairness-aware search",
+    body: "Constrained or multi-objective search on equal-opportunity, disparate-impact, or demographic-parity disparity.",
+    icon: '<path d="M12 3l8 4v6c0 5-4 7-8 8-4-1-8-3-8-8V7z"/>',
+    alt: true,
+  },
+  {
+    title: "Explainable results",
+    body: "SHAP plots, metric curves, confusion matrices, and feature importance — computed on the best trial, on demand.",
+    icon: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
+  },
+  {
+    title: "AI-generated reports",
+    body: "Analyst + reviewer agents summarize a run into a governance-ready report via OpenAI, Gemini, or Anthropic.",
+    icon: '<path d="M4 4h16v12H4z"/><path d="M8 20h8M12 16v4"/>',
+    alt: true,
+  },
+  {
+    title: "Multiclass & persistence",
+    body: "One-vs-rest multiclass with macro-F1, decision-threshold tuning, and durable SQLite runs that rehydrate after a crash.",
+    icon: '<path d="M3 12l4-8 5 16 4-10 5 2"/>',
+  },
+];
+
+const quantumModels = [
+  "CircuitCentric", "DataReuploading", "DressedQuantumCircuit",
+  "ProjectedQuantumKernel", "QuantumKitchenSinks", "QuantumMetricLearner",
+  "TreeTensor", "IQPKernel", "Separable variants",
+];
+const classicalModels = ["SVC", "SVC (linear)", "MLPClassifier", "Perceptron"];
+
+const steps = [
+  { n: "01", h: "Dataset", p: "Upload CSV or load a UCI dataset." },
+  { n: "02", h: "Features", p: "Pick features, target, encoding." },
+  { n: "03", h: "Configure", p: "Models, sampler, pruner, fairness." },
+  { n: "04", h: "Optimize", p: "Run trials with live progress." },
+  { n: "05", h: "Analyze", p: "SHAP, metrics, fairness." },
+  { n: "06", h: "Report", p: "AI summary you can share." },
+];
+---
+
+<!-- ============================ HERO ============================ -->
+<section class="qo-hero">
+  <div class="qo-wrap">
+    <div class="qo-hero-grid">
+      <div>
+        <div class="qo-badges">
+          <span class="qo-pill"><span class="qo-dot q"></span> Quantum models</span>
+          <span class="qo-pill"><span class="qo-dot c"></span> Classical models</span>
+          <span class="qo-pill">Built on Optuna + PennyLane</span>
+        </div>
+        <h1>Tune quantum &amp; classical models in <span class="qo-grad">one search</span>.</h1>
+        <p class="qo-lede">
+          QuOptuna runs a single hyperparameter search across quantum and classical
+          classifiers — fairness-aware, explainable, and reproducible.
+        </p>
+        <div class="qo-cta">
+          <a class="qo-btn qo-btn-primary" href={href("getting-started/quickstart")}>Get started →</a>
+          <a class="qo-btn qo-btn-secondary" href="#how-it-works">See how it works</a>
+        </div>
+      </div>
+      <div class="qo-term" role="img" aria-label="Example terminal running quoptuna optimize">
+        <div class="qo-term-bar"><i></i><i></i><i></i><span>~/project — quoptuna</span></div>
+        <div class="qo-term-body">
+          <div class="cm"># one command, no repo, no Node</div>
+          <div><span class="ok">$</span> uvx quoptuna optimize <span class="fl">--uci-id</span> <span class="nu">53</span> <span class="fl">--trials</span> <span class="nu">30</span></div>
+          <div class="qo-term-row"><span class="cm">trial 12/30 · IQPKernel</span><span class="nu">f1=0.91</span></div>
+          <div class="qo-bar" style="width:40%"></div>
+          <div class="qo-term-row"><span class="cm">trial 24/30 · SVC</span><span class="nu">f1=0.94</span></div>
+          <div class="qo-bar" style="width:80%"></div>
+          <div><span class="ok">✓</span> best: SVC · macro-F1 <span class="nu">0.947</span> · study saved</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ FEATURES ============================ -->
+<section class="qo-section" id="features">
+  <div class="qo-wrap">
+    <div class="qo-sec-head">
+      <div class="qo-eyebrow">Capabilities</div>
+      <h2>Everything a real optimization run needs.</h2>
+      <p>Not a toy — QuOptuna ships the search, the guardrails, and the explanation in one package.</p>
+    </div>
+    <div class="qo-fgrid">
+      {features.map((f) => (
+        <div class={`qo-fcard${f.alt ? " alt" : ""}`}>
+          <div class="qo-ic">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" set:html={f.icon} />
+          </div>
+          <h3>{f.title}</h3>
+          <p>{f.body}</p>
+        </div>
+      ))}
+    </div>
+  </div>
+</section>
+
+<!-- ============================ DUALITY / MODELS ============================ -->
+<section class="qo-section" id="models">
+  <div class="qo-wrap">
+    <div class="qo-sec-head">
+      <div class="qo-eyebrow">Model catalog</div>
+      <h2>Two search spaces, one objective.</h2>
+      <p>A conditional space suggests the model first, then only that model's parameters — so the sampler never wastes trials on irrelevant knobs.</p>
+    </div>
+    <div class="qo-duality">
+      <div class="qo-side q">
+        <h3>Quantum · PennyLane</h3>
+        <ul class="qo-mlist">{quantumModels.map((m) => <li>{m}</li>)}</ul>
+      </div>
+      <div class="mid">⟷</div>
+      <div class="qo-side c">
+        <h3>Classical · scikit-learn</h3>
+        <ul class="qo-mlist">{classicalModels.map((m) => <li>{m}</li>)}</ul>
+        <p style="font-size:13px;color:var(--qo-ink-3);margin:16px 0 0">
+          Baselines run in the same study, scored on the same validation split.
+        </p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ============================ FLOW ============================ -->
+<section class="qo-section" id="how-it-works">
+  <div class="qo-wrap">
+    <div class="qo-sec-head">
+      <div class="qo-eyebrow">End to end</div>
+      <h2>From a CSV to a report.</h2>
+      <p>The same pipeline drives the web wizard, the headless CLI, and the Python API.</p>
+    </div>
+    <div class="qo-flow">
+      {steps.map((s) => (
+        <div class="qo-step"><div class="n">{s.n}</div><h4>{s.h}</h4><p>{s.p}</p></div>
+      ))}
+    </div>
+  </div>
+</section>
+
+<!-- ============================ CTA ============================ -->
+<section class="qo-cta-band">
+  <div class="qo-wrap">
+    <h2>Boot the whole app with one command.</h2>
+    <p><code>uvx quoptuna</code> serves the UI and API on a single port and opens your browser — no Node, no checkout.</p>
+    <div class="qo-cta">
+      <a class="qo-btn qo-btn-primary" href={href("getting-started/installation")}>Read the quickstart →</a>
+      <a class="qo-btn qo-btn-secondary" href={href("reference/python-api")}>Browse the API reference</a>
+    </div>
+  </div>
+</section>
+
+<script>
+  // Hero canvas: a converging "trial field" — points drift toward an optimum,
+  // colored across the quantum→classical axis. Quiet, subject-grounded motion.
+  const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const hero = document.querySelector(".qo-hero");
+  if (hero && !reduce) {
+    const cvs = document.createElement("canvas");
+    cvs.setAttribute("aria-hidden", "true");
+    Object.assign(cvs.style, {
+      position: "absolute", inset: "0", width: "100%", height: "100%",
+      opacity: "0.6", pointerEvents: "none", zIndex: "0",
+    });
+    (hero as HTMLElement).style.position = "relative";
+    hero.prepend(cvs);
+    const inner = hero.querySelector(".qo-wrap") as HTMLElement | null;
+    if (inner) { inner.style.position = "relative"; inner.style.zIndex = "1"; }
+
+    const ctx = cvs.getContext("2d")!;
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    let W = 0, H = 0;
+    const pts: { x: number; y: number; tx: number; ty: number; t: number; s: number }[] = [];
+
+    const hex = (v: string) => {
+      const c = getComputedStyle(document.documentElement).getPropertyValue(v).trim();
+      return c || "#7c3aed";
+    };
+    const lerp = (a: string, b: string, t: number) => {
+      const p = (x: string) => {
+        x = x.replace("#", "");
+        return [parseInt(x.slice(0, 2), 16), parseInt(x.slice(2, 4), 16), parseInt(x.slice(4, 6), 16)];
+      };
+      // fall back gracefully if a token isn't hex
+      if (!a.startsWith("#") || !b.startsWith("#")) return a;
+      const A = p(a), B = p(b);
+      return `rgb(${Math.round(A[0] + (B[0] - A[0]) * t)},${Math.round(A[1] + (B[1] - A[1]) * t)},${Math.round(A[2] + (B[2] - A[2]) * t)})`;
+    };
+
+    function resize() {
+      const r = cvs.getBoundingClientRect();
+      W = r.width; H = r.height;
+      cvs.width = W * DPR; cvs.height = H * DPR;
+      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      if (!pts.length) {
+        for (let i = 0; i < 60; i++) {
+          pts.push({
+            x: Math.random() * W, y: Math.random() * H,
+            tx: W * (0.6 + Math.random() * 0.14), ty: H * (0.42 + Math.random() * 0.16),
+            t: Math.random(), s: 1 + Math.random() * 2,
+          });
+        }
+      }
+    }
+    function frame() {
+      if (!W) { requestAnimationFrame(frame); return; }
+      const q = hex("--qo-quantum"), c = hex("--qo-classical");
+      ctx.clearRect(0, 0, W, H);
+      for (const p of pts) {
+        p.x += (p.tx - p.x) * 0.006; p.y += (p.ty - p.y) * 0.006;
+        if (Math.abs(p.tx - p.x) < 6 && Math.abs(p.ty - p.y) < 6) {
+          p.x = Math.random() * W; p.y = Math.random() * H;
+        }
+        ctx.beginPath();
+        ctx.fillStyle = lerp(q, c, p.t);
+        ctx.arc(p.x, p.y, p.s, 0, 6.283);
+        ctx.fill();
+      }
+      requestAnimationFrame(frame);
+    }
+    window.addEventListener("resize", resize);
+    resize();
+    requestAnimationFrame(frame);
+  }
+</script>

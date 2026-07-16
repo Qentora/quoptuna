@@ -1,0 +1,87 @@
+name: Docs Preview
+
+# Builds a preview of the Astro + Starlight docs site for every pull request
+# that touches docs-site/, then posts the preview URL back as a sticky PR comment.
+#
+# The DEPLOY step is intentionally left pluggable — pick a host (Cloudflare
+# Pages / Netlify / Vercel / GitHub Pages subpath) and fill in the marked
+# `TODO(host)` block plus the repo secrets it needs. Until then the workflow
+# still builds the site (catching broken links / build breaks on every PR) and
+# comments that the preview host is not yet configured.
+
+on:
+  pull_request:
+    paths:
+      - "docs-site/**"
+      - ".github/workflows/docs-preview.yml"
+      - ".github/workflows/docs.yml"
+
+# Needed to post/update the sticky PR comment.
+permissions:
+  contents: read
+  pull-requests: write
+
+concurrency:
+  group: docs-preview-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+
+jobs:
+  build-and-preview:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: docs-site
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      - name: Set up Node
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+          cache: npm
+          cache-dependency-path: docs-site/package-lock.json
+
+      - name: Install dependencies
+        run: npm ci
+
+      # Build at the site root so a preview host serves it from "/".
+      # (Production builds keep the /quoptuna base via astro.config.mjs defaults.)
+      - name: Build site
+        run: npm run build
+        env:
+          DOCS_SITE: https://preview.invalid
+          DOCS_BASE: /
+
+      # ------------------------------------------------------------------ #
+      # TODO(host): deploy docs-site/dist to a preview environment and set  #
+      # `preview_url` for the comment below. Example (Cloudflare Pages):    #
+      #                                                                     #
+      #   - name: Deploy preview                                            #
+      #     id: deploy                                                      #
+      #     uses: cloudflare/wrangler-action@v3                            #
+      #     with:                                                          #
+      #       apiToken: ${{ secrets.CLOUDFLARE_API_TOKEN }}                #
+      #       accountId: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}              #
+      #       command: pages deploy docs-site/dist --project-name=quoptuna-docs --branch=${{ github.head_ref }}
+      #                                                                     #
+      # then reference steps.deploy.outputs.deployment-url below.          #
+      # ------------------------------------------------------------------ #
+      - name: Resolve preview URL
+        id: preview
+        run: |
+          # Replace this with the deploy step's output once a host is wired up.
+          echo "url=" >> "$GITHUB_OUTPUT"
+
+      - name: Comment preview link on PR
+        uses: marocchino/sticky-pull-request-comment@v2
+        with:
+          header: docs-preview
+          message: |
+            ### 📚 Docs preview
+
+            ${{ steps.preview.outputs.url != ''
+              && format('✅ Preview built and deployed: {0}', steps.preview.outputs.url)
+              || '✅ Docs built successfully. ⚙️ A preview **host is not yet configured** — wire up the `TODO(host)` block in `.github/workflows/docs-preview.yml` to publish a live preview URL here.' }}
+
+            <sub>Built from `docs-site/` at commit ${{ github.event.pull_request.head.sha }}.</sub>
