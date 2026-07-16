@@ -155,6 +155,7 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         max_steps: optimizerSettings.maxSteps,
         convergence_interval: optimizerSettings.convergenceInterval,
         max_vmap: optimizerSettings.maxVmap,
+        dev_type: optimizerSettings.devType,
       });
 
       // Persist the execution id immediately so a refresh mid-run can resume.

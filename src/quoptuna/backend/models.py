@@ -1,5 +1,6 @@
 # import sklearn models
 import ast
+import inspect
 
 from sklearn.linear_model import Perceptron
 from sklearn.neural_network import MLPClassifier
@@ -58,102 +59,114 @@ VARIATIONAL_BINARY_MODELS = {
 BINARY_N_CLASSES = 2
 
 
-def create_model(model_type, n_classes: int = BINARY_N_CLASSES, **kwargs):
-    model_constructors = {
-        "CircuitCentricClassifier": (
-            CircuitCentricClassifier,
-            ["max_vmap", "batch_size", "learning_rate", "n_input_copies", "n_layers"],
-        ),
-        "DataReuploadingClassifier": (
-            DataReuploadingClassifier,
-            ["max_vmap", "batch_size", "learning_rate", "n_layers", "observable_type"],
-        ),
-        "DataReuploadingClassifierSeparable": (
-            DataReuploadingClassifierSeparable,
-            ["max_vmap", "batch_size", "learning_rate", "n_layers", "observable_type"],
-        ),
-        "DressedQuantumCircuitClassifier": (
-            DressedQuantumCircuitClassifier,
-            ["max_vmap", "batch_size", "learning_rate", "n_layers"],
-        ),
-        "DressedQuantumCircuitClassifierSeparable": (
-            DressedQuantumCircuitClassifierSeparable,
-            ["max_vmap", "batch_size", "learning_rate", "n_layers"],
-        ),
-        "IQPKernelClassifier": (IQPKernelClassifier, ["max_vmap", "repeats", "C"]),
-        "ProjectedQuantumKernel": (
-            ProjectedQuantumKernel,
-            ["max_vmap", "gamma_factor", "C", "trotter_steps", "t"],
-        ),
-        "QuantumKitchenSinks": (
-            QuantumKitchenSinks,
-            ["max_vmap", "n_qfeatures", "n_episodes"],
-        ),
-        "QuantumMetricLearner": (
-            QuantumMetricLearner,
-            ["max_vmap", "batch_size", "learning_rate", "n_layers"],
-        ),
-        "QuantumBoltzmannMachine": (
-            QuantumBoltzmannMachine,
-            [
-                "max_vmap",
-                "batch_size",
-                "learning_rate",
-                "visible_qubits",
-                "temperature",
-            ],
-        ),
-        "QuantumBoltzmannMachineSeparable": (
-            QuantumBoltzmannMachineSeparable,
-            [
-                "max_vmap",
-                "batch_size",
-                "learning_rate",
-                "visible_qubits",
-                "temperature",
-            ],
-        ),
-        "TreeTensorClassifier": (
-            TreeTensorClassifier,
-            ["max_vmap", "batch_size", "learning_rate"],
-        ),
-        "QuanvolutionalNeuralNetwork": (
-            QuanvolutionalNeuralNetwork,
-            [
-                "max_vmap",
-                "batch_size",
-                "learning_rate",
-                "n_qchannels",
-                "qkernel_shape",
-                "kernel_shape",
-            ],
-        ),
-        "WeiNet": (WeiNet, ["max_vmap", "batch_size", "learning_rate", "filter_name"]),
-        "SeparableVariationalClassifier": (
-            SeparableVariationalClassifier,
-            ["batch_size", "learning_rate", "encoding_layers"],
-        ),
-        "SeparableKernelClassifier": (
-            SeparableKernelClassifier,
-            ["C", "encoding_layers"],
-        ),
-        "ConvolutionalNeuralNetwork": (
-            ConvolutionalNeuralNetwork,
-            ["batch_size", "learning_rate", "kernel_shape"],
-        ),
-        "SVC": (SVC, ["gamma", "C"]),
-        "SVClinear": (LinearSVC, ["C"]),
-        "MLPClassifier": (
-            MLPClassifier,
-            ["batch_size", "hidden_layer_sizes", "alpha"],
-        ),
-        "Perceptron": (Perceptron, ["eta0"]),
-    }
+# Registry: model_type -> (constructor, hyperparameter whitelist). Module-level
+# so the optimizer can suggest only the parameters the sampled model uses
+# (conditional search space) instead of sampling the whole flat space.
+MODEL_CONSTRUCTORS = {
+    "CircuitCentricClassifier": (
+        CircuitCentricClassifier,
+        ["max_vmap", "batch_size", "learning_rate", "n_input_copies", "n_layers"],
+    ),
+    "DataReuploadingClassifier": (
+        DataReuploadingClassifier,
+        ["max_vmap", "batch_size", "learning_rate", "n_layers", "observable_type"],
+    ),
+    "DataReuploadingClassifierSeparable": (
+        DataReuploadingClassifierSeparable,
+        ["max_vmap", "batch_size", "learning_rate", "n_layers", "observable_type"],
+    ),
+    "DressedQuantumCircuitClassifier": (
+        DressedQuantumCircuitClassifier,
+        ["max_vmap", "batch_size", "learning_rate", "n_layers"],
+    ),
+    "DressedQuantumCircuitClassifierSeparable": (
+        DressedQuantumCircuitClassifierSeparable,
+        ["max_vmap", "batch_size", "learning_rate", "n_layers"],
+    ),
+    "IQPKernelClassifier": (IQPKernelClassifier, ["max_vmap", "repeats", "C"]),
+    "ProjectedQuantumKernel": (
+        ProjectedQuantumKernel,
+        ["max_vmap", "gamma_factor", "C", "trotter_steps", "t"],
+    ),
+    "QuantumKitchenSinks": (
+        QuantumKitchenSinks,
+        ["max_vmap", "n_qfeatures", "n_episodes"],
+    ),
+    "QuantumMetricLearner": (
+        QuantumMetricLearner,
+        ["max_vmap", "batch_size", "learning_rate", "n_layers"],
+    ),
+    "QuantumBoltzmannMachine": (
+        QuantumBoltzmannMachine,
+        [
+            "max_vmap",
+            "batch_size",
+            "learning_rate",
+            "visible_qubits",
+            "temperature",
+        ],
+    ),
+    "QuantumBoltzmannMachineSeparable": (
+        QuantumBoltzmannMachineSeparable,
+        [
+            "max_vmap",
+            "batch_size",
+            "learning_rate",
+            "visible_qubits",
+            "temperature",
+        ],
+    ),
+    "TreeTensorClassifier": (
+        TreeTensorClassifier,
+        ["max_vmap", "batch_size", "learning_rate"],
+    ),
+    "QuanvolutionalNeuralNetwork": (
+        QuanvolutionalNeuralNetwork,
+        [
+            "max_vmap",
+            "batch_size",
+            "learning_rate",
+            "n_qchannels",
+            "qkernel_shape",
+            "kernel_shape",
+        ],
+    ),
+    "WeiNet": (WeiNet, ["max_vmap", "batch_size", "learning_rate", "filter_name"]),
+    "SeparableVariationalClassifier": (
+        SeparableVariationalClassifier,
+        ["batch_size", "learning_rate", "encoding_layers"],
+    ),
+    "SeparableKernelClassifier": (
+        SeparableKernelClassifier,
+        ["C", "encoding_layers"],
+    ),
+    "ConvolutionalNeuralNetwork": (
+        ConvolutionalNeuralNetwork,
+        ["batch_size", "learning_rate", "kernel_shape"],
+    ),
+    "SVC": (SVC, ["gamma", "C", "class_weight"]),
+    "SVClinear": (LinearSVC, ["C", "class_weight"]),
+    "MLPClassifier": (
+        MLPClassifier,
+        ["batch_size", "hidden_layer_sizes", "alpha"],
+    ),
+    "Perceptron": (Perceptron, ["eta0", "class_weight"]),
+}
 
-    if model_type not in model_constructors:
+# model_type -> hyperparameter whitelist (exported for the optimizer's
+# conditional per-model search space).
+MODEL_PARAM_KEYS = {name: list(keys) for name, (_cls, keys) in MODEL_CONSTRUCTORS.items()}
+# MLP's learning rate is consumed from raw kwargs (remapped to
+# learning_rate_init below), not via the constructor whitelist — it must
+# still be sampled for MLP trials.
+MODEL_PARAM_KEYS["MLPClassifier"].append("learning_rate")
+
+
+def create_model(model_type, n_classes: int = BINARY_N_CLASSES, **kwargs):
+    if model_type not in MODEL_CONSTRUCTORS:
         raise UnknownModelTypeError(model_type)
 
-    model_class, param_keys = model_constructors[model_type]
+    model_class, param_keys = MODEL_CONSTRUCTORS[model_type]
     params = {key: kwargs.get(key) for key in param_keys}
 
     if model_type == "MLPClassifier":
@@ -167,6 +180,12 @@ def create_model(model_type, n_classes: int = BINARY_N_CLASSES, **kwargs):
             else hidden_layer_sizes
         )
         params["learning_rate_init"] = kwargs.get("learning_rate")
+
+    # Simulator device selection for quantum models. Detected by signature
+    # rather than a whitelist so classical sklearn models are auto-excluded.
+    dev_type = kwargs.get("dev_type")
+    if dev_type is not None and "dev_type" in inspect.signature(model_class.__init__).parameters:
+        params["dev_type"] = dev_type
 
     model = model_class(**params)
 

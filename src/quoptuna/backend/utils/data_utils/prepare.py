@@ -4,7 +4,6 @@ from typing import TYPE_CHECKING, Literal
 
 import numpy as np
 import pandas as pd
-from sklearn.model_selection import train_test_split
 from sklearn.preprocessing import StandardScaler
 
 if TYPE_CHECKING:
@@ -190,7 +189,11 @@ class DataPreparation:
             y_values,
             columns=[self.y_col] if not isinstance(self.y_col, list) else self.y_col,
         )
-        return train_test_split(x, y, train_size=train_size, random_state=42)
+        from quoptuna.backend.utils.data_utils.data import (  # noqa: PLC0415
+            stratified_train_test_split,
+        )
+
+        return stratified_train_test_split(x, y, train_size=train_size, random_state=42)
 
     def prepare_data(self):
         """Selects columns and preprocesses the data."""

@@ -12,9 +12,14 @@ from fastapi.responses import JSONResponse
 from fastapi.staticfiles import StaticFiles
 from starlette.types import Scope
 
+from quoptuna.backend.utils.log_file import attach_file_logging
 from quoptuna.server.api.v1 import analysis, auth, data, optimize, system
 from quoptuna.server.core.auth import require_user
 from quoptuna.server.core.config import settings
+
+# Mirror all backend/server logs to db/logs/quoptuna.log (in addition to the
+# terminal) so runs can be inspected after the fact.
+attach_file_logging()
 
 app = FastAPI(
     title="QuOptuna Next API",

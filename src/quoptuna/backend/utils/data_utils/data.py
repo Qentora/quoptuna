@@ -43,7 +43,20 @@ def preprocess_data(x, y):
     )
     if not (already_pm or already_codes):
         y = TaskSpec.from_target(y).encode(y)
-    return train_test_split(x, y, random_state=42)
+    return stratified_train_test_split(x, y, random_state=42)
+
+
+def stratified_train_test_split(x, y, **kwargs):
+    """train_test_split stratified on ``y``, falling back to unstratified.
+
+    Stratification keeps minority-class proportions consistent across splits
+    (important for imbalanced targets); sklearn raises when a class is too
+    small to stratify, in which case the plain split preserves old behavior.
+    """
+    try:
+        return train_test_split(x, y, stratify=np.asarray(y).ravel(), **kwargs)
+    except ValueError:
+        return train_test_split(x, y, **kwargs)
 
 
 def find_free_port():

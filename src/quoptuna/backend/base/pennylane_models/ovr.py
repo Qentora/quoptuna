@@ -10,10 +10,16 @@ used as an OvR sub-estimator unchanged.
 
 from __future__ import annotations
 
+import logging
+import os
+
+import joblib
 import numpy as np
 from sklearn.base import BaseEstimator, ClassifierMixin, clone
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.multiclass import OneVsRestClassifier
+
+logger = logging.getLogger(__name__)
 
 
 class PlusMinusAdapter(BaseEstimator, ClassifierMixin):
@@ -64,15 +70,40 @@ class ConvergenceAwareOvR(OneVsRestClassifier):
             return True
         return all(getattr(e, "converged_", True) for e in estimators)
 
+    def fit(self, X, y, **fit_params):
+        # Pin joblib to the threading backend: process backends (loky) would
+        # have to pickle the JAX-trained sub-estimators, which is unsafe.
+        # Threads are fine — each sub-fit trains an independent clone() and
+        # JAX releases the GIL during compiled execution.
+        with joblib.parallel_backend("threading", n_jobs=self.n_jobs):
+            return super().fit(X, y, **fit_params)
 
-def wrap_one_vs_rest(model) -> OneVsRestClassifier:
+
+def _resolve_ovr_n_jobs(n_jobs: int | None) -> int:
+    """Explicit arg wins; else the QUOPTUNA_OVR_N_JOBS env var; else 1."""
+    if n_jobs is not None:
+        return max(1, int(n_jobs))
+    raw = os.environ.get("QUOPTUNA_OVR_N_JOBS", "").strip()
+    if not raw:
+        return 1
+    try:
+        return max(1, int(raw))
+    except ValueError:
+        logger.warning("Ignoring invalid QUOPTUNA_OVR_N_JOBS=%r; using 1.", raw)
+        return 1
+
+
+def wrap_one_vs_rest(model, n_jobs: int | None = None) -> OneVsRestClassifier:
     """OvR-wrap a {-1,+1} binary estimator for a K>2 target.
 
-    ``n_jobs=1``: the JAX-trained models are not safe to fit in parallel
-    processes. Training knobs (max_steps, ...) must be set on ``model``
-    before wrapping — the OvR object deliberately does not proxy them, which
-    also keeps the optimizer's pruning callback (gated on ``max_steps``)
-    from attaching to a wrapper whose K interleaved loss series would not be
+    ``n_jobs`` controls how many per-class sub-fits run concurrently
+    (threads, never processes — the JAX-trained models are not safe to fit
+    in parallel processes). Defaults to 1 (serial); set the
+    ``QUOPTUNA_OVR_N_JOBS`` env var to opt in without code changes.
+    Training knobs (max_steps, ...) must be set on ``model`` before
+    wrapping — the OvR object deliberately does not proxy them, which also
+    keeps the optimizer's pruning callback (gated on ``max_steps``) from
+    attaching to a wrapper whose K interleaved loss series would not be
     comparable.
     """
-    return ConvergenceAwareOvR(PlusMinusAdapter(model), n_jobs=1)
+    return ConvergenceAwareOvR(PlusMinusAdapter(model), n_jobs=_resolve_ovr_n_jobs(n_jobs))

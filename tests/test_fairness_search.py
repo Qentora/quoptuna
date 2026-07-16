@@ -135,14 +135,16 @@ def test_constrained_requires_tpe(sensitive_test):
         )
 
 
-def test_multi_objective_rejects_pruner(sensitive_test):
-    with pytest.raises(ValueError, match="does not support pruning"):
-        Optimizer(
-            db_name="unit",
-            fairness_mode="multi_objective",
-            pruner="asha",
-            sensitive_test=sensitive_test,
-        )
+def test_multi_objective_coerces_pruner_to_none(sensitive_test):
+    # Pruning is unsupported on multi-objective studies; the (default) pruner
+    # is coerced to 'none' instead of rejecting the config.
+    opt = Optimizer(
+        db_name="unit",
+        fairness_mode="multi_objective",
+        pruner="asha",
+        sensitive_test=sensitive_test,
+    )
+    assert opt.pruner == "none"
 
 
 def test_unknown_fairness_metric_rejected(sensitive_test):
@@ -281,9 +283,12 @@ def test_optimization_request_fairness_validation():
         OptimizationRequest(
             **base, fairness_mode="constrained", sensitive_feature="g", sampler="grid"
         )
-    with pytest.raises(ValidationError, match="does not support pruning"):
-        OptimizationRequest(
-            **base, fairness_mode="multi_objective", sensitive_feature="g", pruner="hyperband"
-        )
+    # Pruner is coerced (not rejected) for multi-objective searches, so a
+    # request that left the pruner at its "asha" default still validates.
+    coerced = OptimizationRequest(
+        **base, fairness_mode="multi_objective", sensitive_feature="g", pruner="hyperband"
+    )
+    assert coerced.pruner == "none"
     ok = OptimizationRequest(**base, fairness_mode="multi_objective", sensitive_feature="g")
     assert ok.fairness_metric == "equal_opportunity_difference"
+    assert ok.pruner == "none"

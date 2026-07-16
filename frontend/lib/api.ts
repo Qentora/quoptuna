@@ -134,8 +134,10 @@ export interface OptimizationRequest {
   max_steps?: number;
   convergence_interval?: number;
   max_vmap?: number;
+  // PennyLane simulator device; backend falls back to default.qubit.
+  dev_type?: 'default.qubit' | 'lightning.qubit';
   // Fairness-aware search. 'constrained' requires sampler 'tpe';
-  // 'multi_objective' requires pruner 'none'; both require sensitive_feature.
+  // 'multi_objective' coerces the pruner to 'none'; both require sensitive_feature.
   fairness_mode?: 'off' | 'constrained' | 'multi_objective';
   fairness_metric?:
     | 'equal_opportunity_difference'

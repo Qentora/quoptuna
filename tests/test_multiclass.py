@@ -308,6 +308,73 @@ class TestReviewFixes:
         model.fit(x, y)
         assert model.converged_ is True
 
+    def test_ovr_threaded_fit_matches_serial(self):
+        from sklearn.linear_model import LogisticRegression  # noqa: PLC0415
+
+        from quoptuna.backend.base.pennylane_models.ovr import wrap_one_vs_rest  # noqa: PLC0415
+
+        rng = np.random.default_rng(0)
+        x = rng.normal(size=(30, 3))
+        y = np.array([0, 1, 2] * 10)
+        serial = wrap_one_vs_rest(LogisticRegression(random_state=0), n_jobs=1).fit(x, y)
+        threaded = wrap_one_vs_rest(LogisticRegression(random_state=0), n_jobs=2).fit(x, y)
+        assert threaded.n_jobs == 2  # noqa: PLR2004
+        np.testing.assert_array_equal(serial.classes_, threaded.classes_)
+        np.testing.assert_array_equal(serial.predict(x), threaded.predict(x))
+        assert threaded.converged_ is True
+
+    def test_ovr_threaded_converged_aggregation(self):
+        from sklearn.exceptions import ConvergenceWarning  # noqa: PLC0415
+
+        from quoptuna.backend.base.pennylane_models.ovr import wrap_one_vs_rest  # noqa: PLC0415
+
+        class _FlakyBinary:
+            """{-1,+1} estimator whose fit raises ConvergenceWarning for one class."""
+
+            def __init__(self, fail_when_positive_count=10):
+                self.fail_when_positive_count = fail_when_positive_count
+
+            def get_params(self, deep=True):  # noqa: FBT002
+                return {"fail_when_positive_count": self.fail_when_positive_count}
+
+            def set_params(self, **params):
+                self.__dict__.update(params)
+                return self
+
+            def fit(self, _x, y):
+                # First OvR sub-fit (class 0 has 10 positives) fails to converge.
+                self._fitted = True
+                if (np.asarray(y) == 1).sum() == self.fail_when_positive_count:
+                    msg = "did not converge"
+                    raise ConvergenceWarning(msg)
+                return self
+
+            def predict_proba(self, x):
+                n = len(x)
+                return np.column_stack([np.full(n, 0.4), np.full(n, 0.6)])
+
+            def predict(self, x):
+                return np.ones(len(x))
+
+        rng = np.random.default_rng(0)
+        x = rng.normal(size=(24, 2))
+        y = np.array([0, 1, 2] * 8)  # class 0: 8 positives... use count 8
+        model = wrap_one_vs_rest(_FlakyBinary(fail_when_positive_count=8), n_jobs=2)
+        model.fit(x, y)
+        assert model.converged_ is False
+
+    def test_ovr_n_jobs_env_var(self, monkeypatch):
+        from sklearn.linear_model import Perceptron  # noqa: PLC0415
+
+        from quoptuna.backend.base.pennylane_models.ovr import wrap_one_vs_rest  # noqa: PLC0415
+
+        monkeypatch.setenv("QUOPTUNA_OVR_N_JOBS", "3")
+        assert wrap_one_vs_rest(Perceptron()).n_jobs == 3  # noqa: PLR2004
+        monkeypatch.setenv("QUOPTUNA_OVR_N_JOBS", "not-a-number")
+        assert wrap_one_vs_rest(Perceptron()).n_jobs == 1
+        monkeypatch.delenv("QUOPTUNA_OVR_N_JOBS")
+        assert wrap_one_vs_rest(Perceptron()).n_jobs == 1
+
     def test_get_report_isolates_metric_failures(self):
         """One failing metric must not abort later metrics (multiclass report)."""
         from unittest.mock import MagicMock  # noqa: PLC0415
