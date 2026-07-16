@@ -390,9 +390,7 @@ class Optimizer:
             # expensive) and logged under their existing user-attr names so
             # the Analyze tab and reports stay consistent.
             val_pred = model.predict(self.val_x)
-            val_f1 = f1_score(
-                self.val_y, val_pred, average=self.f1_average, zero_division=0
-            )
+            val_f1 = f1_score(self.val_y, val_pred, average=self.f1_average, zero_division=0)
             val_f1 = self._tune_decision_threshold(trial, model, float(val_f1))
             y_pred = model.predict(self.test_x)
             f_score_ = f1_score(self.test_y, y_pred, average=self.f1_average)
@@ -740,10 +738,8 @@ class Optimizer:
         train_y = np.asarray(self.train_y).ravel()
         if len(train_y) >= self.MIN_TRAIN_ROWS_FOR_VAL_SPLIT:
             try:
-                self.train_x, self.val_x, self.train_y, self.val_y = (
-                    stratified_train_test_split(
-                        self.train_x, train_y, test_size=0.2, random_state=42
-                    )
+                self.train_x, self.val_x, self.train_y, self.val_y = stratified_train_test_split(
+                    self.train_x, train_y, test_size=0.2, random_state=42
                 )
             except ValueError:
                 logger.warning("Validation split failed; validating on the test split.")
