@@ -80,11 +80,9 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Deploy docs
-        if: steps.check.outputs.exists == 'false'
-        run: uv run mkdocs gh-deploy --force
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      # Documentation is built and deployed to GitHub Pages by the dedicated
+      # `Deploy Documentation` workflow (.github/workflows/docs.yml) whenever
+      # docs-site/ changes land on the default branch.
 
       - name: Skip publish (version exists)
         if: steps.check.outputs.exists == 'true'
