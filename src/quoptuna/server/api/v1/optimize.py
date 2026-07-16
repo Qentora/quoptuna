@@ -67,7 +67,7 @@ class OptimizationRequest(BaseModel):
     pruner_min_resource: int = 1
     pruner_reduction_factor: int = 3
     # Intermediate value iterative models report for pruning decisions.
-    intermediate_metric: Literal["accuracy", "neg_loss"] = "accuracy"
+    intermediate_metric: Literal["f1", "accuracy", "neg_loss"] = "f1"
     # Optional cap on training steps for iterative models.
     max_steps: Optional[int] = Field(default=None, ge=1)
     # Optional override of the flat-loss convergence window (also the cadence

@@ -9,10 +9,10 @@ early-stops unpromising quantum-model trainings to save compute.
 | Setting | Values | Default |
 | --- | --- | --- |
 | `sampler` | `tpe` (Bayesian), `random`, `grid` | `tpe` |
-| `pruner` | `none`, `asha` (asynchronous successive halving), `hyperband` | `none` |
+| `pruner` | `asha` (asynchronous successive halving), `hyperband`, `none` | `asha` |
 | `pruner_min_resource` | int — rung-0 resource, in units of intermediate reports | `1` |
 | `pruner_reduction_factor` | int — fraction of trials promoted per rung (1/η) | `3` |
-| `intermediate_metric` | `accuracy` (validation accuracy) or `neg_loss` (negated recent training loss) | `accuracy` |
+| `intermediate_metric` | `f1` (validation F1, same averaging as the objective), `accuracy`, or `neg_loss` (negated recent training loss) | `f1` |
 | `max_steps` | optional cap on training steps for iterative models | model default |
 
 All fields are available on the `POST /api/v1/optimize` request and on the
@@ -28,8 +28,14 @@ end in the `PRUNED` state (not `FAILED`) and never win `best_trial`.
 
 The pruner operates on the **report index** (1st, 2nd, 3rd report...), so
 `pruner_min_resource=1` means "a trial may be stopped after its first
-intermediate report". The `accuracy` metric is evaluated on a fixed validation
-subset (first 128 test rows) to bound the circuit cost of each report.
+intermediate report". The `f1`/`accuracy` metrics are evaluated on a capped
+subset (first 128 rows) of the **validation split** to bound the circuit cost
+of each report.
+
+The default metric is `f1` because it matches the objective: on imbalanced
+datasets, pruning on plain accuracy systematically keeps majority-class
+predictors alive while killing the trials that are slowly learning the
+minority class.
 
 Kernel models (IQPKernel, ProjectedQuantumKernel, QuantumKitchenSinks,
 SeparableKernelClassifier) and classical sklearn models have no training steps;
@@ -41,12 +47,12 @@ they always train to completion regardless of the pruner.
     the trial completes with user attribute `converged: false`. To stop slow
     trials from consuming the full default budget (10,000 steps), set
     `max_steps` to a smaller cap — pruning alone cannot stop a trial whose
-    intermediate accuracy stays competitive while its loss keeps drifting.
+    intermediate metric stays competitive while its loss keeps drifting.
 
 !!! warning "`neg_loss` caveat"
     `intermediate_metric="neg_loss"` costs zero extra circuit evaluations, but
     raw training losses are only comparable across trials of the **same model
-    type**. Use it only for single-model studies; the default `accuracy` is
+    type**. Use it only for single-model studies; the default `f1` is
     comparable across the whole search space.
 
 !!! note "Grid search"

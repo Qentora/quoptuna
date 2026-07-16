@@ -4,14 +4,19 @@ from typing import Optional
 
 import numpy as np
 from optuna import Trial, TrialPruned, create_study, load_study
+from optuna.distributions import CategoricalDistribution
 from optuna.pruners import HyperbandPruner, NopPruner, SuccessiveHalvingPruner
 from optuna.samplers import GridSampler, RandomSampler, TPESampler
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.metrics import accuracy_score, f1_score
 
 from quoptuna.backend.base.pennylane_models.device import resolve_dev_type
-from quoptuna.backend.models import create_model
-from quoptuna.backend.utils.data_utils.data import load_data, preprocess_data
+from quoptuna.backend.models import MODEL_PARAM_KEYS, create_model
+from quoptuna.backend.utils.data_utils.data import (
+    load_data,
+    preprocess_data,
+    stratified_train_test_split,
+)
 from quoptuna.backend.utils.storage import ensure_db_dir, optuna_db_path
 from quoptuna.backend.xai.fairness import FAIRNESS_METRICS, WORST_DISPARITY, compute_disparity
 
@@ -52,6 +57,9 @@ DEFAULT_SEARCH_SPACE: dict = {
     "alpha": [0.01, 0.001, 0.0001],
     "hidden_layer_sizes": ["(100,)", "(10, 10, 10, 10)", "(50, 10, 5)"],
     "eta0": [0.1, 1, 10],
+    # Imbalance handling for the classical models that accept it (only
+    # suggested for those, via the conditional per-model search space).
+    "class_weight": [None, "balanced"],
 }
 
 DEFAULT_MODEL_TYPES: list = [
@@ -87,7 +95,7 @@ class Optimizer:
         pruner: str = "asha",
         pruner_min_resource: int = 1,
         pruner_reduction_factor: int = 3,
-        intermediate_metric: str = "accuracy",
+        intermediate_metric: str = "f1",
         max_steps: Optional[int] = None,  # noqa: FA100
         convergence_interval: Optional[int] = None,  # noqa: FA100
         max_vmap: Optional[int] = None,  # noqa: FA100
@@ -118,9 +126,11 @@ class Optimizer:
                 units of intermediate reports.
             pruner_reduction_factor: ASHA/Hyperband reduction factor.
             intermediate_metric: What iterative models report for pruning:
-                "accuracy" (validation accuracy, comparable across model types)
-                or "neg_loss" (negated recent training loss; cheaper, but only
-                meaningful when a single model type is searched).
+                "f1" (default; validation F1 with the objective's averaging —
+                keeps pruning aligned with the objective on imbalanced data),
+                "accuracy" (validation accuracy), or "neg_loss" (negated
+                recent training loss; cheaper, but only meaningful when a
+                single model type is searched).
             max_steps: Optional cap on training steps for iterative models.
             convergence_interval: Optional override of the models' flat-loss
                 convergence window (also the cadence of pruning reports).
@@ -165,10 +175,11 @@ class Optimizer:
         else:
             self.data_path = ""
         self.data = data or {}  # Use an empty dictionary if no data is provided
-        self.train_x = self.data.get("train_x")
-        self.test_x = self.data.get("test_x")
-        self.train_y = self.data.get("train_y")
-        self.test_y = self.data.get("test_y")
+        self.train_x, self.train_y = self.data.get("train_x"), self.data.get("train_y")
+        self.test_x, self.test_y = self.data.get("test_x"), self.data.get("test_y")
+        # Validation split (carved from train at optimize() time); used for
+        # objective scoring and pruning reports. Test stays for reporting.
+        self.val_x = self.val_y = None
         ensure_db_dir()
         self.data_path = str(optuna_db_path(self.db_name))
         self.storage_location = f"sqlite:///{self.data_path}"
@@ -295,6 +306,12 @@ class Optimizer:
         if self.sampler == "grid":
             # All hyperparameters are categorical, so the search space doubles
             # as a grid. Note the grid may be exhausted before n_trials.
+            # The grid stays a flat snapshot even though the objective
+            # suggests parameters conditionally per model: GridSampler
+            # pre-assigns every grid key per trial and conditional suggests
+            # simply consume the pre-assigned values (unsuggested keys are
+            # ignored), so grid cells differing only in irrelevant params are
+            # redundant but valid.
             return GridSampler(
                 {**self.search_space, "model_type": self.model_types},
                 seed=self.sampler_seed,
@@ -333,16 +350,27 @@ class Optimizer:
         self.train_x, self.test_x, self.train_y, self.test_y = preprocess_data(self.X, self.y)
 
     def objective(self, trial: Trial):
+        # Idempotent: covers direct objective() callers (tests, FixedTrial
+        # evaluations) that bypass optimize().
+        self._ensure_validation_split()
         model = None
         try:
             # Sample one value per hyperparameter from the (possibly reduced)
             # search space. Insertion order is preserved for reproducibility.
+            # Conditional search space: suggest the model first, then only the
+            # hyperparameters that model actually uses — irrelevant params
+            # would otherwise pollute TPE's model of good/bad regions.
+            # Iterating self.search_space preserves insertion order and the
+            # intersection semantics of caller-reduced spaces. Unknown model
+            # types (custom registrations in tests) fall back to the full
+            # flat space.
+            model_type = trial.suggest_categorical("model_type", self.model_types)
+            allowed = MODEL_PARAM_KEYS.get(model_type)
             params = {
                 name: trial.suggest_categorical(name, choices)
                 for name, choices in self.search_space.items()
+                if allowed is None or name in allowed
             }
-
-            model_type = trial.suggest_categorical("model_type", self.model_types)
 
             model = create_model(
                 model_type,
@@ -356,9 +384,16 @@ class Optimizer:
             self._attach_pruning_callback(trial, model)
             self._fit_and_record_convergence(trial, model)
 
-            # Single inference pass: quantum predicts are expensive (K circuit
-            # sweeps per pass for OvR); score/accuracy derive from the same
-            # predictions.
+            # The objective is scored on the validation split so model
+            # selection doesn't tune to the test set; test metrics are still
+            # computed (one inference pass each — quantum predicts are
+            # expensive) and logged under their existing user-attr names so
+            # the Analyze tab and reports stay consistent.
+            val_pred = model.predict(self.val_x)
+            val_f1 = f1_score(
+                self.val_y, val_pred, average=self.f1_average, zero_division=0
+            )
+            val_f1 = self._tune_decision_threshold(trial, model, float(val_f1))
             y_pred = model.predict(self.test_x)
             f_score_ = f1_score(self.test_y, y_pred, average=self.f1_average)
             acc_ = accuracy_score(self.test_y, y_pred)
@@ -369,14 +404,18 @@ class Optimizer:
                 {"accuracy": acc_, "f1_score": f_score_, "score": score},
                 trial,
             )
+            trial.set_user_attr("val_f1_score", float(val_f1))
             self._log_resource_attributes(trial, model)
 
             if self.fairness_mode != "off":
+                # Fairness stays on the test split: sensitive_test is
+                # positionally aligned to it, and no sensitive attribute is
+                # available for the train-derived validation split.
                 disparity = self._record_fairness(trial, y_pred)
                 if self.fairness_mode == "multi_objective":
-                    return f_score_, disparity
+                    return val_f1, disparity
 
-            return f_score_  # noqa: TRY300
+            return val_f1  # noqa: TRY300
         except TrialPruned:
             # Must be re-raised before the generic handler below: pruning is a
             # normal ASHA outcome, not a failure. Resource attrs are still
@@ -392,6 +431,57 @@ class Optimizer:
             trial.set_user_attr("error", f"{type(e).__name__}: {e}")
             self._log_resource_attributes(trial, model)
             raise
+
+    THRESHOLD_GRID = np.linspace(0.05, 0.95, 19)
+
+    def _tune_decision_threshold(self, trial: Trial, model, base_val_f1: float) -> float:
+        """Sweep the binary decision threshold on the validation split.
+
+        Unweighted losses on imbalanced data often yield well-ranked
+        probabilities with a bad default 0.5 cutoff; tuning the cutoff on
+        validation recovers minority-class F1 without touching training.
+        Returns the best thresholded validation F1 (or ``base_val_f1``
+        unchanged for multiclass / models without predict_proba / failures).
+        The threshold is recorded as the ``decision_threshold`` user attr;
+        the reported test-side ``f1_score`` attr stays unthresholded (Analyze
+        recomputes without it), with ``f1_score_thresholded`` alongside.
+        """
+        if self.n_classes > 2 or not hasattr(model, "predict_proba"):  # noqa: PLR2004
+            return base_val_f1
+        try:
+            classes = np.sort(np.unique(np.asarray(self.train_y).ravel()))
+            neg_label, pos_label = classes[0], classes[-1]
+            # predict_proba columns are ordered [P(neg), P(pos)] for the
+            # {-1,+1} quantum models and follow classes_ for sklearn.
+            val_proba = np.asarray(model.predict_proba(self.val_x))[:, 1]
+            scores = [
+                f1_score(
+                    self.val_y,
+                    np.where(val_proba >= t, pos_label, neg_label),
+                    average=self.f1_average,
+                    zero_division=0,
+                )
+                for t in self.THRESHOLD_GRID
+            ]
+            best_idx = int(np.argmax(scores))
+            best_f1 = float(scores[best_idx])
+            if best_f1 <= base_val_f1:
+                return base_val_f1
+            threshold = float(self.THRESHOLD_GRID[best_idx])
+            test_proba = np.asarray(model.predict_proba(self.test_x))[:, 1]
+            test_f1_thresholded = f1_score(
+                self.test_y,
+                np.where(test_proba >= threshold, pos_label, neg_label),
+                average=self.f1_average,
+                zero_division=0,
+            )
+            trial.set_user_attr("decision_threshold", threshold)
+            trial.set_user_attr("val_f1_unthresholded", base_val_f1)
+            trial.set_user_attr("f1_score_thresholded", float(test_f1_thresholded))
+        except Exception as exc:  # noqa: BLE001 - tuning must never fail a trial
+            logger.warning("Decision-threshold tuning skipped: %s", exc)
+            return base_val_f1
+        return best_f1
 
     def _attach_pruning_callback(self, trial: Trial, model) -> None:
         """Attach the per-step pruning hook where the model supports it.
@@ -465,19 +555,29 @@ class Optimizer:
         operate in units of intermediate reports as documented. Raw steps
         would let a single report jump several ASHA rungs at once.
         """
-        test_x = self.test_x
-        test_y = self.test_y
-        if test_x is None or test_y is None:
-            msg = "Pruning callback requires test features and labels"
+        if self.val_x is None or self.val_y is None:
+            msg = "Pruning callback requires validation features and labels"
             raise ValueError(msg)
-        val_x = test_x[: self.VALIDATION_SUBSET_SIZE]
-        val_y = test_y[: self.VALIDATION_SUBSET_SIZE]
+        val_x = self.val_x[: self.VALIDATION_SUBSET_SIZE]
+        val_y = self.val_y[: self.VALIDATION_SUBSET_SIZE]
         report_count = {"n": 0}
 
         def callback(step, loss_history):
             if self.intermediate_metric == "neg_loss":
                 window = getattr(model, "convergence_interval", 200)
                 value = -float(np.mean(loss_history[-window:]))
+            elif self.intermediate_metric == "f1":
+                # Match the objective: on imbalanced data, accuracy would let
+                # majority-class predictors survive pruning while the trials
+                # actually learning the minority class get killed.
+                value = float(
+                    f1_score(
+                        val_y,
+                        model.predict(val_x),
+                        average=self.f1_average,
+                        zero_division=0,
+                    )
+                )
             else:
                 value = float(accuracy_score(val_y, model.predict(val_x)))
             report_index = report_count["n"]
@@ -590,7 +690,80 @@ class Optimizer:
                 raise last_exc from None
             raise
 
+    def _check_resume_compatibility(self, study) -> None:
+        """Fail fast when resuming a study whose stored choices conflict.
+
+        Optuna forbids changing a parameter's categorical choices within a
+        study ("CategoricalDistribution does not support dynamic value
+        space"). Without this check, a study created under older defaults
+        (e.g. max_vmap [1]) fails every new trial with that cryptic error;
+        here we raise one clear, actionable error instead.
+        """
+        stored: dict = {}
+        for t in study.trials:
+            for name, dist in t.distributions.items():
+                if isinstance(dist, CategoricalDistribution) and name not in stored:
+                    stored[name] = list(dist.choices)
+        if not stored:
+            return
+        current = {**self.search_space, "model_type": list(self.model_types)}
+        conflicts = {
+            name: (choices, list(current[name]))
+            for name, choices in stored.items()
+            if name in current and list(current[name]) != choices
+        }
+        if conflicts:
+            detail = "; ".join(
+                f"{name}: stored {old} vs current {new}"
+                for name, (old, new) in sorted(conflicts.items())
+            )
+            msg = (
+                f"Study {study.study_name!r} was created with different "
+                f"hyperparameter choices ({detail}). An Optuna study's "
+                "parameter choices are immutable — use a new study name "
+                "(or pass a matching search_space) to continue."
+            )
+            raise ValueError(msg)
+
+    MIN_TRAIN_ROWS_FOR_VAL_SPLIT = 10
+
+    def _ensure_validation_split(self):
+        """Carve a validation split out of TRAIN (idempotent).
+
+        The objective and pruning reports are scored on this split so model
+        selection doesn't tune to the test set (which Analyze/reports use for
+        final metrics). On tiny datasets where a further split is not viable,
+        fall back to validating on the test split (the previous behavior).
+        """
+        if self.val_x is not None:
+            return
+        train_y = np.asarray(self.train_y).ravel()
+        if len(train_y) >= self.MIN_TRAIN_ROWS_FOR_VAL_SPLIT:
+            try:
+                self.train_x, self.val_x, self.train_y, self.val_y = (
+                    stratified_train_test_split(
+                        self.train_x, train_y, test_size=0.2, random_state=42
+                    )
+                )
+            except ValueError:
+                logger.warning("Validation split failed; validating on the test split.")
+        else:
+            logger.warning(
+                "Train set too small (%d rows) for a validation split; "
+                "validating on the test split.",
+                len(train_y),
+            )
+        if self.val_x is None:
+            self.val_x = self.test_x
+            self.val_y = self.test_y
+
     def optimize(self, n_trials=100):
+        """Run the study.
+
+        Note: ``study.best_value`` is the *validation* F1; the corresponding
+        test-set metrics live in each trial's user attrs (``f1_score``,
+        ``accuracy``).
+        """
         if (
             self.train_x is None
             or self.test_x is None
@@ -598,12 +771,14 @@ class Optimizer:
             or self.test_y is None
         ):
             self.load_and_preprocess_data()
+        self._ensure_validation_split()
         # database  stored in a db folder "db"
 
         # sqllite database
 
         study = self._create_or_load_study()
         self.study = study
+        self._check_resume_compatibility(study)
         if self.task_spec:
             # Persisted so analysis endpoints can recover the class structure
             # (kind, labels, favorable class) after a backend restart.

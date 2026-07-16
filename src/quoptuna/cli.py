@@ -386,6 +386,9 @@ def optimize(  # noqa: PLR0913
 
 
 def main() -> None:
+    from quoptuna.backend.utils.log_file import attach_file_logging  # noqa: PLC0415
+
+    attach_file_logging()
     app()
 
 

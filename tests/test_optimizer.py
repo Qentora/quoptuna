@@ -314,6 +314,203 @@ def test_pruner_reports_use_report_index(tiny_data, monkeypatch):
     assert sorted(trial.intermediate_values.keys()) == [0, 1, 2, 3]
 
 
+def test_conditional_search_space_suggests_only_model_params(tiny_data, monkeypatch):
+    """Each trial's params must be limited to the sampled model's whitelist."""
+    from quoptuna.backend.models import MODEL_PARAM_KEYS  # noqa: PLC0415
+
+    monkeypatch.setattr(
+        optimizer_module,
+        "create_model",
+        lambda model_type, **kwargs: _FakeModel(model_type=model_type),
+    )
+    opt = Optimizer(
+        db_name="unit_cond",
+        study_name="cond_study",
+        data=tiny_data,
+        model_types=["SVC", "Perceptron", "DataReuploadingClassifier"],
+        sampler="random",
+        sampler_seed=0,
+    )
+    study, _ = opt.optimize(n_trials=6)
+    for trial in study.trials:
+        model_type = trial.params["model_type"]
+        allowed = set(MODEL_PARAM_KEYS[model_type]) | {"model_type"}
+        assert set(trial.params) <= allowed
+        # And nothing the model uses (that the space covers) is missing.
+        expected = {k for k in MODEL_PARAM_KEYS[model_type] if k in DEFAULT_SEARCH_SPACE}
+        assert expected <= set(trial.params)
+
+
+def test_validation_split_carved_from_train(tiny_data):
+    opt = Optimizer(db_name="unit_val", data=tiny_data)
+    opt._ensure_validation_split()
+    # 20 train rows -> 16 train / 4 val, stratified on the balanced labels.
+    assert len(opt.train_x) == 16  # noqa: PLR2004
+    assert len(opt.val_x) == 4  # noqa: PLR2004
+    assert set(np.asarray(opt.val_y).tolist()) == {0, 1}
+    # Test split untouched, and the call is idempotent.
+    assert len(opt.test_x) == len(tiny_data["test_x"])
+    train_before = opt.train_x
+    opt._ensure_validation_split()
+    assert opt.train_x is train_before
+
+
+def test_validation_split_falls_back_to_test_on_tiny_train():
+    rng = np.random.default_rng(0)
+    data = {
+        "train_x": rng.normal(size=(6, 2)),
+        "train_y": np.array([0, 1] * 3),
+        "test_x": rng.normal(size=(4, 2)),
+        "test_y": np.array([0, 1, 0, 1]),
+    }
+    opt = Optimizer(db_name="unit_val_tiny", data=data)
+    opt._ensure_validation_split()
+    assert opt.val_x is opt.test_x
+    assert opt.val_y is opt.test_y
+
+
+def test_stratified_split_preserves_minority_class():
+    from quoptuna.backend.utils.data_utils.data import (  # noqa: PLC0415
+        stratified_train_test_split,
+    )
+
+    rng = np.random.default_rng(0)
+    x = rng.normal(size=(40, 2))
+    y = np.array([1] * 8 + [0] * 32)  # 20% minority
+    _, _, y_train, y_test = stratified_train_test_split(x, y, random_state=42)
+    assert (np.asarray(y_train) == 1).sum() > 0
+    assert (np.asarray(y_test) == 1).sum() > 0
+    # Single-member class: falls back to unstratified without raising.
+    y_degenerate = np.array([1] + [0] * 39)
+    stratified_train_test_split(x, y_degenerate, random_state=42)
+
+
+def test_objective_returns_validation_f1(tiny_data, monkeypatch):
+    from sklearn.metrics import f1_score  # noqa: PLC0415
+
+    monkeypatch.setattr(
+        optimizer_module,
+        "create_model",
+        lambda model_type, **kwargs: _FakeModel(model_type=model_type),
+    )
+    opt = Optimizer(
+        db_name="unit_valobj",
+        data=tiny_data,
+        model_types=["SVC"],
+        search_space=TINY_SEARCH_SPACE,
+    )
+    trial = FixedTrial({"C": 1.0, "model_type": "SVC"})
+    value = opt.objective(trial)
+    fake_pred = np.resize(np.array([0, 1]), len(opt.val_x))
+    assert value == pytest.approx(f1_score(opt.val_y, fake_pred, zero_division=0))
+    # Test metrics still logged under the existing (prefixed) names.
+    attrs = trial.user_attrs
+    test_pred = np.resize(np.array([0, 1]), len(opt.test_x))
+    assert attrs["Classical_f1_score"] == pytest.approx(f1_score(opt.test_y, test_pred))
+    assert attrs["val_f1_score"] == pytest.approx(value)
+
+
+def test_class_weight_reaches_classical_models():
+    from quoptuna.backend.models import create_model  # noqa: PLC0415
+
+    assert "class_weight" in DEFAULT_SEARCH_SPACE
+    svc = create_model("SVC", C=1.0, gamma=0.1, class_weight="balanced")
+    assert svc.class_weight == "balanced"
+    # Default path (key absent -> None) unchanged.
+    assert create_model("SVC", C=1.0, gamma=0.1).class_weight is None
+
+
+def test_decision_threshold_tuning_improves_val_f1(monkeypatch):
+    """A model with well-ranked probabilities but a bad 0.5 cutoff must get a
+    tuned threshold and a higher objective value."""
+
+    class _ProbaModel(_FakeModel):
+        def fit(self, _x, _y):
+            return self
+
+        def predict(self, x):
+            # Default cutoff predicts all-negative -> F1 = 0.
+            return np.zeros(len(x))
+
+        def predict_proba(self, x):
+            # Perfectly ranked but compressed probabilities: the first
+            # feature encodes the true label (positives ~0.4, negatives ~0.2)
+            # so ranking survives any row shuffling by the splits.
+            pos = np.where(np.asarray(x)[:, 0] > 0.5, 0.4, 0.2)  # noqa: PLR2004
+            return np.column_stack([1 - pos, pos])
+
+    labels = np.array([0, 1] * 10)
+    features = np.column_stack([labels.astype(float), np.zeros(20)])
+    data = {"train_x": features, "train_y": labels, "test_x": features, "test_y": labels}
+    monkeypatch.setattr(
+        optimizer_module,
+        "create_model",
+        lambda model_type, **kwargs: _ProbaModel(model_type=model_type),
+    )
+    opt = Optimizer(
+        db_name="unit_thresh",
+        data=data,
+        model_types=["SVC"],
+        search_space=TINY_SEARCH_SPACE,
+    )
+    trial = FixedTrial({"C": 1.0, "model_type": "SVC"})
+    value = opt.objective(trial)
+    attrs = trial.user_attrs
+    assert attrs["val_f1_unthresholded"] == 0.0
+    assert 0.2 < attrs["decision_threshold"] <= 0.4  # noqa: PLR2004
+    assert value == 1.0  # threshold between the two bands separates perfectly
+    assert attrs["f1_score_thresholded"] == 1.0
+
+
+def test_threshold_tuning_skipped_without_predict_proba(tiny_data, monkeypatch):
+    monkeypatch.setattr(
+        optimizer_module,
+        "create_model",
+        lambda model_type, **kwargs: _FakeModel(model_type=model_type),
+    )
+    opt = Optimizer(
+        db_name="unit_nothresh",
+        data=tiny_data,
+        model_types=["SVC"],
+        search_space=TINY_SEARCH_SPACE,
+    )
+    trial = FixedTrial({"C": 1.0, "model_type": "SVC"})
+    opt.objective(trial)
+    assert "decision_threshold" not in trial.user_attrs
+
+
+def test_default_intermediate_metric_is_f1():
+    assert Optimizer(db_name="unit_im").intermediate_metric == "f1"
+
+
+def test_f1_intermediate_metric_reports_f1_values(tiny_data, monkeypatch):
+    """The 'f1' intermediate metric must report validation F1, not accuracy."""
+    from sklearn.metrics import f1_score  # noqa: PLC0415
+
+    monkeypatch.setattr(
+        optimizer_module,
+        "create_model",
+        lambda model_type, **kwargs: _FakeIterativeModel(model_type=model_type, **kwargs),
+    )
+    opt = Optimizer(
+        db_name="unit_f1im",
+        study_name="f1im_study",
+        data=tiny_data,
+        model_types=["DataReuploadingClassifier"],
+        search_space=TINY_SEARCH_SPACE,
+        pruner="asha",
+        intermediate_metric="f1",
+    )
+    study, _ = opt.optimize(n_trials=1)
+    (trial,) = study.trials
+    # _FakeIterativeModel.predict alternates [0,1,...]; expected F1 on the
+    # 128-row-capped validation split (carved from train).
+    val_x = opt.val_x[: Optimizer.VALIDATION_SUBSET_SIZE]
+    val_y = opt.val_y[: Optimizer.VALIDATION_SUBSET_SIZE]
+    expected = f1_score(val_y, np.resize(np.array([0, 1]), len(val_x)), zero_division=0)
+    assert trial.intermediate_values[0] == pytest.approx(expected)
+
+
 def test_unconverged_trial_is_scored_not_failed(tiny_data, monkeypatch):
     """ConvergenceWarning from the training loop must not waste the trial:
     the partially-trained model is scored and the trial completes."""
@@ -363,6 +560,33 @@ def test_default_max_vmap_vectorizes_full_batch():
     for v in DEFAULT_SEARCH_SPACE["max_vmap"]:
         for b in DEFAULT_SEARCH_SPACE["batch_size"]:
             assert b % v == 0
+
+
+def test_resume_with_conflicting_choices_fails_fast(tiny_data, monkeypatch):
+    monkeypatch.setattr(
+        optimizer_module,
+        "create_model",
+        lambda model_type, **kwargs: _FakeModel(model_type=model_type),
+    )
+    common = {
+        "db_name": "unit_resume",
+        "study_name": "resume_conflict",
+        "data": tiny_data,
+        # Must be a model whose whitelist includes max_vmap, so the param is
+        # actually suggested (conditional search space) and stored.
+        "model_types": ["DataReuploadingClassifier"],
+    }
+    Optimizer(**common, search_space={"max_vmap": [1], "batch_size": [32]}).optimize(n_trials=1)
+    # Same study, changed choices -> one clear error, before any trial runs.
+    with pytest.raises(ValueError, match="new study name"):
+        Optimizer(**common, search_space={"max_vmap": [32], "batch_size": [32]}).optimize(
+            n_trials=1
+        )
+    # Identical choices resume fine.
+    study, _ = Optimizer(**common, search_space={"max_vmap": [1], "batch_size": [32]}).optimize(
+        n_trials=1
+    )
+    assert len(study.trials) == EXPECTED_TRIALS
 
 
 def test_non_dividing_max_vmap_fails_fast():
