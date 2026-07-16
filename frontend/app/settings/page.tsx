@@ -16,8 +16,11 @@ import {
 import {
   DEFAULT_CONVERGENCE_INTERVAL,
   DEFAULT_DATABASE_NAME,
+  DEFAULT_DEV_TYPE,
   DEFAULT_MAX_STEPS,
   DEFAULT_MAX_VMAP,
+  DEV_TYPE_OPTIONS,
+  type DevType,
   MAX_VMAP_OPTIONS,
   loadAppSettings,
   saveAppSettings,
@@ -123,10 +126,12 @@ export default function SettingsPage() {
   const [convergenceInterval, setConvergenceInterval] = useState(
     String(DEFAULT_CONVERGENCE_INTERVAL)
   );
+  const [devType, setDevType] = useState<DevType>(DEFAULT_DEV_TYPE);
   const [savedOptimizer, setSavedOptimizer] = useState({
     maxVmap: String(DEFAULT_MAX_VMAP),
     maxSteps: String(DEFAULT_MAX_STEPS),
     convergenceInterval: String(DEFAULT_CONVERGENCE_INTERVAL),
+    devType: DEFAULT_DEV_TYPE as DevType,
   });
 
   useEffect(() => {
@@ -143,10 +148,14 @@ export default function SettingsPage() {
       maxVmap: String(appSettings.maxVmap),
       maxSteps: String(appSettings.maxSteps),
       convergenceInterval: String(appSettings.convergenceInterval),
+      devType: DEV_TYPE_OPTIONS.includes(appSettings.devType)
+        ? appSettings.devType
+        : DEFAULT_DEV_TYPE,
     };
     setMaxVmap(optimizer.maxVmap);
     setMaxSteps(optimizer.maxSteps);
     setConvergenceInterval(optimizer.convergenceInterval);
+    setDevType(optimizer.devType);
     setSavedOptimizer(optimizer);
   }, []);
 
@@ -155,7 +164,8 @@ export default function SettingsPage() {
     databaseName !== savedDatabaseName ||
     maxVmap !== savedOptimizer.maxVmap ||
     maxSteps !== savedOptimizer.maxSteps ||
-    convergenceInterval !== savedOptimizer.convergenceInterval;
+    convergenceInterval !== savedOptimizer.convergenceInterval ||
+    devType !== savedOptimizer.devType;
 
   const parsePositiveInt = (raw: string, fallback: number): number => {
     const n = Math.floor(Number(raw));
@@ -172,6 +182,7 @@ export default function SettingsPage() {
         maxVmap: parsePositiveInt(maxVmap, DEFAULT_MAX_VMAP),
         maxSteps: parsePositiveInt(maxSteps, DEFAULT_MAX_STEPS),
         convergenceInterval: parsePositiveInt(convergenceInterval, DEFAULT_CONVERGENCE_INTERVAL),
+        devType,
       };
       saveAppSettings({ databaseName: name, ...optimizerValues });
       setDatabaseName(name);
@@ -180,10 +191,12 @@ export default function SettingsPage() {
         maxVmap: String(optimizerValues.maxVmap),
         maxSteps: String(optimizerValues.maxSteps),
         convergenceInterval: String(optimizerValues.convergenceInterval),
+        devType,
       };
       setMaxVmap(optimizer.maxVmap);
       setMaxSteps(optimizer.maxSteps);
       setConvergenceInterval(optimizer.convergenceInterval);
+      setDevType(optimizer.devType);
       setSavedOptimizer(optimizer);
       toast.success('Settings saved');
     } catch {
@@ -294,6 +307,28 @@ export default function SettingsPage() {
               <FieldDescription>
                 Quantum circuit evaluations vectorized per JAX call. Higher is much faster on small
                 datasets but uses more memory. Must divide the batch size (32).
+              </FieldDescription>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="dev-type">Quantum simulator</FieldLabel>
+              <Select value={devType} onValueChange={(v) => setDevType(v as DevType)}>
+                <SelectTrigger id="dev-type" className="w-full max-w-xs">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  {DEV_TYPE_OPTIONS.map((v) => (
+                    <SelectItem key={v} value={v}>
+                      {v}
+                      {v === 'lightning.qubit' ? ' (faster)' : ' (default)'}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                PennyLane device used to simulate quantum circuits. lightning.qubit is a C++
+                state-vector simulator that is usually faster; the backend falls back to
+                default.qubit if it is unavailable.
               </FieldDescription>
             </Field>
 

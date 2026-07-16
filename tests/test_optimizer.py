@@ -206,6 +206,12 @@ def test_build_pruner_variants():
         Optimizer(db_name="unit", pruner="bogus")._build_pruner()
 
 
+def test_default_pruner_is_asha():
+    opt = Optimizer(db_name="unit_default_pruner")
+    assert opt.pruner == "asha"
+    assert type(opt._build_pruner()).__name__ == "SuccessiveHalvingPruner"
+
+
 class _FakeIterativeModel(_FakeModel):
     """Fake with the iterative-training surface (max_steps + callback use)."""
 
@@ -274,6 +280,7 @@ def test_optimize_without_pruner_attaches_no_callback(tiny_data, monkeypatch):
         data=tiny_data,
         model_types=["DataReuploadingClassifier"],
         search_space=TINY_SEARCH_SPACE,
+        pruner="none",
     )
     study, _ = opt.optimize(n_trials=1)
     assert all(not hasattr(m, "training_callback") for m in created)
@@ -348,6 +355,25 @@ def test_max_vmap_override_replaces_search_space_entry():
     # No-op when the (custom) space has no max_vmap key.
     opt2 = Optimizer(db_name="unit_vmap2", search_space={"C": [1.0]}, max_vmap=32)
     assert "max_vmap" not in opt2.search_space
+
+
+def test_default_max_vmap_vectorizes_full_batch():
+    # Vectorized default: one vmap call per batch, not 32 size-1 calls.
+    assert DEFAULT_SEARCH_SPACE["max_vmap"] == [32]
+    for v in DEFAULT_SEARCH_SPACE["max_vmap"]:
+        for b in DEFAULT_SEARCH_SPACE["batch_size"]:
+            assert b % v == 0
+
+
+def test_non_dividing_max_vmap_fails_fast():
+    with pytest.raises(ValueError, match="must divide"):
+        Optimizer(
+            db_name="unit_vmap_bad",
+            search_space={"max_vmap": [3], "batch_size": [32]},
+        )
+    # Override path is validated too.
+    with pytest.raises(ValueError, match="must divide"):
+        Optimizer(db_name="unit_vmap_bad2", max_vmap=5)
 
 
 def test_convergence_interval_reaches_create_model(tiny_data, monkeypatch):

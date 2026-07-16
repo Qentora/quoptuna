@@ -2,6 +2,7 @@
 Optimization endpoints
 """
 
+import logging
 import uuid
 from datetime import datetime
 from typing import Any, Dict, List, Literal, Optional
@@ -13,6 +14,8 @@ from pydantic import BaseModel, ConfigDict, Field, model_validator
 from quoptuna.server.services import dataset_registry, run_store
 from quoptuna.server.services.storage import optuna_storage_url
 from quoptuna.server.services.workflow_service import WorkflowExecutor
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter()
 
@@ -57,10 +60,10 @@ class OptimizationRequest(BaseModel):
     model_types: Optional[List[str]] = None
     search_space: Optional[Dict[str, List[Any]]] = None
     # Search strategy: sampler ("tpe"/"random"/"grid") and pruner
-    # ("none"/"asha"/"hyperband") for early-stopping unpromising trials.
+    # ("asha"/"hyperband"/"none") for early-stopping unpromising trials.
     sampler: Literal["tpe", "random", "grid"] = "tpe"
     sampler_seed: Optional[int] = None
-    pruner: Literal["none", "asha", "hyperband"] = "none"
+    pruner: Literal["none", "asha", "hyperband"] = "asha"
     pruner_min_resource: int = 1
     pruner_reduction_factor: int = 3
     # Intermediate value iterative models report for pruning decisions.
@@ -73,6 +76,9 @@ class OptimizationRequest(BaseModel):
     # Optional override of circuit-evaluation vectorization width; must divide
     # the batch size (32 in the default search space).
     max_vmap: Optional[int] = Field(default=None, ge=1)
+    # PennyLane simulator for quantum models; lightning.qubit (C++ state
+    # vector) is usually faster. Falls back to default.qubit if unavailable.
+    dev_type: Literal["default.qubit", "lightning.qubit"] = "default.qubit"
     # Fairness-aware search: "constrained" adds a TPE feasibility constraint on
     # the disparity; "multi_objective" searches the F1-vs-disparity Pareto front.
     fairness_mode: Literal["off", "constrained", "multi_objective"] = "off"
@@ -95,8 +101,14 @@ class OptimizationRequest(BaseModel):
             msg = "fairness_mode='constrained' requires sampler='tpe' (constraints are TPE-only)"
             raise ValueError(msg)
         if self.fairness_mode == "multi_objective" and self.pruner != "none":
-            msg = "fairness_mode='multi_objective' does not support pruning; set pruner='none'"
-            raise ValueError(msg)
+            # Coerce rather than reject: pruning is genuinely unsupported on
+            # multi-objective studies, and rejecting would 422 requests that
+            # simply left the pruner at its "asha" default.
+            logger.warning(
+                "pruner=%r is unsupported with fairness_mode='multi_objective'; using 'none'.",
+                self.pruner,
+            )
+            self.pruner = "none"
         return self
 
 
@@ -191,6 +203,7 @@ def build_workflow(
                     "max_steps": request.max_steps,
                     "convergence_interval": request.convergence_interval,
                     "max_vmap": request.max_vmap,
+                    "dev_type": request.dev_type,
                     "fairness_mode": request.fairness_mode,
                     "fairness_metric": request.fairness_metric,
                     "fairness_threshold": request.fairness_threshold,

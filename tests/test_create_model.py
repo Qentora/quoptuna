@@ -218,3 +218,24 @@ def test_create_perceptron():
 def test_unknown_model_type():
     with pytest.raises(UnknownModelTypeError):
         create_model("UnknownModel")
+
+
+def test_dev_type_reaches_quantum_models_only():
+    quantum = create_model("DataReuploadingClassifier", max_vmap=1, dev_type="lightning.qubit")
+    assert quantum.dev_type == "lightning.qubit"
+    # Classical models don't accept dev_type; it must be silently dropped.
+    classical = create_model("SVC", C=1.0, dev_type="lightning.qubit")
+    assert not hasattr(classical, "dev_type")
+
+
+def test_dev_type_defaults_untouched_when_absent():
+    model = create_model("DataReuploadingClassifier", max_vmap=1)
+    assert model.dev_type == "default.qubit"
+
+
+def test_resolve_dev_type_fallback():
+    from quoptuna.backend.base.pennylane_models.device import resolve_dev_type  # noqa: PLC0415
+
+    assert resolve_dev_type("default.qubit") == "default.qubit"
+    assert resolve_dev_type("lightning.qubit") == "lightning.qubit"
+    assert resolve_dev_type("bogus.device") == "default.qubit"

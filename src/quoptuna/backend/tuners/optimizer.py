@@ -9,6 +9,7 @@ from optuna.samplers import GridSampler, RandomSampler, TPESampler
 from sklearn.exceptions import ConvergenceWarning
 from sklearn.metrics import accuracy_score, f1_score
 
+from quoptuna.backend.base.pennylane_models.device import resolve_dev_type
 from quoptuna.backend.models import create_model
 from quoptuna.backend.utils.data_utils.data import load_data, preprocess_data
 from quoptuna.backend.utils.storage import ensure_db_dir, optuna_db_path
@@ -23,7 +24,10 @@ logger = logging.getLogger(__name__)
 # (e.g. tests) can pass a reduced ``search_space``/``model_types`` to the
 # ``Optimizer`` to shrink the search and speed up runs.
 DEFAULT_SEARCH_SPACE: dict = {
-    "max_vmap": [1],
+    # Every max_vmap choice must divide every batch_size choice (enforced at
+    # fit time by model_utils.train); 32 vectorizes the whole default batch
+    # in a single JAX vmap call instead of 32 size-1 circuit evaluations.
+    "max_vmap": [32],
     "batch_size": [32],
     "learning_rate": [0.001, 0.01, 0.1],
     "n_input_copies": [1, 2, 3],
@@ -80,13 +84,14 @@ class Optimizer:
         search_space: Optional[dict] = None,  # noqa: FA100
         sampler: str = "tpe",
         sampler_seed: Optional[int] = None,  # noqa: FA100
-        pruner: str = "none",
+        pruner: str = "asha",
         pruner_min_resource: int = 1,
         pruner_reduction_factor: int = 3,
         intermediate_metric: str = "accuracy",
         max_steps: Optional[int] = None,  # noqa: FA100
         convergence_interval: Optional[int] = None,  # noqa: FA100
         max_vmap: Optional[int] = None,  # noqa: FA100
+        dev_type: str = "default.qubit",
         fairness_mode: str = "off",
         fairness_metric: str = "equal_opportunity_difference",
         fairness_threshold: Optional[float] = None,  # noqa: FA100
@@ -105,8 +110,10 @@ class Optimizer:
             study_name: The name of the study for Optuna. Defaults to an empty string.
             sampler: Optuna sampler to use: "tpe" (default), "random", or "grid".
             sampler_seed: Optional seed for the sampler (reproducible searches).
-            pruner: Optuna pruner: "none" (default), "asha" (asynchronous
-                successive halving), or "hyperband".
+            pruner: Optuna pruner: "asha" (default; asynchronous successive
+                halving), "hyperband", or "none". Coerced to "none" when
+                ``fairness_mode`` is "multi_objective" (pruning is
+                unsupported on multi-objective studies).
             pruner_min_resource: ASHA/Hyperband minimum resource (rung 0), in
                 units of intermediate reports.
             pruner_reduction_factor: ASHA/Hyperband reduction factor.
@@ -120,6 +127,10 @@ class Optimizer:
             max_vmap: Optional override of the ``max_vmap`` search-space entry
                 (circuit evaluations vectorized per JAX call). Must divide the
                 batch size.
+            dev_type: PennyLane simulator device for quantum models:
+                "default.qubit" (default) or "lightning.qubit" (C++
+                state-vector simulator, usually faster). Falls back to
+                "default.qubit" with a warning if unavailable.
             fairness_mode: "off" (default), "constrained" (single-objective F1
                 with a TPE feasibility constraint on the disparity), or
                 "multi_objective" (maximize F1, minimize disparity; Pareto
@@ -179,6 +190,9 @@ class Optimizer:
             # Override the vectorization width without touching other entries;
             # objective() keeps sampling it like any other hyperparameter.
             self.search_space = {**self.search_space, "max_vmap": [max_vmap]}
+        self._validate_vmap_batch_divisibility()
+        # Probe once per run, not per trial.
+        self.dev_type = resolve_dev_type(dev_type)
         # Task spec (see backend.task_type.TaskSpec.to_dict): binary targets
         # use the {-1,+1} convention and binary F1; multiclass targets use
         # integer codes 0..K-1, OvR-wrapped variational models and macro-F1.
@@ -207,6 +221,30 @@ class Optimizer:
         else:
             self._disparity_threshold = None
 
+    def _validate_vmap_batch_divisibility(self):
+        """Fail fast if any sampled max_vmap could not divide a batch_size.
+
+        model_utils.train raises at fit time for non-dividing pairs, which
+        would silently fail every trial of a study; catching it here surfaces
+        the misconfiguration before any trial runs.
+        """
+        vmap_choices = self.search_space.get("max_vmap")
+        batch_choices = self.search_space.get("batch_size")
+        if not vmap_choices or not batch_choices:
+            return
+        bad = [
+            (v, b)
+            for v in vmap_choices
+            for b in batch_choices
+            if isinstance(v, int) and isinstance(b, int) and b % v != 0
+        ]
+        if bad:
+            msg = (
+                "Every max_vmap choice must divide every batch_size choice; "
+                f"offending (max_vmap, batch_size) pairs: {bad}"
+            )
+            raise ValueError(msg)
+
     def _validate_fairness_config(self):
         if self.fairness_mode not in ("off", "constrained", "multi_objective"):
             msg = (
@@ -231,10 +269,13 @@ class Optimizer:
             msg = "fairness_mode='constrained' requires sampler='tpe'"
             raise ValueError(msg)
         if self.fairness_mode == "multi_objective" and self.pruner != "none":
-            # Optuna raises at trial.report()/should_prune() time for
-            # multi-objective studies; fail at config time instead.
-            msg = "fairness_mode='multi_objective' does not support pruning; set pruner='none'"
-            raise ValueError(msg)
+            # Optuna does not support pruning on multi-objective studies;
+            # coerce (instead of rejecting) so the "asha" default still works.
+            logger.warning(
+                "Pruner %r is unsupported with fairness_mode='multi_objective'; using 'none'.",
+                self.pruner,
+            )
+            self.pruner = "none"
 
     @staticmethod
     def _fairness_constraints(trial) -> tuple:
@@ -308,6 +349,7 @@ class Optimizer:
                 n_classes=self.n_classes,
                 max_steps=self.max_steps,
                 convergence_interval=self.convergence_interval,
+                dev_type=self.dev_type,
                 **params,
             )
 

@@ -1,5 +1,6 @@
 # import sklearn models
 import ast
+import inspect
 
 from sklearn.linear_model import Perceptron
 from sklearn.neural_network import MLPClassifier
@@ -167,6 +168,12 @@ def create_model(model_type, n_classes: int = BINARY_N_CLASSES, **kwargs):
             else hidden_layer_sizes
         )
         params["learning_rate_init"] = kwargs.get("learning_rate")
+
+    # Simulator device selection for quantum models. Detected by signature
+    # rather than a whitelist so classical sklearn models are auto-excluded.
+    dev_type = kwargs.get("dev_type")
+    if dev_type is not None and "dev_type" in inspect.signature(model_class.__init__).parameters:
+        params["dev_type"] = dev_type
 
     model = model_class(**params)
 

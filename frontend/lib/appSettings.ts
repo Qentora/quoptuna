@@ -18,6 +18,12 @@ export const DEFAULT_MAX_VMAP = 32;
 export const DEFAULT_MAX_STEPS = 2000;
 export const DEFAULT_CONVERGENCE_INTERVAL = 100;
 
+// PennyLane simulator for quantum models. lightning.qubit (C++ state vector)
+// is usually faster; the backend falls back to default.qubit if unavailable.
+export const DEV_TYPE_OPTIONS = ['default.qubit', 'lightning.qubit'] as const;
+export type DevType = (typeof DEV_TYPE_OPTIONS)[number];
+export const DEFAULT_DEV_TYPE: DevType = 'default.qubit';
+
 // train() requires batch_size % max_vmap == 0; batch size is 32 in the
 // default search space, so valid widths are its divisors.
 export const MAX_VMAP_OPTIONS = [1, 2, 4, 8, 16, 32] as const;
@@ -27,6 +33,7 @@ export interface AppSettings {
   maxVmap: number;
   maxSteps: number;
   convergenceInterval: number;
+  devType: DevType;
 }
 
 const DEFAULTS: AppSettings = {
@@ -34,6 +41,7 @@ const DEFAULTS: AppSettings = {
   maxVmap: DEFAULT_MAX_VMAP,
   maxSteps: DEFAULT_MAX_STEPS,
   convergenceInterval: DEFAULT_CONVERGENCE_INTERVAL,
+  devType: DEFAULT_DEV_TYPE,
 };
 
 export function loadAppSettings(): AppSettings {
@@ -68,15 +76,18 @@ export function getOptimizerSettings(): {
   maxVmap: number;
   maxSteps: number;
   convergenceInterval: number;
+  devType: DevType;
 } {
   const s = loadAppSettings();
   const rawVmap = sanitizeInt(s.maxVmap, DEFAULT_MAX_VMAP);
   // Snap to the largest valid divisor of the batch size (32) not above the
   // stored value, so a hand-edited localStorage value can't crash train().
   const maxVmap = [...MAX_VMAP_OPTIONS].reverse().find((v) => v <= rawVmap) ?? 1;
+  const devType = DEV_TYPE_OPTIONS.includes(s.devType) ? s.devType : DEFAULT_DEV_TYPE;
   return {
     maxVmap,
     maxSteps: sanitizeInt(s.maxSteps, DEFAULT_MAX_STEPS),
     convergenceInterval: sanitizeInt(s.convergenceInterval, DEFAULT_CONVERGENCE_INTERVAL),
+    devType,
   };
 }

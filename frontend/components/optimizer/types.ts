@@ -127,7 +127,7 @@ export const initialWorkflowData: WorkflowData = {
     studyName: 'my-optimization-study',
     numTrials: 50,
     sampler: 'tpe',
-    pruner: 'none',
+    pruner: 'asha',
     fairnessMode: 'off',
     fairnessMetric: 'equal_opportunity_difference',
     fairnessThreshold: null,

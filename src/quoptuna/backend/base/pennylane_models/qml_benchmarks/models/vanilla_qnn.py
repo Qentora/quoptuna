@@ -19,7 +19,9 @@ from sklearn.preprocessing import MinMaxScaler
 
 from quoptuna.backend.base.pennylane_models.qml_benchmarks.model_utils import *
 
-jax.config.update("jax_enable_x64", True)
+from quoptuna.backend.base.pennylane_models.qml_benchmarks import (  # noqa: E402
+    jax_config as _jax_config,  # applies the QUOPTUNA_JAX_X64 precision setting
+)
 
 
 class VanillaQNN(BaseEstimator, ClassifierMixin):
