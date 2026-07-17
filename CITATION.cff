@@ -1,0 +1,69 @@
+cff-version: 1.2.0
+message: "If you use QuOptuna in your research, please cite the IEEE SMC Magazine article below."
+title: "QuOptuna"
+type: software
+authors:
+  - family-names: Jose
+    given-names: Edwin
+    email: edwinjose900@gmail.com
+repository-code: "https://github.com/Qentora/quoptuna"
+url: "https://Qentora.github.io/quoptuna"
+license: Apache-2.0
+version: 0.1.3
+keywords:
+  - quantum-computing
+  - quantum-machine-learning
+  - hyperparameter-optimization
+  - optuna
+  - pennylane
+  - automl
+  - fairness
+  - explainable-ai
+preferred-citation:
+  type: article
+  title: "Quoptuna: Automated Optimization and Governance for Quantum Machine Learning"
+  authors:
+    - family-names: Jose
+      given-names: Edwin
+    - family-names: Fong
+      given-names: Alvis C.
+    - family-names: Lai
+      given-names: Chun Sing
+    - family-names: Fong
+      given-names: Bernard
+    - family-names: Lai
+      given-names: Loi Lei
+  journal: "IEEE Systems, Man, and Cybernetics Magazine"
+  year: 2026
+  volume: 12
+  issue: 3
+  start: 116
+  end: 121
+  doi: 10.1109/MSMC.2025.3613072
+references:
+  - type: conference-paper
+    title: "Quoptuna: An Open-Source Framework for Explainable Quantum Machine Learning"
+    authors:
+      - family-names: Jose
+        given-names: Edwin
+      - family-names: Fong
+        given-names: A. C.
+    conference:
+      name: "2025 Interdisciplinary Conference on Electrics and Computer (INTCEC)"
+    year: 2025
+    start: 1
+    end: 5
+    doi: 10.1109/INTCEC65580.2025.11256089
+  - type: conference-paper
+    title: "Design and Development of an Open-Source Toolkit for Quantum Machine Learning"
+    authors:
+      - family-names: Jose
+        given-names: Edwin
+      - family-names: Fong
+        given-names: A. C.
+    conference:
+      name: "2025 IEEE International Conference on Recent Advances in Systems Science and Engineering (RASSE)"
+    year: 2025
+    start: 1
+    end: 6
+    doi: 10.1109/RASSE64831.2025.11315342

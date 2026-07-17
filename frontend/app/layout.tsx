@@ -18,6 +18,10 @@ const jetBrainsMono = JetBrains_Mono({
 export const metadata: Metadata = {
   title: 'QuOptuna',
   description: 'Quantum-enhanced machine learning with automated hyperparameter optimization',
+  icons: {
+    icon: [{ url: '/favicon.ico', sizes: 'any' }, { url: '/icon.png', type: 'image/png' }],
+    apple: '/icon.png',
+  },
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {

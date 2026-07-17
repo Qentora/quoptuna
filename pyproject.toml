@@ -1,7 +1,7 @@
 [project]
 name = "quoptuna"
 version = "0.1.3"
-description = "quoptuna is a proposed open-source project that combines quantum computing with Optuna's hyperparameter optimization framework."
+description = "Fairness-aware, explainable AutoML for quantum and classical machine learning, powered by Optuna and PennyLane."
 authors = [
     {name = "Edwin Jose", email = "edwinjose900@gmail.com"},
 ]
@@ -53,16 +53,26 @@ readme = "README.md"
 classifiers = [
     "Development Status :: 4 - Beta",
     "Intended Audience :: Developers",
+    "Intended Audience :: Science/Research",
     "Operating System :: OS Independent",
     "Programming Language :: Python",
     "Programming Language :: Python :: 3",
-    "Programming Language :: Python :: 3.8",
-    "Programming Language :: Python :: 3.9",
-    "Programming Language :: Python :: 3.10",
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Typing :: Typed",
+]
+keywords = [
+    "quantum-computing",
+    "quantum-machine-learning",
+    "hyperparameter-optimization",
+    "optuna",
+    "pennylane",
+    "automl",
+    "fairness",
+    "explainable-ai",
+    "shap",
 ]
 
 [project.urls]
