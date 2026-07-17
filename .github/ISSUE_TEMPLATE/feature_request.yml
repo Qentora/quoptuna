@@ -1,0 +1,33 @@
+name: Feature request
+description: Suggest an idea or improvement
+labels: ["enhancement"]
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: What problem would this solve?
+      description: Describe the use case, not just the solution.
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed solution
+      description: What you'd like to happen. Alternatives you've considered are welcome too.
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Optimization engine (Optuna / samplers / pruning)
+        - Quantum models (PennyLane)
+        - Fairness / explainability (SHAP, fairlearn)
+        - AI report generation
+        - Web UI / wizard
+        - CLI / API
+        - Docs
+        - Other
+    validations:
+      required: true

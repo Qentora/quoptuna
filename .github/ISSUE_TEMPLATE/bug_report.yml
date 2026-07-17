@@ -1,0 +1,41 @@
+name: Bug report
+description: Something isn't working as expected
+labels: ["bug"]
+body:
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened?
+      description: Clear description of the bug, plus what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: repro
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. uvx quoptuna
+        2. Upload dataset X, configure ...
+        3. Error appears at ...
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs / traceback
+      description: Paste relevant output. Tip — QuOptuna also writes logs to `db/logs/quoptuna.log`.
+      render: shell
+  - type: input
+    id: version
+    attributes:
+      label: QuOptuna version
+      placeholder: "0.1.3 (pip show quoptuna)"
+    validations:
+      required: true
+  - type: input
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: "macOS 15 / Python 3.12 / installed via uvx"
+    validations:
+      required: true

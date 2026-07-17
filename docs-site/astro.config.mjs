@@ -22,7 +22,7 @@ export default defineConfig({
         src: "./src/assets/logo.png",
         alt: "QuOptuna",
       },
-      favicon: "/favicon.svg",
+      favicon: "/favicon.png",
       social: [
         {
           icon: "github",
