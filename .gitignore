@@ -144,3 +144,5 @@ next-env.d.ts
 /frontend/playwright/.cache/
 /.agents/skills/shadcn
 /.agents/skills/migrate-radix-to-base
+.DS_Store
+.DS_Store
