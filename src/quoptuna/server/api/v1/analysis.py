@@ -591,6 +591,20 @@ async def get_analysis_snapshot(snapshot_id: str):
     return snapshot
 
 
+@router.get("/snapshots/{snapshot_id}/artifacts/{filename}")
+async def get_analysis_artifact(snapshot_id: str, filename: str):
+    """Return a short-lived S3 URL for an analysis artifact."""
+    if "/" in filename or "\\" in filename or filename in (".", ".."):
+        raise HTTPException(status_code=400, detail="Invalid artifact filename")
+    url = analysis_store.artifact_url(snapshot_id, filename)
+    if url:
+        return {"snapshot_id": snapshot_id, "filename": filename, "url": url}
+    snapshot = analysis_store.get_snapshot(snapshot_id, hydrate=False)
+    if not snapshot:
+        raise HTTPException(status_code=404, detail="Analysis snapshot not found")
+    raise HTTPException(status_code=404, detail="Artifact is not stored in object storage")
+
+
 @router.get("/snapshots/{snapshot_id}/reports")
 async def list_snapshot_reports(snapshot_id: str):
     if not analysis_store.get_snapshot(snapshot_id, hydrate=False):

@@ -1,4 +1,4 @@
-"""Durable analysis snapshots, binary artifacts, jobs, and generated reports."""
+"""Durable analysis snapshots, reports, and local/S3 artifacts."""
 
 from __future__ import annotations
 
@@ -11,58 +11,19 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
+from sqlmodel import select
+
+from quoptuna.server.core.config import settings
+from quoptuna.server.services.database import session_scope
+from quoptuna.server.services.models import (
+    AnalysisArtifact,
+    AnalysisJob,
+    AnalysisReport,
+    AnalysisSnapshot,
+)
 from quoptuna.server.services import run_store
-from quoptuna.server.services.storage import ensure_db_dir
 
-ARTIFACT_ROOT = Path("db/analysis")
-
-_SCHEMA = """
-CREATE TABLE IF NOT EXISTS analysis_snapshots (
-    id TEXT PRIMARY KEY,
-    optimization_id TEXT NOT NULL,
-    config_key TEXT NOT NULL,
-    config_json TEXT NOT NULL,
-    revision INTEGER NOT NULL DEFAULT 0,
-    payload_json TEXT,
-    artifact_dir TEXT,
-    created_at TEXT NOT NULL,
-    completed_at TEXT,
-    UNIQUE(optimization_id, config_key)
-);
-CREATE TABLE IF NOT EXISTS analysis_jobs (
-    id TEXT PRIMARY KEY,
-    snapshot_id TEXT NOT NULL,
-    status TEXT NOT NULL,
-    current_section TEXT,
-    error TEXT,
-    created_at TEXT NOT NULL,
-    completed_at TEXT
-);
-CREATE TABLE IF NOT EXISTS analysis_reports (
-    id TEXT PRIMARY KEY,
-    optimization_id TEXT NOT NULL,
-    snapshot_id TEXT NOT NULL,
-    snapshot_revision INTEGER NOT NULL,
-    status TEXT NOT NULL,
-    provider TEXT NOT NULL,
-    model_name TEXT NOT NULL,
-    dataset_description TEXT,
-    markdown TEXT,
-    error TEXT,
-    created_at TEXT NOT NULL,
-    completed_at TEXT
-);
-CREATE INDEX IF NOT EXISTS analysis_snapshots_run_idx
-    ON analysis_snapshots(optimization_id, completed_at DESC);
-CREATE INDEX IF NOT EXISTS analysis_reports_snapshot_idx
-    ON analysis_reports(snapshot_id, completed_at DESC);
-"""
-
-
-def _connect():
-    conn = run_store._connect()  # noqa: SLF001 - shares the app database intentionally
-    conn.executescript(_SCHEMA)
-    return conn
+ARTIFACT_ROOT = Path(settings.ARTIFACT_ROOT)
 
 
 def _now() -> str:
@@ -88,78 +49,69 @@ def create_job(optimization_id: str, config: dict[str, Any]) -> dict[str, Any]:
     config = normalize_config(config)
     key = _config_key(config)
     now = _now()
-    with _connect() as conn:
-        row = conn.execute(
-            "SELECT id FROM analysis_snapshots WHERE optimization_id = ? AND config_key = ?",
-            (optimization_id, key),
-        ).fetchone()
-        snapshot_id = row["id"] if row else str(uuid.uuid4())
-        if not row:
-            conn.execute(
-                "INSERT INTO analysis_snapshots "
-                "(id, optimization_id, config_key, config_json, created_at) VALUES (?, ?, ?, ?, ?)",
-                (snapshot_id, optimization_id, key, json.dumps(config), now),
+    with session_scope() as session:
+        snapshot = session.exec(
+            select(AnalysisSnapshot).where(
+                AnalysisSnapshot.optimization_id == optimization_id,
+                AnalysisSnapshot.config_key == key,
             )
-        active = conn.execute(
-            "SELECT id, status FROM analysis_jobs WHERE snapshot_id = ? "
-            "AND status IN ('pending', 'running') ORDER BY created_at DESC LIMIT 1",
-            (snapshot_id,),
-        ).fetchone()
+        ).first()
+        if snapshot is None:
+            snapshot = AnalysisSnapshot(
+                id=str(uuid.uuid4()), optimization_id=optimization_id,
+                config_key=key, config_json=json.dumps(config), created_at=now,
+            )
+            session.add(snapshot)
+            session.commit()
+            session.refresh(snapshot)
+        active = session.exec(
+            select(AnalysisJob).where(
+                AnalysisJob.snapshot_id == snapshot.id,
+                AnalysisJob.status.in_(["pending", "running"]),
+            ).order_by(AnalysisJob.created_at.desc())
+        ).first()
         if active:
-            return {
-                "id": active["id"],
-                "snapshot_id": snapshot_id,
-                "status": active["status"],
-                "created": False,
-            }
-        job_id = str(uuid.uuid4())
-        conn.execute(
-            "INSERT INTO analysis_jobs (id, snapshot_id, status, created_at) VALUES (?, ?, ?, ?)",
-            (job_id, snapshot_id, "pending", now),
-        )
-    return {"id": job_id, "snapshot_id": snapshot_id, "status": "pending", "created": True}
+            return {"id": active.id, "snapshot_id": snapshot.id, "status": active.status, "created": False}
+        job = AnalysisJob(id=str(uuid.uuid4()), snapshot_id=snapshot.id, status="pending", created_at=now)
+        session.add(job)
+        session.commit()
+        return {"id": job.id, "snapshot_id": snapshot.id, "status": job.status, "created": True}
 
 
 def create_revision_job(snapshot_id: str) -> dict[str, Any]:
-    job_id = str(uuid.uuid4())
-    with _connect() as conn:
-        row = conn.execute(
-            "SELECT id FROM analysis_snapshots WHERE id = ? AND revision > 0", (snapshot_id,)
-        ).fetchone()
-        if not row:
+    with session_scope() as session:
+        snapshot = session.get(AnalysisSnapshot, snapshot_id)
+        if not snapshot or snapshot.revision <= 0:
             raise KeyError(snapshot_id)
-        conn.execute(
-            "INSERT INTO analysis_jobs (id, snapshot_id, status, created_at) VALUES (?, ?, 'running', ?)",
-            (job_id, snapshot_id, _now()),
-        )
-    return {"id": job_id, "snapshot_id": snapshot_id, "status": "running"}
+        job = AnalysisJob(id=str(uuid.uuid4()), snapshot_id=snapshot_id, status="running", created_at=_now())
+        session.add(job)
+        session.commit()
+        return {"id": job.id, "snapshot_id": snapshot_id, "status": "running"}
 
 
 def update_job(job_id: str, **fields: Any) -> None:
     allowed = {"status", "current_section", "error", "completed_at"}
     if set(fields) - allowed:
         raise ValueError("Invalid analysis job field")
-    assignments = ", ".join(f"{key} = ?" for key in fields)
-    with _connect() as conn:
-        conn.execute(
-            f"UPDATE analysis_jobs SET {assignments} WHERE id = ?",  # noqa: S608
-            (*fields.values(), job_id),
-        )
+    with session_scope() as session:
+        job = session.get(AnalysisJob, job_id)
+        if job:
+            for key, value in fields.items():
+                setattr(job, key, value)
+            session.add(job)
+            session.commit()
 
 
 def get_job(job_id: str) -> dict[str, Any] | None:
-    with _connect() as conn:
-        row = conn.execute(
-            "SELECT j.*, s.optimization_id, s.revision, s.config_json "
-            "FROM analysis_jobs j JOIN analysis_snapshots s ON s.id = j.snapshot_id "
-            "WHERE j.id = ?",
-            (job_id,),
-        ).fetchone()
-    if not row:
-        return None
-    result = dict(row)
-    result["config"] = json.loads(result.pop("config_json"))
-    return result
+    with session_scope() as session:
+        job = session.get(AnalysisJob, job_id)
+        if not job:
+            return None
+        snapshot = session.get(AnalysisSnapshot, job.snapshot_id)
+        result = job.model_dump()
+        result.update({"optimization_id": snapshot.optimization_id, "revision": snapshot.revision,
+                       "config": json.loads(snapshot.config_json)})
+        return result
 
 
 def _extract_artifacts(value: Any, directory: Path, prefix: str = "payload") -> Any:
@@ -171,15 +123,58 @@ def _extract_artifacts(value: Any, directory: Path, prefix: str = "payload") -> 
         (directory / filename).write_bytes(base64.b64decode(encoded))
         return {"$artifact": filename, "mime_type": mime}
     if isinstance(value, dict):
-        return {
-            key: _extract_artifacts(item, directory, f"{prefix}.{key}")
-            for key, item in value.items()
-        }
+        return {key: _extract_artifacts(item, directory, f"{prefix}.{key}") for key, item in value.items()}
     if isinstance(value, list):
-        return [
-            _extract_artifacts(item, directory, f"{prefix}.{i}") for i, item in enumerate(value)
-        ]
+        return [_extract_artifacts(item, directory, f"{prefix}.{i}") for i, item in enumerate(value)]
     return value
+
+
+class S3ArtifactStore:
+    def __init__(self):
+        import boto3
+        self.client = boto3.client("s3", endpoint_url=settings.S3_ENDPOINT_URL or None,
+                                   region_name=settings.S3_REGION or None,
+                                   aws_access_key_id=settings.S3_ACCESS_KEY_ID or None,
+                                   aws_secret_access_key=settings.S3_SECRET_ACCESS_KEY or None)
+        self.bucket = settings.S3_BUCKET
+
+    def publish_tree(self, payload: Any, directory: Path, prefix: str, run_id: str, snapshot_id: str, revision: int) -> Any:
+        def replace(value: Any) -> Any:
+            if isinstance(value, dict) and "$artifact" in value:
+                filename = value["$artifact"]
+                key = f"{settings.S3_PREFIX.strip('/')}/{prefix}/{filename}"
+                path = directory / filename
+                self.client.upload_file(str(path), self.bucket, key,
+                                        ExtraArgs={"ContentType": value.get("mime_type", "application/octet-stream")})
+                with session_scope() as session:
+                    session.add(AnalysisArtifact(id=str(uuid.uuid4()), optimization_id=run_id,
+                        snapshot_id=snapshot_id, revision=revision, filename=filename,
+                        object_key=key, storage_backend="s3", mime_type=value.get("mime_type"),
+                        size_bytes=path.stat().st_size, checksum=hashlib.sha256(path.read_bytes()).hexdigest()))
+                    session.commit()
+                return {**value, "$object_key": key}
+            if isinstance(value, dict): return {k: replace(v) for k, v in value.items()}
+            if isinstance(value, list): return [replace(v) for v in value]
+            return value
+        return replace(payload)
+
+    def get_url(self, key: str) -> str:
+        return self.client.generate_presigned_url("get_object", Params={"Bucket": self.bucket, "Key": key}, ExpiresIn=settings.S3_SIGNED_URL_TTL)
+
+    def upload_file(self, path: Path, key: str, mime_type: str = "application/octet-stream") -> str:
+        self.client.upload_file(str(path), self.bucket, key, ExtraArgs={"ContentType": mime_type})
+        return key
+
+
+def get_artifact_store() -> S3ArtifactStore | None:
+    if settings.ARTIFACT_STORAGE.lower() != "s3":
+        return None
+    if not settings.S3_BUCKET:
+        raise RuntimeError("S3_BUCKET is required when ARTIFACT_STORAGE=s3")
+    try:
+        return S3ArtifactStore()
+    except ImportError as exc:
+        raise RuntimeError("Install boto3 to use S3 artifact storage") from exc
 
 
 def complete_job(job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
@@ -187,144 +182,109 @@ def complete_job(job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
     if not job:
         raise KeyError(job_id)
     revision = int(job["revision"]) + 1
-    ensure_db_dir()
     final_dir = ARTIFACT_ROOT / job["optimization_id"] / job["snapshot_id"] / str(revision)
     temp_dir = final_dir.with_name(f".{revision}-{job_id}.tmp")
     temp_dir.mkdir(parents=True, exist_ok=False)
     try:
         stored_payload = _extract_artifacts(payload, temp_dir)
+        backend = get_artifact_store()
+        prefix = f"runs/{job['optimization_id']}/analysis/{job['snapshot_id']}/revisions/{revision}"
+        if backend:
+            stored_payload = backend.publish_tree(stored_payload, temp_dir, prefix, job["optimization_id"], job["snapshot_id"], revision)
         final_dir.parent.mkdir(parents=True, exist_ok=True)
         temp_dir.replace(final_dir)
-        now = _now()
-        with _connect() as conn:
-            conn.execute(
-                "UPDATE analysis_snapshots SET revision = ?, payload_json = ?, "
-                "artifact_dir = ?, completed_at = ? WHERE id = ?",
-                (revision, json.dumps(stored_payload), str(final_dir), now, job["snapshot_id"]),
-            )
-            conn.execute(
-                "UPDATE analysis_jobs SET status = 'completed', current_section = 'complete', "
-                "completed_at = ? WHERE id = ?",
-                (now, job_id),
-            )
-        for old_revision in final_dir.parent.iterdir():
-            if old_revision != final_dir and old_revision.is_dir():
-                shutil.rmtree(old_revision, ignore_errors=True)
+        with session_scope() as session:
+            snapshot = session.get(AnalysisSnapshot, job["snapshot_id"])
+            snapshot.revision = revision
+            snapshot.payload_json = json.dumps(stored_payload)
+            snapshot.artifact_dir = str(final_dir)
+            snapshot.storage_backend = "s3" if backend else "local"
+            snapshot.artifact_prefix = prefix if backend else None
+            snapshot.completed_at = _now()
+            analysis_job = session.get(AnalysisJob, job_id)
+            analysis_job.status = "completed"
+            analysis_job.current_section = "complete"
+            analysis_job.completed_at = _now()
+            session.add(snapshot)
+            session.add(analysis_job)
+            session.commit()
+        for old in final_dir.parent.iterdir():
+            if old != final_dir and old.is_dir(): shutil.rmtree(old, ignore_errors=True)
     except Exception:
         shutil.rmtree(temp_dir, ignore_errors=True)
         raise
     return {"snapshot_id": job["snapshot_id"], "revision": revision}
 
 
-def _hydrate_artifacts(value: Any, directory: Path) -> Any:
+def _hydrate(value: Any, directory: Path) -> Any:
+    if isinstance(value, dict) and "$object_key" in value:
+        store = get_artifact_store()
+        return store.get_url(value["$object_key"]) if store else value
     if isinstance(value, dict) and "$artifact" in value:
         path = directory / value["$artifact"]
-        encoded = base64.b64encode(path.read_bytes()).decode()
-        return f"data:{value.get('mime_type', 'application/octet-stream')};base64,{encoded}"
-    if isinstance(value, dict):
-        return {key: _hydrate_artifacts(item, directory) for key, item in value.items()}
-    if isinstance(value, list):
-        return [_hydrate_artifacts(item, directory) for item in value]
+        return "data:%s;base64,%s" % (value.get("mime_type", "application/octet-stream"), base64.b64encode(path.read_bytes()).decode())
+    if isinstance(value, dict): return {k: _hydrate(v, directory) for k, v in value.items()}
+    if isinstance(value, list): return [_hydrate(v, directory) for v in value]
     return value
 
 
 def get_snapshot(snapshot_id: str, hydrate: bool = True) -> dict[str, Any] | None:
-    with _connect() as conn:
-        row = conn.execute(
-            "SELECT * FROM analysis_snapshots WHERE id = ?", (snapshot_id,)
-        ).fetchone()
-    if not row:
-        return None
-    result = dict(row)
-    result["config"] = json.loads(result.pop("config_json"))
-    raw_payload = json.loads(result.pop("payload_json") or "null")
-    result["payload"] = (
-        _hydrate_artifacts(raw_payload, Path(result["artifact_dir"]))
-        if hydrate and raw_payload is not None and result.get("artifact_dir")
-        else raw_payload
-    )
-    return result
+    with session_scope() as session:
+        row = session.get(AnalysisSnapshot, snapshot_id)
+        if not row: return None
+        result = row.model_dump()
+        result["config"] = json.loads(result.pop("config_json"))
+        raw = json.loads(result.pop("payload_json") or "null")
+        result["payload"] = _hydrate(raw, Path(result["artifact_dir"])) if hydrate and raw is not None and result.get("artifact_dir") else raw
+        return result
 
 
 def list_snapshots(optimization_id: str) -> list[dict[str, Any]]:
-    with _connect() as conn:
-        rows = conn.execute(
-            "SELECT id, optimization_id, revision, config_json, created_at, completed_at "
-            "FROM analysis_snapshots WHERE optimization_id = ? "
-            "AND revision > 0 ORDER BY completed_at DESC",
-            (optimization_id,),
-        ).fetchall()
-    return [
-        {
-            "id": row["id"],
-            "optimization_id": row["optimization_id"],
-            "revision": row["revision"],
-            "config": json.loads(row["config_json"]),
-            "created_at": row["created_at"],
-            "completed_at": row["completed_at"],
-        }
-        for row in rows
-    ]
+    with session_scope() as session:
+        rows = session.exec(select(AnalysisSnapshot).where(AnalysisSnapshot.optimization_id == optimization_id, AnalysisSnapshot.revision > 0).order_by(AnalysisSnapshot.completed_at.desc())).all()
+        return [{"id": r.id, "optimization_id": r.optimization_id, "revision": r.revision, "config": json.loads(r.config_json), "created_at": r.created_at, "completed_at": r.completed_at} for r in rows]
 
 
-def create_report(
-    snapshot: dict[str, Any], provider: str, model_name: str, description: str | None
-) -> str:
-    report_id = str(uuid.uuid4())
-    with _connect() as conn:
-        conn.execute(
-            "INSERT INTO analysis_reports (id, optimization_id, snapshot_id, snapshot_revision, "
-            "status, provider, model_name, dataset_description, created_at) "
-            "VALUES (?, ?, ?, ?, 'running', ?, ?, ?, ?)",
-            (
-                report_id,
-                snapshot["optimization_id"],
-                snapshot["id"],
-                snapshot["revision"],
-                provider,
-                model_name,
-                description,
-                _now(),
-            ),
-        )
-    return report_id
+def create_report(snapshot: dict[str, Any], provider: str, model_name: str, description: str | None) -> str:
+    report = AnalysisReport(id=str(uuid.uuid4()), optimization_id=snapshot["optimization_id"], snapshot_id=snapshot["id"], snapshot_revision=snapshot["revision"], status="running", provider=provider, model_name=model_name, dataset_description=description, created_at=_now())
+    with session_scope() as session:
+        session.add(report); session.commit()
+    return report.id
 
 
 def complete_report(report_id: str, markdown: str) -> None:
-    with _connect() as conn:
-        conn.execute(
-            "UPDATE analysis_reports SET status = 'completed', markdown = ?, completed_at = ? WHERE id = ?",
-            (markdown, _now(), report_id),
-        )
+    with session_scope() as session:
+        row = session.get(AnalysisReport, report_id)
+        if row: row.status, row.markdown, row.completed_at = "completed", markdown, _now(); session.add(row); session.commit()
 
 
 def fail_report(report_id: str, error: str) -> None:
-    with _connect() as conn:
-        conn.execute(
-            "UPDATE analysis_reports SET status = 'failed', error = ?, completed_at = ? WHERE id = ?",
-            (error, _now(), report_id),
-        )
+    with session_scope() as session:
+        row = session.get(AnalysisReport, report_id)
+        if row: row.status, row.error, row.completed_at = "failed", error, _now(); session.add(row); session.commit()
 
 
 def list_reports(snapshot_id: str) -> list[dict[str, Any]]:
-    with _connect() as conn:
-        rows = conn.execute(
-            "SELECT * FROM analysis_reports WHERE snapshot_id = ? ORDER BY created_at DESC",
-            (snapshot_id,),
-        ).fetchall()
-    return [dict(row) for row in rows]
+    with session_scope() as session:
+        return [r.model_dump() for r in session.exec(select(AnalysisReport).where(AnalysisReport.snapshot_id == snapshot_id).order_by(AnalysisReport.created_at.desc())).all()]
+
+
+def artifact_url(snapshot_id: str, filename: str) -> str | None:
+    with session_scope() as session:
+        row = session.exec(select(AnalysisArtifact).where(AnalysisArtifact.snapshot_id == snapshot_id, AnalysisArtifact.filename == filename)).first()
+    if not row or not row.object_key: return None
+    store = get_artifact_store()
+    return store.get_url(row.object_key) if store else None
 
 
 def delete_for_run(optimization_id: str) -> None:
-    with _connect() as conn:
-        snapshot_ids = [
-            row["id"]
-            for row in conn.execute(
-                "SELECT id FROM analysis_snapshots WHERE optimization_id = ?", (optimization_id,)
-            ).fetchall()
-        ]
+    with session_scope() as session:
+        snapshots = session.exec(select(AnalysisSnapshot).where(AnalysisSnapshot.optimization_id == optimization_id)).all()
+        snapshot_ids = [s.id for s in snapshots]
         for snapshot_id in snapshot_ids:
-            conn.execute("DELETE FROM analysis_jobs WHERE snapshot_id = ?", (snapshot_id,))
-            conn.execute("DELETE FROM analysis_reports WHERE snapshot_id = ?", (snapshot_id,))
-        conn.execute("DELETE FROM analysis_snapshots WHERE optimization_id = ?", (optimization_id,))
+            for row in session.exec(select(AnalysisJob).where(AnalysisJob.snapshot_id == snapshot_id)).all(): session.delete(row)
+            for row in session.exec(select(AnalysisReport).where(AnalysisReport.snapshot_id == snapshot_id)).all(): session.delete(row)
+            for row in session.exec(select(AnalysisArtifact).where(AnalysisArtifact.snapshot_id == snapshot_id)).all(): session.delete(row)
+            session.delete(session.get(AnalysisSnapshot, snapshot_id))
+        session.commit()
     shutil.rmtree(ARTIFACT_ROOT / optimization_id, ignore_errors=True)

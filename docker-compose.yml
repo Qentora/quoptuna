@@ -27,7 +27,8 @@ services:
       - ./src:/quoptuna/src
       - ./uploads:/app/uploads
     environment:
-      - DATABASE_URL=sqlite:///./quoptuna.db
+      - DATABASE_URL=sqlite:///./db/quoptuna_app.db
+      - OPTUNA_DB_SCHEMA=optuna
       - CORS_ORIGINS=http://localhost:3000,http://localhost:5173
     command: uvicorn app.main:app --host 0.0.0.0 --port 8000 --reload
 

@@ -31,7 +31,19 @@ class Settings(BaseSettings):
         return v
 
     # Database
-    DATABASE_URL: str = "sqlite:///./quoptuna.db"
+    DATABASE_URL: str = "sqlite:///./db/quoptuna_app.db"
+    # Optuna may use the same database, or a separate one, in deployments.
+    OPTUNA_DATABASE_URL: str = ""
+    OPTUNA_DB_SCHEMA: str = "optuna"
+    ARTIFACT_STORAGE: str = "local"
+    ARTIFACT_ROOT: str = "db/analysis"
+    S3_ENDPOINT_URL: str = ""
+    S3_BUCKET: str = ""
+    S3_REGION: str = ""
+    S3_ACCESS_KEY_ID: str = ""
+    S3_SECRET_ACCESS_KEY: str = ""
+    S3_PREFIX: str = "quoptuna"
+    S3_SIGNED_URL_TTL: int = 900
 
     # File Upload
     UPLOAD_DIR: str = "./uploads"

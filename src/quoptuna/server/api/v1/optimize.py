@@ -12,6 +12,7 @@ from optuna.trial import TrialState
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
 from quoptuna.server.services import dataset_registry, run_store
+from quoptuna.server.core.config import settings
 from quoptuna.server.services.storage import optuna_storage_url
 from quoptuna.server.services.workflow_service import WorkflowExecutor
 
@@ -37,6 +38,8 @@ class OptimizationRequest(BaseModel):
     model_config = ConfigDict(protected_namespaces=())
 
     dataset_id: str
+    session_id: Optional[str] = None
+    user_id: Optional[str] = None
     dataset_source: str  # 'uci' or 'upload'
     selected_features: List[str]
     target_column: str
@@ -344,6 +347,9 @@ def get_job(job_id: str) -> Dict[str, Any]:
 async def start_optimization(request: OptimizationRequest, background_tasks: BackgroundTasks):
     """Start a new optimization study"""
     job_id = f"opt_{uuid.uuid4().hex[:8]}"
+    session_id = request.session_id or str(uuid.uuid4())
+    request.session_id = session_id
+    dataset_record = dataset_registry.get(request.dataset_id)
 
     optimization_jobs[job_id] = {
         "id": job_id,
@@ -357,6 +363,12 @@ async def start_optimization(request: OptimizationRequest, background_tasks: Bac
         "completed_at": None,
         "error": None,
         "request": request.dict(),  # Store request for later use
+        "session_id": session_id,
+        "user_id": request.user_id,
+        "source_file_id": request.dataset_id,
+        "source_file_path": (dataset_record or {}).get("file_path"),
+        "study_storage_key": request.database_name,
+        "artifact_storage": settings.ARTIFACT_STORAGE,
     }
     run_store.save_run(optimization_jobs[job_id])
 
@@ -426,6 +438,11 @@ async def get_optimization_detail(optimization_id: str):
         "error": job.get("error"),
         "request": request_data,
         "dataset": record,
+        "session_id": job.get("session_id"),
+        "user_id": job.get("user_id"),
+        "source_file_id": job.get("source_file_id") or request_data.get("dataset_id"),
+        "study_storage_key": job.get("study_storage_key") or request_data.get("database_name"),
+        "artifact_storage": job.get("artifact_storage") or settings.ARTIFACT_STORAGE,
     }
 
 

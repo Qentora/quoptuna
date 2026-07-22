@@ -385,6 +385,22 @@ def optimize(  # noqa: PLR0913
     console.print_json(json.dumps(summary, default=str))
 
 
+@app.command("migrate-supabase")
+def migrate_supabase(
+    source_db: str = typer.Option("db/quoptuna_app.db", "--source-db"),
+    database_url: str = typer.Option(None, "--database-url"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+) -> None:
+    """Migrate legacy application metadata into SQLModel/PostgreSQL."""
+    import json  # noqa: PLC0415
+    from quoptuna.server.core.config import settings  # noqa: PLC0415
+    from quoptuna.server.services.migration import migrate_app_store  # noqa: PLC0415
+
+    target = database_url or settings.DATABASE_URL
+    result = migrate_app_store(source_db, target, dry_run=dry_run)
+    console.print_json(json.dumps(result))
+
+
 def main() -> None:
     from quoptuna.backend.utils.log_file import attach_file_logging  # noqa: PLC0415
 
