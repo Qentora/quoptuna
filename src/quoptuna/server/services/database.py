@@ -13,13 +13,18 @@ from quoptuna.server.core.config import settings
 def _database_url() -> str:
     # Keep the historical local location unless an explicit URL is configured.
     try:
-        from quoptuna.server.services import run_store  # noqa: PLC0415
+        from quoptuna.server.services import run_store
+
         if run_store.APP_DB_PATH != "db/quoptuna_app.db":
             return f"sqlite:///{run_store.APP_DB_PATH}"
     except ImportError:
         pass
     url = settings.DATABASE_URL or "sqlite:///./db/quoptuna_app.db"
-    return url.replace("postgresql://", "postgresql+psycopg://", 1) if url.startswith("postgresql://") else url
+    return (
+        url.replace("postgresql://", "postgresql+psycopg://", 1)
+        if url.startswith("postgresql://")
+        else url
+    )
 
 
 def _engine_kwargs(url: str) -> dict:
@@ -41,7 +46,7 @@ def get_engine():
 
 def init_db() -> None:
     """Create application tables; production schema changes use migrations."""
-    from quoptuna.server.services.models import (  # noqa: F401, PLC0415
+    from quoptuna.server.services.models import (
         AnalysisArtifact,
         AnalysisJob,
         AnalysisReport,

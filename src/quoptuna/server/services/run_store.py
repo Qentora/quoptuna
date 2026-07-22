@@ -23,13 +23,20 @@ def _run_dict(row: Run) -> Dict[str, Any]:
 def save_run(job: Dict[str, Any]) -> None:
     request = job.get("request") or {}
     values = Run(
-        job_id=job["id"], study_name=request.get("study_name"),
-        db_name=request.get("database_name"), status=job.get("status"),
-        request_json=json.dumps(request), started_at=job.get("started_at"),
-        completed_at=job.get("completed_at"), error=job.get("error"),
-        best_value=job.get("best_value"), best_params_json=json.dumps(job.get("best_params")),
-        total_trials=job.get("total_trials"), current_trial=job.get("current_trial"),
-        session_id=job.get("session_id"), user_id=job.get("user_id"),
+        job_id=job["id"],
+        study_name=request.get("study_name"),
+        db_name=request.get("database_name"),
+        status=job.get("status"),
+        request_json=json.dumps(request),
+        started_at=job.get("started_at"),
+        completed_at=job.get("completed_at"),
+        error=job.get("error"),
+        best_value=job.get("best_value"),
+        best_params_json=json.dumps(job.get("best_params")),
+        total_trials=job.get("total_trials"),
+        current_trial=job.get("current_trial"),
+        session_id=job.get("session_id"),
+        user_id=job.get("user_id"),
         dataset_id=request.get("dataset_id"),
         source_file_id=job.get("source_file_id") or request.get("dataset_id"),
         source_file_path=job.get("source_file_path"),
@@ -95,9 +102,13 @@ def mark_stale_runs_interrupted() -> None:
 
 def save_dataset(record: Dict[str, Any]) -> None:
     values = Dataset(
-        id=record["id"], name=record.get("name"), source=record.get("source"),
-        file_path=record.get("file_path"), object_key=record.get("object_key"),
-        checksum=record.get("checksum"), rows=record.get("rows"),
+        id=record["id"],
+        name=record.get("name"),
+        source=record.get("source"),
+        file_path=record.get("file_path"),
+        object_key=record.get("object_key"),
+        checksum=record.get("checksum"),
+        rows=record.get("rows"),
         columns_json=json.dumps(record.get("columns")),
     )
     with session_scope() as session:

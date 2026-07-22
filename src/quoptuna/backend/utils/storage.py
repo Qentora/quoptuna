@@ -10,6 +10,7 @@ that exists on disk.
 
 from pathlib import Path
 from urllib.parse import quote, urlparse, urlunparse
+
 from quoptuna.server.core.config import settings
 
 DB_DIR = Path("db")
@@ -66,7 +67,8 @@ def ensure_optuna_schema() -> None:
     if not url.startswith(("postgresql://", "postgresql+")):
         return
     from sqlalchemy import create_engine, text  # noqa: PLC0415
+
     engine = create_engine(url)
     with engine.begin() as connection:
         schema = settings.OPTUNA_DB_SCHEMA.replace('"', '""')
-        connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))  # noqa: S608
+        connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))

@@ -11,8 +11,8 @@ from fastapi import APIRouter, BackgroundTasks, HTTPException
 from optuna.trial import TrialState
 from pydantic import BaseModel, ConfigDict, Field, model_validator
 
-from quoptuna.server.services import dataset_registry, run_store
 from quoptuna.server.core.config import settings
+from quoptuna.server.services import dataset_registry, run_store
 from quoptuna.server.services.storage import optuna_storage_url
 from quoptuna.server.services.workflow_service import WorkflowExecutor
 
