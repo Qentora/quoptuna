@@ -9,6 +9,9 @@ that exists on disk.
 """
 
 from pathlib import Path
+from urllib.parse import quote, urlparse, urlunparse
+
+from quoptuna.server.core.config import settings
 
 DB_DIR = Path("db")
 
@@ -42,4 +45,30 @@ def optuna_db_path(db_name: str) -> Path:
 
 
 def optuna_storage_url(db_name: str) -> str:
-    return f"sqlite:///{optuna_db_path(db_name)}"
+    url = ""
+    if settings.OPTUNA_DATABASE_URL:
+        url = settings.OPTUNA_DATABASE_URL
+    elif settings.DATABASE_URL.startswith(("postgresql://", "postgresql+")):
+        url = settings.DATABASE_URL
+    else:
+        return f"sqlite:///{optuna_db_path(db_name)}"
+    ensure_optuna_schema()
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+    parsed = urlparse(url)
+    options = quote(f"-csearch_path={settings.OPTUNA_DB_SCHEMA}", safe="")
+    separator = "&" if parsed.query else ""
+    return urlunparse(parsed._replace(query=f"{parsed.query}{separator}options={options}"))
+
+
+def ensure_optuna_schema() -> None:
+    """Create the isolated PostgreSQL schema used by Optuna."""
+    url = settings.OPTUNA_DATABASE_URL or settings.DATABASE_URL
+    if not url.startswith(("postgresql://", "postgresql+")):
+        return
+    from sqlalchemy import create_engine, text  # noqa: PLC0415
+
+    engine = create_engine(url)
+    with engine.begin() as connection:
+        schema = settings.OPTUNA_DB_SCHEMA.replace('"', '""')
+        connection.execute(text(f'CREATE SCHEMA IF NOT EXISTS "{schema}"'))
