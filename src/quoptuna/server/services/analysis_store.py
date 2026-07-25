@@ -14,7 +14,6 @@ from typing import Any
 from sqlmodel import select
 
 from quoptuna.server.core.config import settings
-from quoptuna.server.services import run_store
 from quoptuna.server.services.database import session_scope
 from quoptuna.server.services.models import (
     AnalysisArtifact,
@@ -287,10 +286,7 @@ def _hydrate(value: Any, directory: Path) -> Any:
         return store.get_url(value["$object_key"]) if store else value
     if isinstance(value, dict) and "$artifact" in value:
         path = directory / value["$artifact"]
-        return "data:%s;base64,%s" % (
-            value.get("mime_type", "application/octet-stream"),
-            base64.b64encode(path.read_bytes()).decode(),
-        )
+        return f"data:{value.get('mime_type', 'application/octet-stream')};base64,{base64.b64encode(path.read_bytes()).decode()}"
     if isinstance(value, dict):
         return {k: _hydrate(v, directory) for k, v in value.items()}
     if isinstance(value, list):

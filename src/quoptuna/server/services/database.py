@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from contextlib import contextmanager
+from functools import lru_cache
 from typing import Iterator
 
 from sqlmodel import Session, SQLModel, create_engine
@@ -33,27 +34,15 @@ def _engine_kwargs(url: str) -> dict:
     return {"pool_pre_ping": True, "pool_recycle": 1800}
 
 
-engine = None
-
-
-def get_engine():
-    global engine
-    url = _database_url()
-    if engine is None or str(engine.url) != url:
-        engine = create_engine(url, **_engine_kwargs(url))
-    return engine
+@lru_cache(maxsize=8)
+def get_engine(url: str | None = None):
+    url = url or _database_url()
+    return create_engine(url, **_engine_kwargs(url))
 
 
 def init_db() -> None:
     """Create application tables; production schema changes use migrations."""
-    from quoptuna.server.services.models import (
-        AnalysisArtifact,
-        AnalysisJob,
-        AnalysisReport,
-        AnalysisSnapshot,
-        Dataset,
-        Run,
-    )
+    from quoptuna.server.services import models as _models  # noqa: F401
 
     SQLModel.metadata.create_all(get_engine())
 

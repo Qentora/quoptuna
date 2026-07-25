@@ -2,9 +2,11 @@
 
 from __future__ import annotations
 
-import json
 import sqlite3
-from pathlib import Path
+from typing import TYPE_CHECKING
+
+if TYPE_CHECKING:
+    from pathlib import Path
 
 from sqlalchemy import create_engine
 from sqlmodel import Session, SQLModel
@@ -58,12 +60,13 @@ def migrate_app_store(
     target_engine = create_engine(
         target_url,
         connect_args={"check_same_thread": False} if target_url.startswith("sqlite") else {},
-        pool_pre_ping=True if not target_url.startswith("sqlite") else False,
+        pool_pre_ping=not target_url.startswith("sqlite"),
     )
     SQLModel.metadata.create_all(target_engine)
     with Session(target_engine, expire_on_commit=False) as session:
         for row in runs:
-            get = row.keys().__contains__
+            row_keys = set(row.keys())
+            get = row_keys.__contains__
             request_json = row["request_json"] if get("request_json") else "{}"
             session.merge(
                 Run(
@@ -93,7 +96,8 @@ def migrate_app_store(
                 )
             )
         for row in datasets:
-            columns = row["columns_json"] if "columns_json" in row.keys() else "[]"
+            row_keys = set(row.keys())
+            columns = row["columns_json"] if "columns_json" in row_keys else "[]"
             session.merge(
                 Dataset(
                     id=row["id"],
@@ -105,7 +109,8 @@ def migrate_app_store(
                 )
             )
         for row in snapshots:
-            get = row.keys().__contains__
+            row_keys = set(row.keys())
+            get = row_keys.__contains__
             session.merge(
                 AnalysisSnapshot(
                     id=row["id"],
