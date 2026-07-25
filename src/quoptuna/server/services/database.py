@@ -9,6 +9,23 @@ from typing import Iterator
 from sqlmodel import Session, SQLModel, create_engine
 
 from quoptuna.server.core.config import settings
+from quoptuna.server.services.models import (
+    AnalysisArtifact,
+    AnalysisJob,
+    AnalysisReport,
+    AnalysisSnapshot,
+    Dataset,
+    Run,
+)
+
+APPLICATION_MODELS = (
+    Run,
+    Dataset,
+    AnalysisSnapshot,
+    AnalysisJob,
+    AnalysisReport,
+    AnalysisArtifact,
+)
 
 
 def _database_url() -> str:
@@ -42,9 +59,9 @@ def get_engine(url: str | None = None):
 
 def init_db() -> None:
     """Create application tables; production schema changes use migrations."""
-    from quoptuna.server.services import models as _models  # noqa: F401
-
-    SQLModel.metadata.create_all(get_engine())
+    SQLModel.metadata.create_all(
+        get_engine(), tables=[model.__table__ for model in APPLICATION_MODELS]
+    )
 
 
 @contextmanager
