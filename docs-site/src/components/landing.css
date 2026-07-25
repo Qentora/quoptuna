@@ -1,133 +1,249 @@
-/* Shared styles for the custom QuOptuna marketing landing sections.
-   Scoped by the .qo- prefix so they never leak into Starlight doc pages. */
+/* ============================================================================
+   QuOptuna landing — VERBATIM port of the approved standalone design.
+   Fully self-contained and scoped to .qo-root so Starlight's base styles,
+   spacing, box-sizing and theme never alter it. Renders in the design's exact
+   dark theme. Do not rely on src/styles/theme.css tokens here.
+   ============================================================================ */
 
-.qo-wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
-.qo-eyebrow {
-  font-family: var(--qo-mono); font-size: 12px; letter-spacing: 0.18em;
-  text-transform: uppercase; color: var(--qo-ink-3);
-}
-.qo-section { padding: 72px 0; border-top: 1px solid var(--qo-line); }
-.qo-sec-head { max-width: 640px; margin: 0 auto 44px; text-align: center; }
-.qo-sec-head h2 {
-  font-size: clamp(28px, 4vw, 38px); margin: 12px 0 12px;
-  letter-spacing: -0.02em; line-height: 1.08; color: var(--qo-ink);
-}
-.qo-sec-head p { color: var(--qo-ink-2); font-size: 17px; margin: 0; }
+/* exact tokens from the standalone design (dark) */
+.qo-root {
+  --qo-quantum: #a78bfa; --qo-quantum-deep: #c4b5fd; --qo-quantum-soft: #241a3d;
+  --qo-classical: #fb923c; --qo-classical-soft: #2e1a0f;
+  --qo-ground: #0d0a16; --qo-surface: #171223;
+  --qo-line: #271f3a; --qo-line-2: #372c50;
+  --qo-ink: #f3f0fb; --qo-ink-2: #b9b1d0; --qo-ink-3: #8a82a3;
+  --qo-good: #34d399; --qo-star: #f5c542;
+  --qo-mono: ui-monospace, "SF Mono", Menlo, monospace;
+  --qo-sans: system-ui, -apple-system, "Segoe UI", sans-serif;
 
-/* ---- HERO ---- */
-.qo-hero { position: relative; overflow: hidden; padding: 20px 0 8px; }
-.qo-hero-grid {
-  display: grid; grid-template-columns: 1.1fr 0.9fr; gap: 40px; align-items: center;
-}
-@media (max-width: 900px) { .qo-hero-grid { grid-template-columns: 1fr; } }
-.qo-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 22px; }
-.qo-pill {
-  font-family: var(--qo-mono); font-size: 11.5px; padding: 5px 11px; border-radius: 999px;
-  border: 1px solid var(--qo-line-2); background: var(--qo-surface); color: var(--qo-ink-2);
-  display: inline-flex; align-items: center; gap: 6px;
-}
-.qo-dot { width: 7px; height: 7px; border-radius: 50%; }
-.qo-dot.q { background: var(--qo-quantum); }
-.qo-dot.c { background: var(--qo-classical); }
-.qo-hero h1 {
-  font-size: clamp(38px, 5.6vw, 62px); line-height: 1.02; letter-spacing: -0.035em;
-  margin: 0 0 18px; color: var(--qo-ink); text-wrap: balance;
-}
-.qo-grad {
-  background: linear-gradient(100deg, var(--qo-quantum), var(--qo-classical));
-  -webkit-background-clip: text; background-clip: text; color: transparent;
-}
-.qo-lede { font-size: clamp(17px, 2.1vw, 20px); color: var(--qo-ink-2); max-width: 36ch; margin: 0 0 28px; }
-.qo-cta { display: flex; gap: 12px; flex-wrap: wrap; }
-.qo-btn {
-  display: inline-flex; align-items: center; gap: 8px; font-weight: 650; font-size: 15px;
-  padding: 12px 22px; border-radius: 11px; cursor: pointer; border: 1px solid transparent;
-  transition: transform .12s ease, box-shadow .12s ease; text-decoration: none;
-}
-.qo-btn-primary { background: var(--qo-quantum); color: #fff; box-shadow: 0 8px 24px -8px var(--qo-quantum); }
-.qo-btn-primary:hover { transform: translateY(-1px); }
-.qo-btn-secondary { background: var(--qo-surface); color: var(--qo-ink); border-color: var(--qo-line-2); }
-.qo-btn-secondary:hover { border-color: var(--qo-quantum); }
+  --beat: 3.2s;
+  --ease-out: cubic-bezier(.2,.7,.3,1);
+  --ease-io:  cubic-bezier(.65,0,.35,1);
+  --dur-micro: .18s;
+  --dur-ui:    .6s;
+  --stagger:   .08s;
 
-/* terminal card */
-.qo-term {
-  background: var(--qo-surface); border: 1px solid var(--qo-line); border-radius: 14px;
-  box-shadow: 0 30px 60px -34px rgba(60,30,120,.4); overflow: hidden;
+  /* the design's body reset, applied to the wrapper.
+     NB: keep the wrapper transparent so the fixed/absolute background layers
+     (#qo-space starfield at z-index:-2, aurora, #qo-halo) remain visible behind
+     the content — an opaque background here would cover them. The dark ground
+     is painted on <body> instead (see theme.css). */
+  display: block;
+  background: transparent;
+  color: var(--qo-ink);
+  font-family: var(--qo-sans);
+  -webkit-font-smoothing: antialiased;
+  line-height: normal;
 }
-.qo-term-bar { display: flex; align-items: center; gap: 7px; padding: 11px 14px; border-bottom: 1px solid var(--qo-line); }
-.qo-term-bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--qo-line-2); }
-.qo-term-bar span { margin-left: 8px; font-family: var(--qo-mono); font-size: 12px; color: var(--qo-ink-3); }
-.qo-term-body { padding: 18px; font-family: var(--qo-mono); font-size: 13px; line-height: 1.85; color: var(--qo-ink); }
-.qo-term-body .cm { color: var(--qo-ink-3); }
-.qo-term-body .fl { color: var(--qo-quantum); }
-.qo-term-body .ok { color: var(--qo-good); }
-.qo-term-body .nu { color: var(--qo-classical); }
-.qo-term-row { display: flex; justify-content: space-between; }
-.qo-bar { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--qo-quantum), var(--qo-classical)); margin-top: 2px; }
+.qo-root *, .qo-root *::before, .qo-root *::after { box-sizing: border-box; }
+/* Neutralise Starlight's markdown vertical-rhythm margins (:where(*+*){margin-top:1rem})
+   so spacing inside the landing is controlled solely by this file — exactly like
+   the standalone design. */
+.qo-root * { margin-top: 0; margin-bottom: 0; }
 
-/* ---- FEATURE GRID ---- */
-.qo-fgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
-@media (max-width: 900px) { .qo-fgrid { grid-template-columns: repeat(2, 1fr); } }
-@media (max-width: 600px) { .qo-fgrid { grid-template-columns: 1fr; } }
-.qo-fcard {
-  background: var(--qo-surface); border: 1px solid var(--qo-line); border-radius: 14px;
-  padding: 24px 22px; transition: border-color .15s ease, transform .15s ease;
-}
-.qo-fcard:hover { border-color: var(--qo-quantum); transform: translateY(-2px); }
-.qo-fcard .qo-ic {
-  width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center;
-  background: var(--qo-quantum-soft); color: var(--qo-quantum-deep); margin-bottom: 14px;
-}
-.qo-fcard.alt .qo-ic { background: var(--qo-classical-soft); color: var(--qo-classical); }
-.qo-fcard h3 { font-size: 17px; margin: 0 0 8px; letter-spacing: -0.01em; color: var(--qo-ink); }
-.qo-fcard p { color: var(--qo-ink-2); font-size: 14.5px; margin: 0; line-height: 1.55; }
-.qo-ic svg { width: 21px; height: 21px; }
+.qo-root .qo-wrap { max-width: 1100px; margin: 0 auto; padding: 0 24px; }
+.qo-root .qo-eyebrow { font-family: var(--qo-mono); font-size: 12px; letter-spacing: 0.18em; text-transform: uppercase; color: var(--qo-ink-3); }
+.qo-root .qo-section { padding: 84px 0; border-top: 1px solid var(--qo-line); }
+.qo-root .qo-sec-head { max-width: 620px; margin: 0 auto 44px; text-align: center; }
+.qo-root .qo-sec-head h2 { font-size: clamp(28px, 4vw, 40px); margin: 12px 0 8px; letter-spacing: -0.025em; line-height: 1.08; color: var(--qo-ink); font-weight: 700; }
+.qo-root .qo-sec-head p { color: var(--qo-ink-2); font-size: 16px; margin: 0; }
 
-/* ---- DUALITY ---- */
-.qo-duality {
-  display: grid; grid-template-columns: 1fr auto 1fr; align-items: stretch;
-  border: 1px solid var(--qo-line); border-radius: 14px; overflow: hidden; background: var(--qo-surface);
+/* HERO */
+.qo-root .qo-hero { position: relative; overflow: hidden; padding: 48px 0 24px; }
+.qo-root .qo-hero::before { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none;
+  background: radial-gradient(70% 90% at 78% 30%, color-mix(in srgb, var(--qo-classical) 22%, transparent), transparent 60%),
+              radial-gradient(80% 100% at 12% 8%, color-mix(in srgb, var(--qo-quantum) 30%, transparent), transparent 58%); }
+.qo-root .qo-hero::after { content: ""; position: absolute; inset: 0; z-index: 0; pointer-events: none; opacity: .5;
+  background-image: linear-gradient(var(--qo-line) 1px, transparent 1px), linear-gradient(90deg, var(--qo-line) 1px, transparent 1px);
+  background-size: 46px 46px;
+  -webkit-mask-image: radial-gradient(70% 70% at 50% 30%, #000, transparent 75%);
+  mask-image: radial-gradient(70% 70% at 50% 30%, #000, transparent 75%); }
+.qo-root .qo-hero .qo-wrap { position: relative; z-index: 1; }
+.qo-root .qo-hero-grid { display: grid; grid-template-columns: 1.05fr 0.95fr; gap: 44px; align-items: center; }
+@media (max-width: 900px) { .qo-root .qo-hero-grid { grid-template-columns: 1fr; } }
+.qo-root .qo-badges { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 20px; }
+.qo-root .qo-pill { font-family: var(--qo-mono); font-size: 11.5px; padding: 5px 11px; border-radius: 999px; border: 1px solid var(--qo-line-2); background: color-mix(in srgb, var(--qo-surface) 70%, transparent); backdrop-filter: blur(6px); color: var(--qo-ink-2); display: inline-flex; align-items: center; gap: 6px; }
+.qo-root .qo-dot { width: 7px; height: 7px; border-radius: 50%; }
+.qo-root .qo-dot.q { background: var(--qo-quantum); } .qo-root .qo-dot.c { background: var(--qo-classical); }
+.qo-root .qo-hero h1 { font-size: clamp(42px, 6vw, 68px); line-height: 1.0; letter-spacing: -0.04em; margin: 0 0 16px; color: var(--qo-ink); text-wrap: balance; font-weight: 800; }
+.qo-root .qo-grad { background: linear-gradient(100deg, var(--qo-quantum), var(--qo-classical)); -webkit-background-clip: text; background-clip: text; color: transparent; }
+.qo-root .qo-lede { font-size: clamp(17px, 2.1vw, 20px); color: var(--qo-ink-2); max-width: 34ch; margin: 0 0 26px; line-height: 1.45; }
+.qo-root .qo-cta { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.qo-root .qo-btn { display: inline-flex; align-items: center; gap: 8px; font-weight: 650; font-size: 15px; padding: 12px 22px; border-radius: 11px; cursor: pointer; border: 1px solid transparent; transition: transform var(--dur-micro) var(--ease-out), box-shadow var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out); text-decoration: none; }
+.qo-root .qo-btn-primary { background: var(--qo-quantum); color: #fff; box-shadow: 0 8px 24px -8px var(--qo-quantum); }
+.qo-root .qo-btn-primary:hover { transform: translateY(-1px); }
+.qo-root .qo-btn-secondary { background: var(--qo-surface); color: var(--qo-ink); border-color: var(--qo-line-2); }
+.qo-root .qo-btn-secondary:hover { border-color: var(--qo-quantum); }
+.qo-root .qo-btn svg { width: 17px; height: 17px; }
+
+.qo-root .qo-term { background: var(--qo-surface); border: 1px solid var(--qo-line); border-radius: 14px; box-shadow: 0 40px 80px -40px rgba(60,30,120,.55); overflow: hidden; }
+.qo-root .qo-term-bar { display: flex; align-items: center; gap: 7px; padding: 11px 14px; border-bottom: 1px solid var(--qo-line); }
+.qo-root .qo-term-bar i { width: 11px; height: 11px; border-radius: 50%; background: var(--qo-line-2); }
+.qo-root .qo-term-bar span { margin-left: 8px; font-family: var(--qo-mono); font-size: 12px; color: var(--qo-ink-3); }
+.qo-root .qo-term-body { padding: 18px; font-family: var(--qo-mono); font-size: 13px; line-height: 1.85; color: var(--qo-ink); }
+.qo-root .qo-term-body .cm { color: var(--qo-ink-3); } .qo-root .qo-term-body .fl { color: var(--qo-quantum); }
+.qo-root .qo-term-body .ok { color: var(--qo-good); } .qo-root .qo-term-body .nu { color: var(--qo-classical); }
+.qo-root .qo-term-row { display: flex; justify-content: space-between; }
+.qo-root .qo-bar { height: 6px; border-radius: 3px; background: linear-gradient(90deg, var(--qo-quantum), var(--qo-classical)); margin-top: 2px; }
+
+/* STAR BANNER */
+.qo-root .qo-star-band { position: relative; overflow: hidden; padding: 60px 0; border-top: 1px solid var(--qo-line);
+  background: radial-gradient(120% 160% at 85% 20%, color-mix(in srgb, var(--qo-star) 16%, transparent), transparent 55%),
+              radial-gradient(120% 160% at 0% 100%, var(--qo-quantum-soft), transparent 60%); }
+.qo-root .qo-star-inner { display: grid; grid-template-columns: 1fr auto; align-items: center; gap: 36px; }
+@media (max-width: 820px) { .qo-root .qo-star-inner { grid-template-columns: 1fr; text-align: center; justify-items: center; } }
+.qo-root .qo-star-inner h2 { font-size: clamp(26px, 3.6vw, 34px); margin: 8px 0 8px; letter-spacing: -0.025em; color: var(--qo-ink); font-weight: 700; }
+.qo-root .qo-star-inner .qo-eyebrow { color: var(--qo-classical); }
+.qo-root .qo-star-inner > div > p { color: var(--qo-ink-2); font-size: 16px; margin: 0; max-width: 42ch; }
+.qo-root .qo-star-side { display: flex; flex-direction: column; gap: 14px; align-items: stretch; min-width: 230px; }
+.qo-root .qo-stats { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+.qo-root .qo-stat { background: color-mix(in srgb, var(--qo-surface) 82%, transparent); border: 1px solid var(--qo-line-2); border-radius: 12px; padding: 12px 14px; text-align: left; }
+.qo-root .qo-stat .v { font-family: var(--qo-mono); font-variant-numeric: tabular-nums; font-size: 22px; font-weight: 700; line-height: 1; color: var(--qo-ink); display: flex; align-items: center; gap: 6px; }
+.qo-root .qo-stat.star .v { color: var(--qo-star); }
+.qo-root .qo-stat.dl .v { color: var(--qo-classical); }
+.qo-root .qo-stat .k { font-size: 11px; text-transform: uppercase; letter-spacing: .08em; color: var(--qo-ink-3); margin-top: 6px; }
+.qo-root .qo-stat .v svg { width: 18px; height: 18px; }
+.qo-root .qo-star-btn { display: inline-flex; justify-content: center; align-items: center; gap: 9px; font-weight: 700; font-size: 15px; padding: 13px 22px; border-radius: 12px; text-decoration: none; color: #fff; background: linear-gradient(100deg, var(--qo-quantum), var(--qo-classical)); background-size: 200% 100%; border: 1px solid transparent; transition: transform var(--dur-micro) var(--ease-out), box-shadow var(--dur-micro) var(--ease-out); animation: qo-grad-shift calc(var(--beat) * 2.5) var(--ease-io) infinite; }
+.qo-root .qo-star-btn:hover { transform: translateY(-2px); box-shadow: 0 16px 34px -16px var(--qo-quantum); }
+.qo-root .qo-star-btn .gh { width: 18px; height: 18px; }
+
+/* FEATURE GRID */
+.qo-root .qo-fgrid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px; }
+@media (max-width: 900px) { .qo-root .qo-fgrid { grid-template-columns: repeat(2, 1fr); } }
+@media (max-width: 600px) { .qo-root .qo-fgrid { grid-template-columns: 1fr; } }
+.qo-root .qo-fcard { background: var(--qo-surface); border: 1px solid var(--qo-line); border-radius: 14px; padding: 22px 20px; transition: border-color var(--dur-micro) var(--ease-out), transform var(--dur-micro) var(--ease-out), box-shadow var(--dur-micro) var(--ease-out); }
+.qo-root .qo-fcard:hover { border-color: var(--qo-quantum); transform: translateY(-3px); box-shadow: 0 20px 40px -28px var(--qo-quantum); }
+.qo-root .qo-fcard .qo-ic { width: 40px; height: 40px; border-radius: 10px; display: grid; place-items: center; background: var(--qo-quantum-soft); color: var(--qo-quantum-deep); margin-bottom: 13px; }
+.qo-root .qo-fcard.alt .qo-ic { background: var(--qo-classical-soft); color: var(--qo-classical); }
+.qo-root .qo-fcard h3 { font-size: 16px; margin: 0 0 6px; letter-spacing: -0.01em; color: var(--qo-ink); font-weight: 700; }
+.qo-root .qo-fcard p { color: var(--qo-ink-2); font-size: 14px; margin: 0; line-height: 1.5; }
+.qo-root .qo-ic svg { width: 21px; height: 21px; }
+
+/* DUALITY — double funnel */
+.qo-root .qo-funnel { position: relative; }
+.qo-root .qo-funnel .stage { position: relative; height: 340px; }
+@media (max-width: 820px) { .qo-root .qo-funnel .stage { height: auto; } }
+.qo-root .qo-funnel svg.funnels { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 0; }
+.qo-root .qo-funnel canvas { position: absolute; inset: 0; width: 100%; height: 100%; z-index: 1; pointer-events: none; }
+.qo-root .qo-waist { position: absolute; top: 50%; left: 50%; transform: translate(-50%, -50%); z-index: 3; display: flex; flex-direction: column; align-items: center; gap: 8px; }
+.qo-root .qo-waist .orb { position: relative; width: 52px; height: 52px; border-radius: 50%; display: grid; place-items: center;
+  background: var(--qo-surface); border: 2px solid transparent; color: var(--qo-ink);
+  background-image: linear-gradient(var(--qo-surface), var(--qo-surface)), linear-gradient(135deg, var(--qo-quantum), var(--qo-classical));
+  background-origin: border-box; background-clip: padding-box, border-box;
+  box-shadow: 0 0 30px -2px var(--qo-quantum), 0 0 30px -2px var(--qo-classical);
+  animation: qo-waist-pulse var(--beat) var(--ease-io) infinite; }
+.qo-root .qo-waist .orb::before { content: ""; position: absolute; inset: -7px; border-radius: 50%; pointer-events: none;
+  border: 1.5px solid color-mix(in srgb, var(--qo-quantum) 55%, #fff);
+  box-shadow: 0 0 14px color-mix(in srgb, var(--qo-quantum) 60%, transparent);
+  animation: qo-ring var(--beat) var(--ease-io) infinite; }
+@keyframes qo-ring { 0% { transform: scale(.9); opacity: .85; } 100% { transform: scale(1.4); opacity: 0; } }
+@keyframes qo-waist-pulse {
+  0%,100% { box-shadow: 0 0 24px -6px var(--qo-quantum), 0 0 24px -6px var(--qo-classical); }
+  50%     { box-shadow: 0 0 34px -2px var(--qo-quantum), 0 0 34px -2px var(--qo-classical); }
 }
-@media (max-width: 760px) { .qo-duality { grid-template-columns: 1fr; } }
-.qo-duality .qo-side { padding: 28px 26px; }
-.qo-duality .q { background: linear-gradient(180deg, var(--qo-quantum-soft), transparent); }
-.qo-duality .c { background: linear-gradient(180deg, var(--qo-classical-soft), transparent); }
-.qo-duality .mid {
-  display: flex; align-items: center; justify-content: center; padding: 0 16px;
-  font-family: var(--qo-mono); color: var(--qo-ink-3); font-size: 20px;
-  border-left: 1px solid var(--qo-line); border-right: 1px solid var(--qo-line);
-}
-@media (max-width: 760px) { .qo-duality .mid { border: none; padding: 8px; } }
-.qo-duality h3 {
-  font-size: 13px; font-family: var(--qo-mono); letter-spacing: .04em; text-transform: uppercase;
-  margin: 0 0 14px;
-}
-.qo-duality .q h3 { color: var(--qo-quantum-deep); }
-.qo-duality .c h3 { color: var(--qo-classical); }
-.qo-mlist { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 7px; }
-.qo-mlist li {
-  font-family: var(--qo-mono); font-size: 12px; padding: 4px 9px; border-radius: 7px;
-  border: 1px solid var(--qo-line-2); color: var(--qo-ink-2); background: var(--qo-ground);
+.qo-root .qo-waist .orb svg { width: 26px; height: 26px; }
+.qo-root .qo-waist .label { font-family: var(--qo-mono); font-size: 10px; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--qo-ink-3); text-align: center; background: var(--qo-surface); padding: 2px 8px; border-radius: 999px; border: 1px solid var(--qo-line); }
+.qo-root .qo-fmouth { position: absolute; top: 50%; transform: translateY(-50%); z-index: 2; width: 34%; }
+.qo-root .qo-fmouth.q { left: 2%; } .qo-root .qo-fmouth.c { right: 2%; text-align: right; }
+.qo-root .qo-fmouth-head { display: flex; align-items: center; gap: 9px; margin-bottom: 12px; }
+.qo-root .qo-fmouth.c .qo-fmouth-head { flex-direction: row-reverse; }
+.qo-root .qo-fmouth-head .badge { width: 30px; height: 30px; flex: none; border-radius: 9px; display: grid; place-items: center; box-shadow: 0 0 16px -2px currentColor; }
+.qo-root .qo-fmouth.q .badge { background: var(--qo-quantum-soft); color: var(--qo-quantum-deep); }
+.qo-root .qo-fmouth.c .badge { background: var(--qo-classical-soft); color: var(--qo-classical); }
+.qo-root .qo-fmouth-head .badge svg { width: 17px; height: 17px; }
+.qo-root .qo-fmouth-head h3 { font-size: 12.5px; font-family: var(--qo-mono); letter-spacing: .04em; text-transform: uppercase; margin: 0; }
+.qo-root .qo-fmouth.q h3 { color: var(--qo-quantum-deep); } .qo-root .qo-fmouth.c h3 { color: var(--qo-classical); }
+.qo-root .qo-fmouth-head .tally { font-family: var(--qo-mono); font-size: 11px; color: var(--qo-ink-3);
+  padding: 2px 8px; border-radius: 999px; border: 1px solid var(--qo-line-2); background: color-mix(in srgb, var(--qo-surface) 78%, transparent); }
+.qo-root .qo-mlist { list-style: none; margin: 0; padding: 0; display: flex; flex-wrap: wrap; gap: 6px; }
+.qo-root .qo-fmouth.c .qo-mlist { justify-content: flex-end; }
+.qo-root .qo-mlist li { font-family: var(--qo-mono); font-size: 11.5px; padding: 4px 9px; border-radius: 7px;
+  border: 1px solid var(--qo-line-2); color: var(--qo-ink-2); background: color-mix(in srgb, var(--qo-surface) 82%, transparent);
+  transition: transform var(--dur-micro) var(--ease-out), border-color var(--dur-micro) var(--ease-out), box-shadow var(--dur-micro) var(--ease-out); }
+.qo-root .qo-fmouth.q .qo-mlist li:hover { transform: translateY(-2px); border-color: var(--qo-quantum); color: var(--qo-quantum-deep); box-shadow: 0 6px 16px -8px var(--qo-quantum); }
+.qo-root .qo-fmouth.c .qo-mlist li:hover { transform: translateY(-2px); border-color: var(--qo-classical); color: var(--qo-classical); box-shadow: 0 6px 16px -8px var(--qo-classical); }
+.qo-root .qo-funnel.in .qo-mlist li { animation: qo-rise var(--dur-ui) both var(--ease-out); animation-delay: calc(var(--stagger) * 0.4 * var(--i, 0)); }
+@media (max-width: 820px) {
+  .qo-root .qo-funnel .stage { display: flex; flex-direction: column; align-items: center; gap: 0; }
+  .qo-root .qo-funnel svg.funnels, .qo-root .qo-funnel canvas, .qo-root .qo-waist { display: none; }
+  .qo-root .qo-fmouth { position: static; width: 100%; transform: none; padding: 22px; border: 1px solid var(--qo-line); }
+  .qo-root .qo-fmouth.q { background: linear-gradient(180deg, var(--qo-quantum-soft), transparent); border-radius: 16px 16px 0 0; border-bottom: none; }
+  .qo-root .qo-fmouth.c { background: linear-gradient(180deg, transparent, var(--qo-classical-soft)); border-radius: 0 0 16px 16px; border-top: none; text-align: left; }
+  .qo-root .qo-fmouth.c .qo-fmouth-head { flex-direction: row; } .qo-root .qo-fmouth.c .qo-mlist { justify-content: flex-start; }
 }
 
-/* ---- FLOW ---- */
-.qo-flow { display: grid; grid-template-columns: repeat(6, 1fr); gap: 10px; }
-@media (max-width: 820px) { .qo-flow { grid-template-columns: repeat(2, 1fr); } }
-.qo-step { background: var(--qo-surface); border: 1px solid var(--qo-line); border-radius: 11px; padding: 16px 14px; }
-.qo-step .n { font-family: var(--qo-mono); font-size: 11px; color: var(--qo-quantum); font-weight: 700; }
-.qo-step h4 { margin: 6px 0 4px; font-size: 14.5px; font-weight: 700; color: var(--qo-ink); }
-.qo-step p { margin: 0; font-size: 12.5px; color: var(--qo-ink-3); }
+/* FLOW pipeline */
+.qo-root .qo-tron { position: relative; margin-top: 8px; padding: 8px 0; }
+.qo-root .qo-flow { position: relative; z-index: 1; display: grid; grid-template-columns: repeat(6, 1fr); gap: 16px; }
+.qo-root .qo-flow::before { content: ""; position: absolute; left: 8%; right: 8%; top: 30px; height: 2px; z-index: 0;
+  background: linear-gradient(90deg, var(--qo-quantum), var(--qo-classical)); opacity: .3; border-radius: 3px; }
+.qo-root .qo-flow::after { content: ""; position: absolute; top: 26px; left: 8%; width: 56px; height: 10px; z-index: 0; border-radius: 10px;
+  background: radial-gradient(closest-side, color-mix(in srgb, var(--qo-quantum) 60%, transparent), transparent);
+  animation: qo-pulse var(--beat) var(--ease-io) infinite; }
+@keyframes qo-pulse { 0% { left: 8%; opacity: 0; } 10% { opacity: .8; } 90% { opacity: .8; } 100% { left: calc(92% - 56px); opacity: 0; } }
+@media (max-width: 760px) { .qo-root .qo-flow { grid-template-columns: repeat(3, 1fr); row-gap: 30px; }
+  .qo-root .qo-flow::before, .qo-root .qo-flow::after { display: none; } }
+@media (max-width: 440px) { .qo-root .qo-flow { grid-template-columns: repeat(2, 1fr); } }
+.qo-root .qo-step { position: relative; z-index: 1; display: flex; flex-direction: column; align-items: center; text-align: center; gap: 11px; }
+.qo-root .qo-step .node { position: relative; width: 60px; height: 60px; border-radius: 16px; display: grid; place-items: center;
+  background: var(--qo-quantum-soft); color: var(--qo-quantum-deep); border: 1px solid var(--qo-line);
+  transition: transform var(--dur-micro) var(--ease-out), box-shadow var(--dur-micro) var(--ease-out); }
+.qo-root .qo-step:nth-child(n+4) .node { background: var(--qo-classical-soft); color: var(--qo-classical); }
+.qo-root .qo-step .node svg { width: 26px; height: 26px; }
+.qo-root .qo-step:hover .node { transform: translateY(-3px); box-shadow: 0 12px 24px -14px currentColor; }
+.qo-root .qo-step .node .n { position: absolute; top: -8px; right: -8px; width: 22px; height: 22px; border-radius: 50%; display: grid; place-items: center;
+  font-family: var(--qo-mono); font-size: 11px; font-weight: 700; color: #fff;
+  background: linear-gradient(135deg, var(--qo-quantum), var(--qo-classical)); border: 2px solid var(--qo-ground); }
+.qo-root .qo-step h4 { margin: 0; font-size: 15px; font-weight: 650; letter-spacing: -0.01em; color: var(--qo-ink); }
+.qo-root .qo-step p { margin: 0; font-size: 12.5px; color: var(--qo-ink-3); line-height: 1.35; }
 
-/* ---- CTA ---- */
-.qo-cta-band {
-  padding: 80px 0; text-align: center;
-  background: radial-gradient(120% 140% at 50% 0%, var(--qo-quantum-soft), transparent 62%);
-  border-top: 1px solid var(--qo-line);
+/* CTA */
+.qo-root .qo-cta-band { padding: 84px 0; text-align: center; background: radial-gradient(120% 140% at 50% 0%, var(--qo-quantum-soft), transparent 62%); border-top: 1px solid var(--qo-line); }
+.qo-root .qo-cta-band h2 { font-size: clamp(28px, 4.5vw, 44px); margin: 0 0 12px; letter-spacing: -0.02em; color: var(--qo-ink); font-weight: 800; }
+.qo-root .qo-cta-band p { color: var(--qo-ink-2); font-size: 17px; max-width: 46ch; margin: 0 auto 24px; }
+.qo-root .qo-cta-band .qo-cta { justify-content: center; }
+.qo-root code { font-family: var(--qo-mono); background: var(--qo-quantum-soft); color: var(--qo-quantum-deep); padding: 2px 6px; border-radius: 5px; }
+
+/* GLOBAL animation layer */
+.qo-root::before { content: ""; position: fixed; inset: -20vmax; z-index: -1; pointer-events: none;
+  background:
+    radial-gradient(38vmax 38vmax at 18% 12%, color-mix(in srgb, var(--qo-quantum) 16%, transparent), transparent 60%),
+    radial-gradient(34vmax 34vmax at 84% 78%, color-mix(in srgb, var(--qo-classical) 13%, transparent), transparent 60%),
+    radial-gradient(30vmax 30vmax at 62% 30%, color-mix(in srgb, var(--qo-quantum) 10%, transparent), transparent 60%);
+  filter: blur(20px); animation: qo-aurora calc(var(--beat) * 8) var(--ease-io) infinite alternate; }
+@keyframes qo-aurora {
+  0%   { transform: translate3d(0,0,0) scale(1); }
+  50%  { transform: translate3d(2%, -2.5%, 0) scale(1.08); }
+  100% { transform: translate3d(-2%, 2%, 0) scale(1.04); }
 }
-.qo-cta-band h2 { font-size: clamp(28px, 4.5vw, 44px); margin: 0 0 14px; color: var(--qo-ink); letter-spacing: -0.02em; }
-.qo-cta-band p { color: var(--qo-ink-2); font-size: 18px; max-width: 48ch; margin: 0 auto 26px; }
-.qo-cta-band .qo-cta { justify-content: center; }
+.qo-root #qo-space { position: absolute; top: 0; left: 0; width: 100%; z-index: -2; pointer-events: none; opacity: .9; }
+#qo-halo { position: fixed; top: 0; left: 0; width: 520px; height: 520px; z-index: -1; pointer-events: none;
+  margin: -260px 0 0 -260px; border-radius: 50%; opacity: 0; transition: opacity .6s var(--ease-out);
+  background:
+    radial-gradient(closest-side, color-mix(in srgb, #a78bfa 12%, transparent), transparent 62%),
+    radial-gradient(closest-side at 62% 62%, color-mix(in srgb, #fb923c 9%, transparent), transparent 60%);
+  filter: blur(14px); will-change: transform; }
+#qo-halo.on { opacity: .85; }
+
+.qo-root .qo-reveal { opacity: 0; transform: translateY(26px); transition: opacity var(--dur-ui) var(--ease-out), transform var(--dur-ui) var(--ease-out); }
+.qo-root .qo-reveal.in { opacity: 1; transform: none; }
+.qo-root .qo-fgrid.in .qo-fcard, .qo-root .qo-flow.in .qo-step, .qo-root .qo-stats.in .qo-stat { animation: qo-rise var(--dur-ui) both var(--ease-out); }
+.qo-root .qo-fgrid.in .qo-fcard:nth-child(2), .qo-root .qo-flow.in .qo-step:nth-child(2), .qo-root .qo-stats.in .qo-stat:nth-child(2) { animation-delay: calc(var(--stagger) * 1); }
+.qo-root .qo-fgrid.in .qo-fcard:nth-child(3), .qo-root .qo-flow.in .qo-step:nth-child(3) { animation-delay: calc(var(--stagger) * 2); }
+.qo-root .qo-fgrid.in .qo-fcard:nth-child(4), .qo-root .qo-flow.in .qo-step:nth-child(4) { animation-delay: calc(var(--stagger) * 3); }
+.qo-root .qo-fgrid.in .qo-fcard:nth-child(5), .qo-root .qo-flow.in .qo-step:nth-child(5) { animation-delay: calc(var(--stagger) * 4); }
+.qo-root .qo-fgrid.in .qo-fcard:nth-child(6), .qo-root .qo-flow.in .qo-step:nth-child(6) { animation-delay: calc(var(--stagger) * 5); }
+@keyframes qo-rise { from { opacity: 0; transform: translateY(20px); } to { opacity: 1; transform: none; } }
+.qo-root .qo-grad { background-size: 200% 100%; animation: qo-grad-shift calc(var(--beat) * 2.5) var(--ease-io) infinite; }
+@keyframes qo-grad-shift { 0%,100% { background-position: 0% 50%; } 50% { background-position: 100% 50%; } }
+.qo-root .qo-term { animation: qo-float calc(var(--beat) * 2) var(--ease-io) infinite; }
+@keyframes qo-float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-8px); } }
 
 @media (prefers-reduced-motion: reduce) {
-  .qo-btn, .qo-fcard { transition: none; }
+  .qo-root .qo-btn, .qo-root .qo-fcard, .qo-root .qo-mlist li, .qo-root .qo-step .node, .qo-root .qo-star-btn { transition: none; }
+  .qo-root::before, .qo-root .qo-grad, .qo-root .qo-term, .qo-root .qo-star-btn,
+  .qo-root .qo-waist .orb, .qo-root .qo-waist .orb::before, .qo-root .qo-flow::after, .qo-root .qo-funnel.in .qo-mlist li,
+  .qo-root .qo-fgrid.in .qo-fcard, .qo-root .qo-flow.in .qo-step, .qo-root .qo-stats.in .qo-stat { animation: none !important; }
+  .qo-root .qo-reveal { opacity: 1 !important; transform: none !important; }
 }
