@@ -66,6 +66,7 @@ def ensure_optuna_schema() -> None:
     if not url.startswith(("postgresql://", "postgresql+")):
         return
     from sqlalchemy import create_engine, text  # noqa: PLC0415
+
     if url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
     engine = create_engine(url)
