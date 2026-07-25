@@ -42,7 +42,7 @@ def get_engine(url: str | None = None):
 
 def init_db() -> None:
     """Create application tables; production schema changes use migrations."""
-    from quoptuna.server.services import models as _models  # noqa: F401
+    from quoptuna.server.services import models as _models
 
     SQLModel.metadata.create_all(get_engine())
 
