@@ -60,7 +60,8 @@ def get_engine(url: str | None = None):
 def init_db() -> None:
     """Create application tables; production schema changes use migrations."""
     SQLModel.metadata.create_all(
-        get_engine(), tables=[model.__table__ for model in APPLICATION_MODELS]  # type: ignore[attr-defined, union-attr]
+        get_engine(),
+        tables=[model.__table__ for model in APPLICATION_MODELS],  # type: ignore[attr-defined, union-attr]
     )
 
 
