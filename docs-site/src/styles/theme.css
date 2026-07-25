@@ -138,7 +138,13 @@ body:not(:has(.qo-hero)) .main-frame,
 body:not(:has(.qo-hero)) .main-pane,
 body:not(:has(.qo-hero)) .lg\:sl-flex { background: transparent !important; }
 /* main content sits above the starfield */
-body:not(:has(.qo-hero)) .page > .main-frame { position: relative; z-index: 1; }
+body:not(:has(.qo-hero)) .page > .main-frame {
+  position: relative;
+  z-index: 1;
+  /* the header is now sticky (in normal flow), so drop Starlight's fixed-header
+     spacer that would otherwise leave a large empty gap above the page title */
+  padding-top: 0 !important;
+}
 /* keep the top header STICKY, pinned above the starfield and content */
 body:not(:has(.qo-hero)) .page > header,
 body:not(:has(.qo-hero)) header.header {
@@ -154,6 +160,51 @@ body:not(:has(.qo-hero)) .sidebar-pane,
 body:not(:has(.qo-hero)) .right-sidebar {
   background: color-mix(in srgb, var(--qo-ground) 70%, transparent) !important;
 }
+
+/* -- Brand-themed scrollbars (slim, violet thumb) across the docs. -- */
+/* Firefox */
+.sidebar-content,
+.right-sidebar,
+.main-frame,
+html {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--qo-quantum) 55%, transparent) transparent;
+}
+/* WebKit / Chromium */
+.sidebar-content::-webkit-scrollbar,
+.right-sidebar::-webkit-scrollbar,
+.main-frame::-webkit-scrollbar,
+.sl-markdown-content pre::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.sidebar-content::-webkit-scrollbar-track,
+.right-sidebar::-webkit-scrollbar-track,
+.main-frame::-webkit-scrollbar-track,
+.sl-markdown-content pre::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-content::-webkit-scrollbar-thumb,
+.right-sidebar::-webkit-scrollbar-thumb,
+.main-frame::-webkit-scrollbar-thumb,
+.sl-markdown-content pre::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: linear-gradient(var(--qo-quantum), var(--qo-classical));
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.sidebar-content::-webkit-scrollbar-thumb:hover,
+.right-sidebar::-webkit-scrollbar-thumb:hover,
+.main-frame::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(var(--qo-quantum-deep), var(--qo-classical));
+  background-clip: padding-box;
+}
+.sidebar-content::-webkit-scrollbar-corner,
+body::-webkit-scrollbar-corner { background: transparent; }
 
 /* -- Custom landing page: let <Landing /> own the whole splash canvas. --
    The splash template still emits an <h1> from the page title; hide it and
