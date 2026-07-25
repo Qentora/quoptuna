@@ -100,6 +100,61 @@
   letter-spacing: -0.02em;
 }
 
+/* -- Brand gradient aesthetic on doc pages (not the custom landing). -- */
+/* Gradient wordmark in the header, matching the landing's --qo-grad. */
+body:not(:has(.qo-hero)) .site-title span {
+  background: linear-gradient(100deg, var(--qo-quantum), var(--qo-classical));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* Gradient page title (the main <h1>) on doc pages. */
+body:not(:has(.qo-hero)) .content-panel h1#_top {
+  background: linear-gradient(100deg, var(--qo-quantum), var(--qo-classical));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  width: fit-content;
+}
+/* Subtle ambient brand glow behind doc content, echoing the landing aurora. */
+body:not(:has(.qo-hero)) .main-frame::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(40vmax 40vmax at 100% 0%, color-mix(in srgb, var(--qo-classical) 8%, transparent), transparent 60%),
+    radial-gradient(44vmax 44vmax at 0% 100%, color-mix(in srgb, var(--qo-quantum) 9%, transparent), transparent 60%);
+}
+body:not(:has(.qo-hero)) .main-frame > * { position: relative; z-index: 1; }
+
+/* -- Let the site-wide star canvas (#qo-bg-space, injected at body level,
+   z-index:0) show through: keep the dark ground on <body>, make the page
+   wrappers transparent, and lift real content above the canvas. -- */
+body:not(:has(.qo-hero)) { background: var(--qo-ground) !important; }
+body:not(:has(.qo-hero)) .page,
+body:not(:has(.qo-hero)) .main-frame,
+body:not(:has(.qo-hero)) .main-pane,
+body:not(:has(.qo-hero)) .lg\:sl-flex { background: transparent !important; }
+/* main content sits above the starfield */
+body:not(:has(.qo-hero)) .page > .main-frame { position: relative; z-index: 1; }
+/* keep the top header STICKY, pinned above the starfield and content */
+body:not(:has(.qo-hero)) .page > header,
+body:not(:has(.qo-hero)) header.header {
+  position: sticky !important;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--qo-ground) 88%, transparent) !important;
+  backdrop-filter: blur(8px);
+}
+/* content column + sidebars get a faint translucent panel so text stays legible
+   while stars remain visible in the margins */
+body:not(:has(.qo-hero)) .sidebar-pane,
+body:not(:has(.qo-hero)) .right-sidebar {
+  background: color-mix(in srgb, var(--qo-ground) 70%, transparent) !important;
+}
+
 /* -- Custom landing page: let <Landing /> own the whole splash canvas. --
    The splash template still emits an <h1> from the page title; hide it and
    drop the content padding so our full-bleed sections start at the top. */

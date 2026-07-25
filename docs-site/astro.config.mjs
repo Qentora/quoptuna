@@ -23,6 +23,21 @@ export default defineConfig({
         alt: "QuOptuna",
       },
       favicon: "/favicon.png",
+      // Default the whole site to dark (matches the landing page). Runs before
+      // paint; a user's explicit theme choice in localStorage still wins.
+      head: [
+        {
+          tag: "script",
+          content:
+            "try{var t=localStorage.getItem('starlight-theme');" +
+            "if(t!=='light'&&t!=='dark'){document.documentElement.dataset.theme='dark';}}catch(e){}",
+        },
+        // Site-wide animated background (star particles + cursor halo).
+        {
+          tag: "script",
+          attrs: { src: base.replace(/\/$/, "") + "/qo-background.js", defer: true },
+        },
+      ],
       social: [
         {
           icon: "github",
