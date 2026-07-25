@@ -11,7 +11,7 @@ from datetime import datetime
 from pathlib import Path
 from typing import Any
 
-from sqlmodel import select
+from sqlmodel import col, select
 
 from quoptuna.server.core.config import settings
 from quoptuna.server.services.database import session_scope
@@ -70,9 +70,9 @@ def create_job(optimization_id: str, config: dict[str, Any]) -> dict[str, Any]:
             select(AnalysisJob)
             .where(
                 AnalysisJob.snapshot_id == snapshot.id,
-                AnalysisJob.status.in_(["pending", "running"]),
+                col(AnalysisJob.status).in_(["pending", "running"]),
             )
-            .order_by(AnalysisJob.created_at.desc())
+            .order_by(col(AnalysisJob.created_at).desc())
         ).first()
         if active:
             return {
@@ -121,6 +121,8 @@ def get_job(job_id: str) -> dict[str, Any] | None:
         if not job:
             return None
         snapshot = session.get(AnalysisSnapshot, job.snapshot_id)
+        if snapshot is None:
+            return None
         result = job.model_dump()
         result.update(
             {
@@ -258,6 +260,8 @@ def complete_job(job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
         temp_dir.replace(final_dir)
         with session_scope() as session:
             snapshot = session.get(AnalysisSnapshot, job["snapshot_id"])
+            if snapshot is None:
+                raise KeyError(job["snapshot_id"])
             snapshot.revision = revision
             snapshot.payload_json = json.dumps(stored_payload)
             snapshot.artifact_dir = str(final_dir)
@@ -265,6 +269,8 @@ def complete_job(job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
             snapshot.artifact_prefix = prefix if backend else None
             snapshot.completed_at = _now()
             analysis_job = session.get(AnalysisJob, job_id)
+            if analysis_job is None:
+                raise KeyError(job_id)
             analysis_job.status = "completed"
             analysis_job.current_section = "complete"
             analysis_job.completed_at = _now()
@@ -317,7 +323,7 @@ def list_snapshots(optimization_id: str) -> list[dict[str, Any]]:
             .where(
                 AnalysisSnapshot.optimization_id == optimization_id, AnalysisSnapshot.revision > 0
             )
-            .order_by(AnalysisSnapshot.completed_at.desc())
+            .order_by(col(AnalysisSnapshot.completed_at).desc())
         ).all()
         return [
             {
@@ -377,7 +383,7 @@ def list_reports(snapshot_id: str) -> list[dict[str, Any]]:
             for r in session.exec(
                 select(AnalysisReport)
                 .where(AnalysisReport.snapshot_id == snapshot_id)
-                .order_by(AnalysisReport.created_at.desc())
+                .order_by(col(AnalysisReport.created_at).desc())
             ).all()
         ]
 
@@ -402,18 +408,20 @@ def delete_for_run(optimization_id: str) -> None:
         ).all()
         snapshot_ids = [s.id for s in snapshots]
         for snapshot_id in snapshot_ids:
-            for row in session.exec(
+            for job_row in session.exec(
                 select(AnalysisJob).where(AnalysisJob.snapshot_id == snapshot_id)
             ).all():
-                session.delete(row)
-            for row in session.exec(
+                session.delete(job_row)
+            for report_row in session.exec(
                 select(AnalysisReport).where(AnalysisReport.snapshot_id == snapshot_id)
             ).all():
-                session.delete(row)
-            for row in session.exec(
+                session.delete(report_row)
+            for artifact_row in session.exec(
                 select(AnalysisArtifact).where(AnalysisArtifact.snapshot_id == snapshot_id)
             ).all():
-                session.delete(row)
-            session.delete(session.get(AnalysisSnapshot, snapshot_id))
+                session.delete(artifact_row)
+            snapshot_row = session.get(AnalysisSnapshot, snapshot_id)
+            if snapshot_row is not None:
+                session.delete(snapshot_row)
         session.commit()
     shutil.rmtree(ARTIFACT_ROOT / optimization_id, ignore_errors=True)

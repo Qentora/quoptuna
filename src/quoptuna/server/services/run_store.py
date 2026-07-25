@@ -3,7 +3,7 @@
 import json
 from typing import Any, Dict, List, Optional
 
-from sqlmodel import select
+from sqlmodel import col, select
 
 from quoptuna.server.services.database import session_scope
 from quoptuna.server.services.models import Dataset, Run
@@ -79,7 +79,7 @@ def get_run(job_id: str) -> Optional[Dict[str, Any]]:
 
 def list_runs() -> List[Dict[str, Any]]:
     with session_scope() as session:
-        rows = session.exec(select(Run).order_by(Run.started_at.desc())).all()
+        rows = session.exec(select(Run).order_by(col(Run.started_at).desc())).all()
         return [_run_dict(row) for row in rows]
 
 
@@ -93,7 +93,7 @@ def delete_run(job_id: str) -> None:
 
 def mark_stale_runs_interrupted() -> None:
     with session_scope() as session:
-        rows = session.exec(select(Run).where(Run.status.in_(["running", "pending"]))).all()
+        rows = session.exec(select(Run).where(col(Run.status).in_(["running", "pending"]))).all()
         for row in rows:
             row.status = "interrupted"
             session.add(row)
