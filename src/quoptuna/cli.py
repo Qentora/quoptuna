@@ -393,6 +393,7 @@ def migrate_supabase(
 ) -> None:
     """Migrate legacy application metadata into SQLModel/PostgreSQL."""
     import json  # noqa: PLC0415
+
     from quoptuna.server.core.config import settings  # noqa: PLC0415
     from quoptuna.server.services.migration import migrate_app_store  # noqa: PLC0415
 
