@@ -1,6 +1,6 @@
 [project]
 name = "quoptuna"
-version = "0.1.3"
+version = "0.1.4"
 description = "Fairness-aware, explainable AutoML for quantum and classical machine learning, powered by Optuna and PennyLane."
 authors = [
     {name = "Edwin Jose", email = "edwinjose900@gmail.com"},

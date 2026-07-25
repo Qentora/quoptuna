@@ -51,7 +51,6 @@ def optuna_storage_url(db_name: str) -> str:
         url = settings.DATABASE_URL
     else:
         return f"sqlite:///{optuna_db_path(db_name)}"
-    ensure_optuna_schema()
     if url.startswith("postgresql://"):
         url = url.replace("postgresql://", "postgresql+psycopg://", 1)
     parsed = urlparse(url)
@@ -66,6 +65,8 @@ def ensure_optuna_schema() -> None:
     if not url.startswith(("postgresql://", "postgresql+")):
         return
     from sqlalchemy import create_engine, text  # noqa: PLC0415
+    if url.startswith("postgresql://"):
+        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
     engine = create_engine(url)
     with engine.begin() as connection:
         schema = settings.OPTUNA_DB_SCHEMA.replace('"', '""')
