@@ -48,6 +48,9 @@ dependencies = [
     "fairlearn>=0.11.0",
     "openai-agents[litellm]>=0.0.16",
     "auth0-server-python>=1.0.0b1,<2",
+    "sqlmodel>=0.0.22,<0.1.0",
+    "psycopg[binary]>=3.2.0,<4.0.0",
+    "boto3>=1.35.0,<2.0.0",
 ]
 readme = "README.md"
 classifiers = [

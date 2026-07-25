@@ -18,6 +18,7 @@ class DatasetRecord(TypedDict, total=False):
     name: str
     source: str  # 'upload' | 'uci'
     file_path: str
+    object_key: Optional[str]
     rows: int
     columns: List[str]
 

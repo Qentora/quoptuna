@@ -13,6 +13,7 @@ from fastapi.responses import JSONResponse
 
 from quoptuna.server.core.config import settings
 from quoptuna.server.services import dataset_registry
+from quoptuna.server.services.analysis_store import get_artifact_store
 
 router = APIRouter()
 
@@ -89,12 +90,20 @@ async def upload_dataset(file: UploadFile = File(...)):
 
         df = pd.read_csv(file_path)
 
+        object_key = None
+        artifact_store = get_artifact_store()
+        if artifact_store:
+            object_key = artifact_store.upload_file(
+                file_path, f"{settings.S3_PREFIX.strip('/')}/datasets/{file_id}.csv", "text/csv"
+            )
+
         dataset_registry.register(
             {
                 "id": file_id,
                 "name": filename,
                 "source": "upload",
                 "file_path": str(file_path),
+                "object_key": object_key,
                 "rows": len(df),
                 "columns": list(df.columns),
             }
@@ -107,6 +116,7 @@ async def upload_dataset(file: UploadFile = File(...)):
                 "filename": file.filename,
                 "id": file_id,
                 "file_path": str(file_path),
+                "object_key": object_key,
                 "rows": len(df),
                 "columns": list(df.columns),
             },

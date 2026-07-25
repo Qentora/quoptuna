@@ -385,6 +385,75 @@ def optimize(  # noqa: PLR0913
     console.print_json(json.dumps(summary, default=str))
 
 
+@app.command("migrate-supabase")
+def migrate_supabase(
+    source_db: str = typer.Option("db/quoptuna_app.db", "--source-db"),
+    database_url: str = typer.Option(None, "--database-url"),
+    dry_run: bool = typer.Option(False, "--dry-run"),
+) -> None:
+    """Migrate legacy application metadata into SQLModel/PostgreSQL."""
+    import json  # noqa: PLC0415
+
+    from quoptuna.server.core.config import settings  # noqa: PLC0415
+    from quoptuna.server.services.migration import migrate_app_store  # noqa: PLC0415
+
+    target = database_url or settings.DATABASE_URL
+    result = migrate_app_store(source_db, target, dry_run=dry_run)
+    console.print_json(json.dumps(result))
+
+
+@app.command("migrate-optuna")
+def migrate_optuna(
+    source_db: str = typer.Argument(..., help="Local Optuna SQLite database, e.g. db/results.db."),
+    study_name: str = typer.Option(None, "--study-name", help="Migrate only this study."),
+    target_url: str = typer.Option(None, "--target-url", help="Override OPTUNA_DATABASE_URL."),
+) -> None:
+    """Copy Optuna studies from a local SQLite database to PostgreSQL/Supabase."""
+    import optuna  # noqa: PLC0415
+
+    from quoptuna.backend.utils.storage import (  # noqa: PLC0415
+        ensure_optuna_schema,
+        optuna_storage_url,
+    )
+    from quoptuna.server.core.config import settings  # noqa: PLC0415
+
+    source_path = Path(source_db)
+    if not source_path.exists():
+        console.print(f"[red]Source database not found:[/red] {source_db}")
+        raise typer.Exit(1)
+    if source_path.suffix.lower() != ".db":
+        console.print("[red]Source must be a SQLite .db file.[/red]")
+        raise typer.Exit(2)
+    if not (target_url or settings.OPTUNA_DATABASE_URL):
+        console.print("[red]Set OPTUNA_DATABASE_URL or pass --target-url.[/red]")
+        raise typer.Exit(2)
+
+    if target_url:
+        settings.OPTUNA_DATABASE_URL = target_url
+    source = f"sqlite:///{source_path}"
+    target = optuna_storage_url(source_path.stem)
+    ensure_optuna_schema()
+
+    summaries = optuna.study.get_all_study_summaries(storage=source)
+    if study_name:
+        summaries = [summary for summary in summaries if summary.study_name == study_name]
+        if not summaries:
+            console.print(f"[red]Study not found:[/red] {study_name}")
+            raise typer.Exit(1)
+
+    migrated = 0
+    for summary in summaries:
+        console.print(f"Migrating [bold]{summary.study_name}[/bold] ({summary.n_trials} trials)")
+        optuna.copy_study(
+            from_study_name=summary.study_name,
+            from_storage=source,
+            to_storage=target,
+            to_study_name=summary.study_name,
+        )
+        migrated += 1
+    console.print(f"[green]Migrated {migrated} study/studies.[/green]")
+
+
 def main() -> None:
     from quoptuna.backend.utils.log_file import attach_file_logging  # noqa: PLC0415
 

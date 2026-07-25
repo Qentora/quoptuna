@@ -3,7 +3,56 @@ title: CLI reference
 description: The quoptuna command-line interface — the run and optimize subcommands and their options.
 ---
 
-The `quoptuna` command is a [Typer](https://typer.tiangolo.com/) application with two subcommands. Invoking `quoptuna` with no subcommand is equivalent to `quoptuna run`.
+The `quoptuna` command is a [Typer](https://typer.tiangolo.com/) application. Invoking `quoptuna` with no subcommand is equivalent to `quoptuna run`.
+
+## `quoptuna migrate-supabase`
+
+Copy application metadata from the legacy SQLite `quoptuna_app.db` into the
+configured SQLModel database. The source file is not deleted.
+
+```bash
+quoptuna migrate-supabase \
+  --source-db db/quoptuna_app.db \
+  --database-url "$DATABASE_URL" \
+  --dry-run
+
+quoptuna migrate-supabase \
+  --source-db db/quoptuna_app.db \
+  --database-url "$DATABASE_URL"
+```
+
+`--dry-run` reports the records that would be copied. The command is safe to
+repeat and uses stable IDs when writing the destination.
+
+## `quoptuna migrate-optuna`
+
+Copy all Optuna studies from one local SQLite database into the PostgreSQL
+database configured by `OPTUNA_DATABASE_URL`:
+
+```bash
+quoptuna migrate-optuna db/results-trial-june15.db
+```
+
+Copy only one study:
+
+```bash
+quoptuna migrate-optuna \
+  db/results-trial-june15.db \
+  --study-name heart-june16-trial3
+```
+
+Override the configured destination:
+
+```bash
+quoptuna migrate-optuna \
+  db/results-trial-june15.db \
+  --target-url "$OPTUNA_DATABASE_URL"
+```
+
+The command copies study metadata and trials, does not delete the source file,
+and reports each migrated study. Existing studies with the same name can cause
+Optuna to reject a repeat; verify the destination before rerunning a partially
+completed migration.
 
 ## `quoptuna run`
 
