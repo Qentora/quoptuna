@@ -1,11 +1,14 @@
 """Textual UI for Terraform-backed QuOptuna infrastructure operations."""
 from __future__ import annotations
 
+import json
 from typing import TYPE_CHECKING, ClassVar
 
 from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
-from textual.widgets import Button, Footer, Header, Label, RichLog, Static
+from textual.screen import ModalScreen
+from textual.widgets import Button, Footer, Header, Input, Label, RichLog, Static
+from textual.worker import WorkerState
 
 from .runner import ALLOWED_ACTIONS, OperationResult, run_operation, validate_env_file
 
@@ -13,7 +16,58 @@ if TYPE_CHECKING:
     from pathlib import Path
 
     from textual.app import Binding
-    from textual.worker import Worker, WorkerState
+    from textual.worker import Worker
+
+
+class ConfirmOperation(ModalScreen[bool]):
+    """Require confirmation, optionally by typing an exact environment name."""
+
+    CSS = """
+    ConfirmOperation {
+        align: center middle;
+    }
+    #confirm-dialog {
+        width: 62;
+        height: auto;
+        border: round $warning;
+        background: $surface;
+        padding: 1 2;
+    }
+    #confirm-buttons {
+        height: auto;
+        align-horizontal: right;
+    }
+    """
+
+    def __init__(self, action: str, environment: str, *, typed: bool = False) -> None:
+        super().__init__()
+        self.action_name = action
+        self.environment = environment
+        self.typed = typed
+
+    def compose(self) -> ComposeResult:
+        with Vertical(id="confirm-dialog"):
+            yield Label(
+                f"{self.action_name.title()} infrastructure for {self.environment}?"
+            )
+            if self.typed:
+                yield Label(f"Type {self.environment} to confirm.")
+                yield Input(placeholder=self.environment, id="confirm-input")
+            with Horizontal(id="confirm-buttons"):
+                yield Button("Cancel", id="cancel")
+                yield Button("Confirm", variant="error", id="confirm")
+
+    def on_button_pressed(self, event: Button.Pressed) -> None:
+        if event.button.id == "cancel":
+            self.dismiss(False)  # noqa: FBT003
+            return
+        if event.button.id == "confirm":
+            if self.typed:
+                value = self.query_one("#confirm-input", Input).value.strip()
+                if value != self.environment:
+                    self.notify("Environment name does not match", severity="error")
+                    return
+            self.dismiss(True)  # noqa: FBT003
 
 
 class InfraApp(App[None]):
@@ -59,6 +113,16 @@ class InfraApp(App[None]):
     def on_button_pressed(self, event: Button.Pressed) -> None:
         action = event.button.id.removeprefix("action-") if event.button.id else ""
         if action in ALLOWED_ACTIONS:
+            if action in {"pause", "destroy"}:
+                self.push_screen(
+                    ConfirmOperation(action, self.environment, typed=action == "destroy"),
+                    lambda confirmed: self._confirmed_operation(action, confirmed=confirmed),
+                )
+            else:
+                self._start_operation(action)
+
+    def _confirmed_operation(self, action: str, *, confirmed: bool | None) -> None:
+        if confirmed:
             self._start_operation(action)
 
     def _start_operation(self, action: str) -> None:
@@ -95,4 +159,26 @@ class InfraApp(App[None]):
             result = event.worker.result
             if isinstance(result, OperationResult):
                 status = "succeeded" if result.succeeded else f"failed ({result.returncode})"
-                self.query_one("#status", Static).update(f"{result.action}: {status}")
+                if result.action == "status" and result.succeeded:
+                    self._render_status(result.output)
+                else:
+                    self.query_one("#status", Static).update(f"{result.action}: {status}")
+
+    def _render_status(self, output: str) -> None:
+        try:
+            value = json.loads(output)
+        except json.JSONDecodeError:
+            self.query_one("#status", Static).update("Status returned invalid JSON")
+            return
+        self.query_one("#status", Static).update(
+            "\n".join(
+                [
+                    f"State: {value.get('state', 'unknown')}",
+                    f"Health: {value.get('health', 'unknown')}",
+                    f"URL: {value.get('url', '-')}",
+                    f"Instance: {value.get('instance_id', '-')}",
+                    f"Active work: {value.get('active_work', 0)}",
+                    f"Image: {value.get('image') or '-'}",
+                ]
+            )
+        )

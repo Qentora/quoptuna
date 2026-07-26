@@ -107,6 +107,23 @@ async def get_current_user(request: Request) -> Optional[dict]:
     return await get_auth_client().get_user({"request": request})
 
 
+def enforce_approved_user(user: dict) -> dict:
+    """Require a verified identity whose email is explicitly approved."""
+    configured = settings.AUTH_ALLOWED_EMAILS
+    entries = configured.split(",") if isinstance(configured, str) else configured
+    allowed = {
+        email.strip().lower()
+        for email in entries
+        if isinstance(email, str) and email.strip()
+    }
+    email = str(user.get("email") or "").strip().lower()
+    if settings.AUTH_REQUIRE_VERIFIED_EMAIL and user.get("email_verified") is not True:
+        raise HTTPException(status_code=403, detail="A verified email address is required")
+    if allowed and email not in allowed:
+        raise HTTPException(status_code=403, detail="This email address is not approved")
+    return user
+
+
 async def require_user(request: Request) -> Optional[dict]:
     """FastAPI dependency: 401 unless a valid session exists.
 
@@ -118,4 +135,4 @@ async def require_user(request: Request) -> Optional[dict]:
     user = await get_current_user(request)
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return user
+    return enforce_approved_user(user)

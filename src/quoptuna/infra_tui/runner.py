@@ -32,8 +32,10 @@ def redact_output(value: str) -> str:
     return SECRET_PATTERN.sub(r"\1=***", value)
 
 
-def script_command(action: str, environment: str, *, terraform_dir: Path,
-                   env_file: Path | None = None, json_output: bool = False) -> list[str]:
+def script_command(  # noqa: PLR0913
+                   action: str, environment: str, *, terraform_dir: Path,
+                   env_file: Path | None = None, json_output: bool = False,
+                   confirmed_destroy: bool = False) -> list[str]:
     if action not in ALLOWED_ACTIONS:
         raise ValueError(f"Unsupported infrastructure action: {action}")  # noqa: EM102, TRY003
     if not environment or "/" in environment or ".." in environment:
@@ -43,13 +45,22 @@ def script_command(action: str, environment: str, *, terraform_dir: Path,
         command.extend(["--env-file", str(env_file)])
     if json_output:
         command.append("--json")
+    if confirmed_destroy and action == "destroy":
+        command.append("--confirm-destroy")
     return command
 
 
 def run_operation(action: str, environment: str, *, terraform_dir: Path,
                   env_file: Path | None = None,
                   on_output: Callable[[str], None] | None = None) -> OperationResult:
-    command = script_command(action, environment, terraform_dir=terraform_dir, env_file=env_file)
+    command = script_command(
+        action,
+        environment,
+        terraform_dir=terraform_dir,
+        env_file=env_file,
+        json_output=action == "status",
+        confirmed_destroy=action == "destroy",
+    )
     script = Path(command[0])
     if not script.is_file() or not os.access(script, os.X_OK):
         return OperationResult(action, 127, f"Script is missing or not executable: {script}")

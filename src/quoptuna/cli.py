@@ -466,6 +466,29 @@ def infrastructure(
     InfraApp(environment, terraform_dir.resolve(), env_file.resolve() if env_file else None).run()
 
 
+@app.command("active-work")
+def active_work() -> None:
+    """Print active optimization and analysis counts as JSON."""
+    import json  # noqa: PLC0415
+
+    from quoptuna.server.services.deployment import active_work as inspect_work  # noqa: PLC0415
+
+    console.print_json(json.dumps(inspect_work()))
+
+
+@app.command("deployment-check")
+def check_deployment() -> None:
+    """Print deployment readiness checks as JSON and fail when unhealthy."""
+    import json  # noqa: PLC0415
+
+    from quoptuna.server.services.deployment import deployment_check  # noqa: PLC0415
+
+    result = deployment_check()
+    console.print_json(json.dumps(result))
+    if not result["ok"]:
+        raise typer.Exit(1)
+
+
 def main() -> None:
     from quoptuna.backend.utils.log_file import attach_file_logging  # noqa: PLC0415
 

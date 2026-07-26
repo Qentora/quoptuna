@@ -23,3 +23,10 @@ def test_redact_output_hides_database_url() -> None:
 def test_validate_env_file(tmp_path: Path) -> None:
     assert validate_env_file(None)[0]
     assert not validate_env_file(tmp_path / "missing.env")[0]
+
+
+def test_destroy_confirmation_flag_is_only_added_explicitly(tmp_path: Path) -> None:
+    command = script_command(
+        "destroy", "production", terraform_dir=tmp_path, confirmed_destroy=True
+    )
+    assert command[-1] == "--confirm-destroy"

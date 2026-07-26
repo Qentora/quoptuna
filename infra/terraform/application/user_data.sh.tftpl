@@ -1,0 +1,55 @@
+#!/usr/bin/env bash
+set -euo pipefail
+
+dnf install -y docker jq awscli2
+systemctl enable --now docker
+mkdir -p /usr/local/lib/docker/cli-plugins /opt/quoptuna
+curl -fsSL \
+  https://github.com/docker/compose/releases/download/v2.32.4/docker-compose-linux-x86_64 \
+  -o /usr/local/lib/docker/cli-plugins/docker-compose
+chmod +x /usr/local/lib/docker/cli-plugins/docker-compose
+
+cat >/usr/local/bin/quoptuna-refresh-dns <<'SCRIPT'
+#!/usr/bin/env bash
+set -euo pipefail
+token="$(curl -fsS -X PUT -H 'X-aws-ec2-metadata-token-ttl-seconds: 60' \
+  http://169.254.169.254/latest/api/token)"
+public_ip="$(curl -fsS -H "X-aws-ec2-metadata-token: $token" \
+  http://169.254.169.254/latest/meta-data/public-ipv4)"
+change_file="$(mktemp)"
+trap 'rm -f "$change_file"' EXIT
+jq -n --arg name '${record_name}' --arg ip "$public_ip" '{
+  Changes: [{
+    Action: "UPSERT",
+    ResourceRecordSet: {
+      Name: $name, Type: "A", TTL: 60,
+      ResourceRecords: [{Value: $ip}]
+    }
+  }]
+}' >"$change_file"
+aws route53 change-resource-record-sets \
+  --region '${aws_region}' \
+  --hosted-zone-id '${hosted_zone_id}' \
+  --change-batch "file://$change_file"
+SCRIPT
+chmod +x /usr/local/bin/quoptuna-refresh-dns
+
+cat >/etc/systemd/system/quoptuna-start.service <<'UNIT'
+[Unit]
+Description=Refresh QuOptuna DNS and start containers
+After=network-online.target docker.service
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/local/bin/quoptuna-refresh-dns
+ExecStart=/bin/bash -c 'test ! -f /opt/quoptuna/docker-compose.yml || docker compose -f /opt/quoptuna/docker-compose.yml up -d'
+RemainAfterExit=yes
+
+[Install]
+WantedBy=multi-user.target
+UNIT
+
+systemctl daemon-reload
+systemctl enable quoptuna-start.service
+/usr/local/bin/quoptuna-refresh-dns

@@ -1,0 +1,47 @@
+name: Infrastructure
+
+on:
+  pull_request:
+    paths:
+      - "infra/**"
+      - "Dockerfile.production"
+      - ".dockerignore"
+      - ".env.deploy.example"
+      - ".github/workflows/infrastructure.yml"
+
+concurrency:
+  group: infrastructure-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: hashicorp/setup-terraform@v3
+        with:
+          terraform_version: "1.15.8"
+
+      - name: Install ShellCheck
+        run: |
+          sudo apt-get update
+          sudo apt-get install --yes shellcheck
+
+      - name: Shell syntax
+        run: |
+          bash -n infra/scripts/*.sh
+          shellcheck -x -P infra/scripts infra/scripts/*.sh
+
+      - name: Terraform formatting
+        run: terraform fmt -check -recursive infra/terraform
+
+      - name: Validate foundation
+        run: |
+          terraform -chdir=infra/terraform/foundation init -backend=false
+          terraform -chdir=infra/terraform/foundation validate
+
+      - name: Validate application
+        run: |
+          terraform -chdir=infra/terraform/application init -backend=false
+          terraform -chdir=infra/terraform/application validate
