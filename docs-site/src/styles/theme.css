@@ -100,6 +100,16 @@
   letter-spacing: -0.02em;
 }
 
+/* Official wordmark image in the header — size it to the header. */
+.site-title .qo-wordmark {
+  height: 1.7rem !important;
+  width: auto !important;
+  display: block;
+}
+@media (max-width: 30rem) {
+  .site-title .qo-wordmark { height: 1.35rem !important; }
+}
+
 /* -- Brand gradient aesthetic on doc pages (not the custom landing). -- */
 /* Gradient wordmark in the header, matching the landing's --qo-grad. */
 body:not(:has(.qo-hero)) .site-title span {

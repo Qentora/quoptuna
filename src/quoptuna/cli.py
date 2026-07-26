@@ -454,6 +454,18 @@ def migrate_optuna(
     console.print(f"[green]Migrated {migrated} study/studies.[/green]")
 
 
+@app.command("infra")
+def infrastructure(
+    environment: str = typer.Option("dev", "--environment", "-e"),
+    env_file: Path | None = typer.Option(None, "--env-file", help="Deployment .env file."),
+    terraform_dir: Path = typer.Option(Path("infra"), "--terraform-dir"),
+) -> None:
+    """Open the Textual console for Terraform-backed infrastructure operations."""
+    from quoptuna.infra_tui.app import InfraApp  # noqa: PLC0415
+
+    InfraApp(environment, terraform_dir.resolve(), env_file.resolve() if env_file else None).run()
+
+
 def main() -> None:
     from quoptuna.backend.utils.log_file import attach_file_logging  # noqa: PLC0415
 

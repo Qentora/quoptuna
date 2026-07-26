@@ -52,7 +52,10 @@ export default defineConfig({
       lastUpdated: true,
       // Custom marketing landing page uses the splash template; components below
       // let the homepage render bespoke sections while docs pages keep the shell.
-      components: {},
+      components: {
+        // Custom wordmark whose typography + gradient match the logo.
+        SiteTitle: "./src/components/SiteTitle.astro",
+      },
       sidebar: [
         {
           label: "Getting Started",
