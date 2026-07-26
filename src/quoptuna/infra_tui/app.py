@@ -1,18 +1,19 @@
 """Textual UI for Terraform-backed QuOptuna infrastructure operations."""
 from __future__ import annotations
 
-from collections.abc import Sequence
 from typing import TYPE_CHECKING, ClassVar
 
-from textual.app import App, Binding, ComposeResult
+from textual.app import App, ComposeResult
 from textual.containers import Horizontal, Vertical
 from textual.widgets import Button, Footer, Header, Label, RichLog, Static
-from textual.worker import Worker
 
 from .runner import ALLOWED_ACTIONS, OperationResult, run_operation, validate_env_file
 
 if TYPE_CHECKING:
     from pathlib import Path
+
+    from textual.app import Binding
+    from textual.worker import Worker, WorkerState
 
 
 class InfraApp(App[None]):
@@ -26,7 +27,7 @@ class InfraApp(App[None]):
     #logs { height: 1fr; border: round $accent; }
     Button { margin: 1; }
     """
-    BINDINGS: ClassVar[Sequence[Binding | tuple[str, str] | tuple[str, str, str]]] = [
+    BINDINGS: ClassVar[list[Binding | tuple[str, str] | tuple[str, str, str]]] = [
         ("q", "quit", "Quit"), ("r", "refresh", "Refresh status")
     ]
 
@@ -86,8 +87,11 @@ class InfraApp(App[None]):
         self.query_one("#logs", RichLog).write(line)
 
     def on_worker_state_changed(self, event: Worker.StateChanged) -> None:
-        if event.state.is_terminal:
+        if event.state in (WorkerState.CANCELLED, WorkerState.ERROR, WorkerState.SUCCESS):
             self.running = False
+            if event.state is not WorkerState.SUCCESS:
+                self.query_one("#status", Static).update(f"Operation {event.state.name.lower()}")
+                return
             result = event.worker.result
             if isinstance(result, OperationResult):
                 status = "succeeded" if result.succeeded else f"failed ({result.returncode})"
