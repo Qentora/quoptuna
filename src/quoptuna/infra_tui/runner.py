@@ -1,4 +1,5 @@
 """Safe subprocess execution for infrastructure scripts."""
+
 from __future__ import annotations
 
 import os
@@ -33,9 +34,14 @@ def redact_output(value: str) -> str:
 
 
 def script_command(  # noqa: PLR0913
-                   action: str, environment: str, *, terraform_dir: Path,
-                   env_file: Path | None = None, json_output: bool = False,
-                   confirmed_destroy: bool = False) -> list[str]:
+    action: str,
+    environment: str,
+    *,
+    terraform_dir: Path,
+    env_file: Path | None = None,
+    json_output: bool = False,
+    confirmed_destroy: bool = False,
+) -> list[str]:
     if action not in ALLOWED_ACTIONS:
         raise ValueError(f"Unsupported infrastructure action: {action}")  # noqa: EM102, TRY003
     if not environment or "/" in environment or ".." in environment:
@@ -50,9 +56,14 @@ def script_command(  # noqa: PLR0913
     return command
 
 
-def run_operation(action: str, environment: str, *, terraform_dir: Path,
-                  env_file: Path | None = None,
-                  on_output: Callable[[str], None] | None = None) -> OperationResult:
+def run_operation(
+    action: str,
+    environment: str,
+    *,
+    terraform_dir: Path,
+    env_file: Path | None = None,
+    on_output: Callable[[str], None] | None = None,
+) -> OperationResult:
     command = script_command(
         action,
         environment,
@@ -65,8 +76,12 @@ def run_operation(action: str, environment: str, *, terraform_dir: Path,
     if not script.is_file() or not os.access(script, os.X_OK):
         return OperationResult(action, 127, f"Script is missing or not executable: {script}")
     process = subprocess.Popen(  # noqa: S603
-        command, cwd=terraform_dir.parent, stdout=subprocess.PIPE,
-        stderr=subprocess.STDOUT, text=True, env=os.environ.copy()
+        command,
+        cwd=terraform_dir.parent,
+        stdout=subprocess.PIPE,
+        stderr=subprocess.STDOUT,
+        text=True,
+        env=os.environ.copy(),
     )
     lines: list[str] = []
     if process.stdout is None:

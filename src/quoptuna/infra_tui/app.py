@@ -1,4 +1,5 @@
 """Textual UI for Terraform-backed QuOptuna infrastructure operations."""
+
 from __future__ import annotations
 
 import json
@@ -47,9 +48,7 @@ class ConfirmOperation(ModalScreen[bool]):
 
     def compose(self) -> ComposeResult:
         with Vertical(id="confirm-dialog"):
-            yield Label(
-                f"{self.action_name.title()} infrastructure for {self.environment}?"
-            )
+            yield Label(f"{self.action_name.title()} infrastructure for {self.environment}?")
             if self.typed:
                 yield Label(f"Type {self.environment} to confirm.")
                 yield Input(placeholder=self.environment, id="confirm-input")
@@ -82,7 +81,8 @@ class InfraApp(App[None]):
     Button { margin: 1; }
     """
     BINDINGS: ClassVar[list[Binding | tuple[str, str] | tuple[str, str, str]]] = [
-        ("q", "quit", "Quit"), ("r", "refresh", "Refresh status")
+        ("q", "quit", "Quit"),
+        ("r", "refresh", "Refresh status"),
     ]
 
     def __init__(self, environment: str, terraform_dir: Path, env_file: Path | None) -> None:
@@ -140,7 +140,10 @@ class InfraApp(App[None]):
 
     def _run(self, action: str) -> OperationResult:
         return run_operation(
-            action, self.environment, terraform_dir=self.terraform_dir, env_file=self.env_file,
+            action,
+            self.environment,
+            terraform_dir=self.terraform_dir,
+            env_file=self.env_file,
             on_output=self._write_log_from_thread,
         )
 

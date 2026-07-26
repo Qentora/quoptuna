@@ -87,9 +87,7 @@ def count_active_runs() -> int:
     """Return durable runs that make a restart or stop unsafe."""
     with session_scope() as session:
         return len(
-            session.exec(
-                select(Run).where(col(Run.status).in_(["running", "pending"]))
-            ).all()
+            session.exec(select(Run).where(col(Run.status).in_(["running", "pending"]))).all()
         )
 
 

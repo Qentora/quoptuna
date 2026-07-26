@@ -19,9 +19,7 @@ def active_work() -> dict[str, int]:
     with session_scope() as session:
         analyses = len(
             session.exec(
-                select(AnalysisJob).where(
-                    col(AnalysisJob.status).in_(["pending", "running"])
-                )
+                select(AnalysisJob).where(col(AnalysisJob.status).in_(["pending", "running"]))
             ).all()
         )
     runs = count_active_runs()
