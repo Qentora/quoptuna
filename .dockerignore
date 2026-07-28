@@ -15,6 +15,9 @@ docs
 docs-site
 tests
 src/quoptuna/web
+frontend/.next
+frontend/node_modules
+frontend/out
 **/__pycache__
 *.pyc
 .DS_Store

@@ -62,3 +62,6 @@ def test_production_image_builds_frontend_from_source():
     assert "COPY --from=frontend /frontend/out ./src/quoptuna/web" in dockerfile
     assert "frontend" not in dockerignore
     assert "src/quoptuna/web" in dockerignore
+    assert "frontend/.next" in dockerignore
+    assert "frontend/node_modules" in dockerignore
+    assert "frontend/out" in dockerignore
