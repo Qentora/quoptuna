@@ -2,11 +2,11 @@
 import { defineConfig } from "astro/config";
 import starlight from "@astrojs/starlight";
 
-// Deployed to GitHub Pages project site: https://Qentora.github.io/quoptuna
-// so we need an explicit `site` + `base`. Override at build time for PR previews
-// with DOCS_SITE / DOCS_BASE env vars (see .github/workflows/docs-preview.yml).
-const site = process.env.DOCS_SITE ?? "https://Qentora.github.io";
-const base = process.env.DOCS_BASE ?? "/quoptuna";
+// Deployed to the apex custom domain https://quoptuna.org (GitHub Pages).
+// Served at the site root, so `base` is "/". Override at build time for PR
+// previews with DOCS_SITE / DOCS_BASE env vars (see docs-preview.yml).
+const site = process.env.DOCS_SITE ?? "https://quoptuna.org";
+const base = process.env.DOCS_BASE ?? "/";
 
 export default defineConfig({
   site,
@@ -23,6 +23,21 @@ export default defineConfig({
         alt: "QuOptuna",
       },
       favicon: "/favicon.png",
+      // Default the whole site to dark (matches the landing page). Runs before
+      // paint; a user's explicit theme choice in localStorage still wins.
+      head: [
+        {
+          tag: "script",
+          content:
+            "try{var t=localStorage.getItem('starlight-theme');" +
+            "if(t!=='light'&&t!=='dark'){document.documentElement.dataset.theme='dark';}}catch(e){}",
+        },
+        // Site-wide animated background (star particles + cursor halo).
+        {
+          tag: "script",
+          attrs: { src: base.replace(/\/$/, "") + "/qo-background.js", defer: true },
+        },
+      ],
       social: [
         {
           icon: "github",
@@ -37,7 +52,10 @@ export default defineConfig({
       lastUpdated: true,
       // Custom marketing landing page uses the splash template; components below
       // let the homepage render bespoke sections while docs pages keep the shell.
-      components: {},
+      components: {
+        // Custom wordmark whose typography + gradient match the logo.
+        SiteTitle: "./src/components/SiteTitle.astro",
+      },
       sidebar: [
         {
           label: "Getting Started",

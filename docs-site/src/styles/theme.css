@@ -37,8 +37,17 @@
   --qo-ink-2: #4a4360;
   --qo-ink-3: #6f6788;
   --qo-good: #059669;
+  --qo-star: #f5b301;
   --qo-display: "Archivo", var(--__sl-font, system-ui), sans-serif;
   --qo-mono: var(--__sl-font-mono, ui-monospace, "SF Mono", Menlo, monospace);
+
+  /* ---- Motion system: one beat, shared easings, standard durations ---- */
+  --beat: 3.2s;                 /* the base rhythm; every loop is a multiple */
+  --ease-out: cubic-bezier(.2, .7, .3, 1);
+  --ease-io:  cubic-bezier(.65, 0, .35, 1);
+  --dur-micro: .18s;            /* hovers / taps */
+  --dur-ui:    .6s;             /* reveals */
+  --stagger:   .08s;            /* gap between staggered siblings */
 }
 
 :root[data-theme="dark"] {
@@ -69,6 +78,7 @@
   --qo-ink-2: #b9b1d0;
   --qo-ink-3: #8a82a3;
   --qo-good: #34d399;
+  --qo-star: #f5c542;
 }
 
 /* Slightly tighter, more editorial headings to match the prototype. */
@@ -90,10 +100,127 @@
   letter-spacing: -0.02em;
 }
 
+/* Official wordmark image in the header — size it to the header. */
+.site-title .qo-wordmark {
+  height: 1.7rem !important;
+  width: auto !important;
+  display: block;
+}
+@media (max-width: 30rem) {
+  .site-title .qo-wordmark { height: 1.35rem !important; }
+}
+
+/* -- Brand gradient aesthetic on doc pages (not the custom landing). -- */
+/* Gradient wordmark in the header, matching the landing's --qo-grad. */
+body:not(:has(.qo-hero)) .site-title span {
+  background: linear-gradient(100deg, var(--qo-quantum), var(--qo-classical));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+}
+/* Gradient page title (the main <h1>) on doc pages. */
+body:not(:has(.qo-hero)) .content-panel h1#_top {
+  background: linear-gradient(100deg, var(--qo-quantum), var(--qo-classical));
+  -webkit-background-clip: text;
+  background-clip: text;
+  color: transparent;
+  width: fit-content;
+}
+/* Subtle ambient brand glow behind doc content, echoing the landing aurora. */
+body:not(:has(.qo-hero)) .main-frame::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  z-index: 0;
+  pointer-events: none;
+  background:
+    radial-gradient(40vmax 40vmax at 100% 0%, color-mix(in srgb, var(--qo-classical) 8%, transparent), transparent 60%),
+    radial-gradient(44vmax 44vmax at 0% 100%, color-mix(in srgb, var(--qo-quantum) 9%, transparent), transparent 60%);
+}
+body:not(:has(.qo-hero)) .main-frame > * { position: relative; z-index: 1; }
+
+/* -- Let the site-wide star canvas (#qo-bg-space, injected at body level,
+   z-index:0) show through: keep the dark ground on <body>, make the page
+   wrappers transparent, and lift real content above the canvas. -- */
+body:not(:has(.qo-hero)) { background: var(--qo-ground) !important; }
+body:not(:has(.qo-hero)) .page,
+body:not(:has(.qo-hero)) .main-frame,
+body:not(:has(.qo-hero)) .main-pane,
+body:not(:has(.qo-hero)) .lg\:sl-flex { background: transparent !important; }
+/* main content sits above the starfield */
+body:not(:has(.qo-hero)) .page > .main-frame {
+  position: relative;
+  z-index: 1;
+  /* the header is now sticky (in normal flow), so drop Starlight's fixed-header
+     spacer that would otherwise leave a large empty gap above the page title */
+  padding-top: 0 !important;
+}
+/* keep the top header STICKY, pinned above the starfield and content */
+body:not(:has(.qo-hero)) .page > header,
+body:not(:has(.qo-hero)) header.header {
+  position: sticky !important;
+  top: 0;
+  z-index: 20;
+  background: color-mix(in srgb, var(--qo-ground) 88%, transparent) !important;
+  backdrop-filter: blur(8px);
+}
+/* content column + sidebars get a faint translucent panel so text stays legible
+   while stars remain visible in the margins */
+body:not(:has(.qo-hero)) .sidebar-pane,
+body:not(:has(.qo-hero)) .right-sidebar {
+  background: color-mix(in srgb, var(--qo-ground) 70%, transparent) !important;
+}
+
+/* -- Brand-themed scrollbars (slim, violet thumb) across the docs. -- */
+/* Firefox */
+.sidebar-content,
+.right-sidebar,
+.main-frame,
+html {
+  scrollbar-width: thin;
+  scrollbar-color: color-mix(in srgb, var(--qo-quantum) 55%, transparent) transparent;
+}
+/* WebKit / Chromium */
+.sidebar-content::-webkit-scrollbar,
+.right-sidebar::-webkit-scrollbar,
+.main-frame::-webkit-scrollbar,
+.sl-markdown-content pre::-webkit-scrollbar,
+body::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.sidebar-content::-webkit-scrollbar-track,
+.right-sidebar::-webkit-scrollbar-track,
+.main-frame::-webkit-scrollbar-track,
+.sl-markdown-content pre::-webkit-scrollbar-track,
+body::-webkit-scrollbar-track {
+  background: transparent;
+}
+.sidebar-content::-webkit-scrollbar-thumb,
+.right-sidebar::-webkit-scrollbar-thumb,
+.main-frame::-webkit-scrollbar-thumb,
+.sl-markdown-content pre::-webkit-scrollbar-thumb,
+body::-webkit-scrollbar-thumb {
+  border-radius: 999px;
+  background: linear-gradient(var(--qo-quantum), var(--qo-classical));
+  border: 2px solid transparent;
+  background-clip: padding-box;
+}
+.sidebar-content::-webkit-scrollbar-thumb:hover,
+.right-sidebar::-webkit-scrollbar-thumb:hover,
+.main-frame::-webkit-scrollbar-thumb:hover,
+body::-webkit-scrollbar-thumb:hover {
+  background: linear-gradient(var(--qo-quantum-deep), var(--qo-classical));
+  background-clip: padding-box;
+}
+.sidebar-content::-webkit-scrollbar-corner,
+body::-webkit-scrollbar-corner { background: transparent; }
+
 /* -- Custom landing page: let <Landing /> own the whole splash canvas. --
    The splash template still emits an <h1> from the page title; hide it and
    drop the content padding so our full-bleed sections start at the top. */
-body:has(.qo-hero) .sl-markdown-content > h1:first-child {
+body:has(.qo-hero) .sl-markdown-content > h1:first-child,
+body:has(.qo-hero) h1#_top {
   position: absolute;
   width: 1px;
   height: 1px;
@@ -101,7 +228,95 @@ body:has(.qo-hero) .sl-markdown-content > h1:first-child {
   clip: rect(0 0 0 0);
   white-space: nowrap;
 }
+/* the splash template's title lives in its own content-panel; collapse it */
+body:has(.qo-hero) main > .content-panel:first-child { display: none !important; }
 body:has(.qo-hero) main .sl-container > .sl-markdown-content {
   margin-top: 0;
 }
+
+/* -- Bare, full-bleed landing that matches the standalone design exactly. --
+   On the landing page only: hide the Starlight top header/nav and strip every
+   content wrapper's padding, max-width and offsets so the custom <Landing />
+   sections span edge-to-edge (their own .qo-wrap handles inner width). */
+/* The landing always renders in the exact DARK theme of the standalone design,
+   regardless of the site-wide theme toggle. Pin the dark token values on the
+   landing page so it can never fall back to light. */
+body:has(.qo-hero) {
+  --sl-color-accent-low: #241a3d;
+  --sl-color-accent: #a78bfa;
+  --sl-color-accent-high: #ddd6fe;
+  --sl-color-white: #f3f0fb;
+  --sl-color-gray-1: #e5e0f3;
+  --sl-color-gray-2: #b9b1d0;
+  --sl-color-gray-3: #8a82a3;
+  --sl-color-gray-4: #4f4766;
+  --sl-color-gray-5: #372c50;
+  --sl-color-gray-6: #211a33;
+  --sl-color-gray-7: #171223;
+  --sl-color-black: #0d0a16;
+
+  --qo-quantum: #a78bfa;
+  --qo-quantum-deep: #c4b5fd;
+  --qo-quantum-soft: #241a3d;
+  --qo-classical: #fb923c;
+  --qo-classical-soft: #2e1a0f;
+  --qo-ground: #0d0a16;
+  --qo-surface: #171223;
+  --qo-line: #271f3a;
+  --qo-line-2: #372c50;
+  --qo-ink: #f3f0fb;
+  --qo-ink-2: #b9b1d0;
+  --qo-ink-3: #8a82a3;
+  --qo-good: #34d399;
+  --qo-star: #f5c542;
+}
+/* exact ground + text colour of the standalone design */
+body:has(.qo-hero),
+body:has(.qo-hero) .page,
+body:has(.qo-hero) .main-frame,
+body:has(.qo-hero) .main-pane {
+  background: var(--qo-ground) !important;
+  color: var(--qo-ink) !important;
+}
+body:has(.qo-hero) .header,
+body:has(.qo-hero) .sidebar,
+body:has(.qo-hero) .right-sidebar,
+body:has(.qo-hero) .mobile-preferences,
+body:has(.qo-hero) .sl-nav,
+body:has(.qo-hero) starlight-menu-button,
+body:has(.qo-hero) a[href="#_top"],
+body:has(.qo-hero) .print\:hidden,
+body:has(.qo-hero) main > footer,
+body:has(.qo-hero) .sl-markdown-content > footer,
+body:has(.qo-hero) footer {
+  display: none !important;
+}
+body:has(.qo-hero) .main-frame {
+  padding-top: 0 !important;
+  padding-inline-start: 0 !important;
+}
+/* kill the top sliver: the page wrapper's expanded-header spacer + any top pad */
+body:has(.qo-hero) { margin: 0 !important; }
+body:has(.qo-hero) .page { --sl-nav-height: 0px !important; display: block !important; }
+body:has(.qo-hero) .page > .header { position: static !important; height: 0 !important; }
+body:has(.qo-hero) .main-pane > .content-panel:first-of-type,
+body:has(.qo-hero) main { padding-top: 0 !important; margin-top: 0 !important; }
+body:has(.qo-hero) .main-pane { width: 100% !important; }
+body:has(.qo-hero) main > .content-panel,
+body:has(.qo-hero) main > .content-panel > .sl-container {
+  padding: 0 !important;
+  max-width: none !important;
+  margin: 0 !important;
+}
+body:has(.qo-hero) main .sl-container > .sl-markdown-content {
+  max-width: none !important;
+  margin: 0 !important;
+  padding: 0 !important;
+}
+/* the custom root must sit flush at the very top — kill margin-collapse gap */
+body:has(.qo-hero) .qo-root { margin: 0 !important; }
+body:has(.qo-hero) .qo-root > .qo-hero:first-of-type,
+body:has(.qo-hero) .qo-hero { margin-top: 0 !important; }
+/* the splash template adds a top border/hr on the first content panel — remove it */
+body:has(.qo-hero) main > .content-panel + .content-panel { border-top: 0 !important; }
 

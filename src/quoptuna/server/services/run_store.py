@@ -83,6 +83,14 @@ def list_runs() -> List[Dict[str, Any]]:
         return [_run_dict(row) for row in rows]
 
 
+def count_active_runs() -> int:
+    """Return durable runs that make a restart or stop unsafe."""
+    with session_scope() as session:
+        return len(
+            session.exec(select(Run).where(col(Run.status).in_(["running", "pending"]))).all()
+        )
+
+
 def delete_run(job_id: str) -> None:
     with session_scope() as session:
         row = session.get(Run, job_id)

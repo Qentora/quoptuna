@@ -1,0 +1,27 @@
+---
+// Overrides Starlight's SiteTitle: renders the official QuOptuna wordmark
+// (assets/branding/quoptuna_wordmark_transparent.svg) in the header, no icon.
+import type { Props } from "@astrojs/starlight/props";
+import wordmark from "../assets/quoptuna-wordmark.svg";
+
+const href = import.meta.env.BASE_URL;
+---
+
+<a href={href} class="site-title sl-flex qo-site-title" aria-label="QuOptuna">
+  <img src={wordmark.src} alt="QuOptuna" class="qo-wordmark" width={wordmark.width} height={wordmark.height} />
+</a>
+
+<style>
+  .qo-site-title {
+    align-items: center;
+    text-decoration: none;
+  }
+  .qo-wordmark {
+    height: 1.7rem;
+    width: auto;
+    display: block;
+  }
+  @media (max-width: 30rem) {
+    .qo-wordmark { height: 1.35rem; }
+  }
+</style>

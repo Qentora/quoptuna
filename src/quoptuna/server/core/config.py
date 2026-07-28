@@ -4,7 +4,7 @@ Application configuration
 
 from typing import List, Union
 
-from pydantic import field_validator
+from pydantic import field_validator, model_validator
 from pydantic_settings import BaseSettings
 
 
@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     # API Settings
     API_V1_STR: str = "/api/v1"
     PROJECT_NAME: str = "QuOptuna Next"
+    APP_ENV: str = "development"
 
     # CORS
     CORS_ORIGINS: Union[List[str], str] = [
@@ -64,6 +65,29 @@ class Settings(BaseSettings):
     AUTH0_CLIENT_SECRET: str = ""
     AUTH0_SECRET: str = ""  # 64-char hex, generate with: openssl rand -hex 32
     APP_BASE_URL: str = "http://localhost:8000"
+    AUTH_ALLOWED_EMAILS: Union[List[str], str] = []
+    AUTH_REQUIRE_VERIFIED_EMAIL: bool = True
+
+    @field_validator("AUTH_ALLOWED_EMAILS", mode="before")
+    @classmethod
+    def parse_allowed_emails(cls, value):
+        """Normalize a comma-separated allowlist while preserving list input."""
+        if isinstance(value, str):
+            return [email.strip().lower() for email in value.split(",") if email.strip()]
+        if isinstance(value, list):
+            return [str(email).strip().lower() for email in value if str(email).strip()]
+        return value
+
+    @model_validator(mode="after")
+    def validate_production_auth(self):
+        """Never start a public production deployment with an open Auth0 tenant."""
+        if (
+            self.APP_ENV.lower() == "production"
+            and self.AUTH_ENABLED
+            and not self.AUTH_ALLOWED_EMAILS
+        ):
+            raise ValueError("AUTH_ALLOWED_EMAILS is required when Auth0 is enabled in production")
+        return self
 
     @property
     def AUTH_ENABLED(self) -> bool:  # noqa: N802 - matches env-style settings naming

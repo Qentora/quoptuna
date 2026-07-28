@@ -8,7 +8,7 @@ from auth0_server_python.auth_types import LogoutOptions, StartInteractiveLoginO
 from fastapi import APIRouter, HTTPException, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 
-from quoptuna.server.core.auth import get_auth_client, get_current_user
+from quoptuna.server.core.auth import enforce_approved_user, get_auth_client, get_current_user
 from quoptuna.server.core.config import settings
 
 logger = logging.getLogger(__name__)
@@ -100,4 +100,4 @@ async def profile(request: Request):
     user = await get_current_user(request)
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return {"user": user, "auth_enabled": True}
+    return {"user": enforce_approved_user(user), "auth_enabled": True}

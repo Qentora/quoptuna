@@ -57,6 +57,9 @@ target/
 
 # Environments
 .env
+.env.deploy
+.env.production
+.env.dev
 .venv
 env/
 venv/
@@ -129,6 +132,13 @@ yarn-error.log*
 
 # env files (keep .env.example tracked)
 .env*.local
+
+# Terraform working data and local state (remote state is stored in S3).
+**/.terraform/*
+*.tfstate
+*.tfstate.*
+*.tfplan
+crash.log
 
 # vercel
 .vercel

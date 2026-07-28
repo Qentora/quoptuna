@@ -14,7 +14,7 @@ from starlette.types import Scope
 
 from quoptuna.backend.utils.log_file import attach_file_logging
 from quoptuna.server.api.v1 import analysis, auth, data, optimize, system
-from quoptuna.server.core.auth import require_user
+from quoptuna.server.core.auth import redirect_unauthenticated_requests, require_user
 from quoptuna.server.core.config import settings
 
 # Mirror all backend/server logs to db/logs/quoptuna.log (in addition to the
@@ -37,6 +37,7 @@ app.add_middleware(
     allow_methods=["*"],
     allow_headers=["*"],
 )
+app.middleware("http")(redirect_unauthenticated_requests)
 
 # Include routers. API routes require a session when Auth0 is configured
 # (AUTH0_* env vars set); /auth/*, /api/v1/health, and docs stay open.

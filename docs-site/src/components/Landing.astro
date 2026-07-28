@@ -2,81 +2,40 @@
 // Full marketing landing page for QuOptuna docs.
 // Reproduces the approved design prototype; scoped with the .qo- prefix so it
 // never affects Starlight doc pages. Rendered by src/content/docs/index.mdx.
+// Brand + motion tokens live in src/styles/theme.css.
 import "./landing.css";
 
 const base = import.meta.env.BASE_URL.replace(/\/$/, "");
 const href = (p: string) => `${base}/${p.replace(/^\//, "")}`;
-
-const features = [
-  {
-    title: "Guided 6-step wizard",
-    body: "Dataset → Features → Configure → Optimize → Analyze → Report. State persists across navigation and restarts.",
-    icon: '<path d="M4 6h16M4 12h10M4 18h7"/>',
-  },
-  {
-    title: "Samplers & pruners",
-    body: "TPE, random, and grid samplers with ASHA / Hyperband pruning. Iterative quantum models report intermediate scores for early stopping.",
-    icon: '<circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 3"/>',
-  },
-  {
-    title: "Fairness-aware search",
-    body: "Constrained or multi-objective search on equal-opportunity, disparate-impact, or demographic-parity disparity.",
-    icon: '<path d="M12 3l8 4v6c0 5-4 7-8 8-4-1-8-3-8-8V7z"/>',
-    alt: true,
-  },
-  {
-    title: "Explainable results",
-    body: "SHAP plots, metric curves, confusion matrices, and feature importance — computed on the best trial, on demand.",
-    icon: '<path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/>',
-  },
-  {
-    title: "AI-generated reports",
-    body: "Analyst + reviewer agents summarize a run into a governance-ready report via OpenAI, Gemini, or Anthropic.",
-    icon: '<path d="M4 4h16v12H4z"/><path d="M8 20h8M12 16v4"/>',
-    alt: true,
-  },
-  {
-    title: "Multiclass & persistence",
-    body: "One-vs-rest multiclass with macro-F1, decision-threshold tuning, and durable SQLite runs that rehydrate after a crash.",
-    icon: '<path d="M3 12l4-8 5 16 4-10 5 2"/>',
-  },
-];
-
-const quantumModels = [
-  "CircuitCentric", "DataReuploading", "DressedQuantumCircuit",
-  "ProjectedQuantumKernel", "QuantumKitchenSinks", "QuantumMetricLearner",
-  "TreeTensor", "IQPKernel", "Separable variants",
-];
-const classicalModels = ["SVC", "SVC (linear)", "MLPClassifier", "Perceptron"];
-
-const steps = [
-  { n: "01", h: "Dataset", p: "Upload CSV or load a UCI dataset." },
-  { n: "02", h: "Features", p: "Pick features, target, encoding." },
-  { n: "03", h: "Configure", p: "Models, sampler, pruner, fairness." },
-  { n: "04", h: "Optimize", p: "Run trials with live progress." },
-  { n: "05", h: "Analyze", p: "SHAP, metrics, fairness." },
-  { n: "06", h: "Report", p: "AI summary you can share." },
-];
+const REPO = "https://github.com/Qentora/quoptuna";
 ---
+
+<!-- Verbatim standalone design, self-contained under .qo-root so Starlight's
+     base styles / spacing / theme never alter it. Renders in the exact dark
+     theme of the artifact. -->
+<div class="qo-root">
+<canvas id="qo-space" aria-hidden="true"></canvas>
+<div id="qo-halo" aria-hidden="true"></div>
 
 <!-- ============================ HERO ============================ -->
 <section class="qo-hero">
+  <canvas id="hero-cvs" aria-hidden="true" style="position:absolute;inset:0;width:100%;height:100%;opacity:.55;pointer-events:none;z-index:0"></canvas>
   <div class="qo-wrap">
     <div class="qo-hero-grid">
       <div>
         <div class="qo-badges">
-          <span class="qo-pill"><span class="qo-dot q"></span> Quantum models</span>
-          <span class="qo-pill"><span class="qo-dot c"></span> Classical models</span>
-          <span class="qo-pill">Built on Optuna + PennyLane</span>
+          <span class="qo-pill"><span class="qo-dot q"></span> Quantum</span>
+          <span class="qo-pill"><span class="qo-dot c"></span> Classical</span>
+          <span class="qo-pill">Optuna + PennyLane</span>
         </div>
-        <h1>Tune quantum &amp; classical models in <span class="qo-grad">one search</span>.</h1>
-        <p class="qo-lede">
-          QuOptuna runs a single hyperparameter search across quantum and classical
-          classifiers — fairness-aware, explainable, and reproducible.
-        </p>
+        <h1>One search. <span class="qo-grad">Quantum &amp; classical</span>.</h1>
+        <p class="qo-lede">Fairness-aware, explainable hyperparameter tuning across both model families.</p>
         <div class="qo-cta">
           <a class="qo-btn qo-btn-primary" href={href("getting-started/quickstart")}>Get started →</a>
-          <a class="qo-btn qo-btn-secondary" href="#how-it-works">See how it works</a>
+          <a class="qo-btn qo-btn-secondary" href={REPO}>
+            <svg viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+            Star
+          </a>
         </div>
       </div>
       <div class="qo-term" role="img" aria-label="Example terminal running quoptuna optimize">
@@ -95,65 +54,132 @@ const steps = [
   </div>
 </section>
 
+<!-- ============================ STAR BANNER ============================ -->
+<section class="qo-star-band">
+  <div class="qo-wrap">
+    <div class="qo-star-inner">
+      <div>
+        <div class="qo-eyebrow">Open source · MIT</div>
+        <h2>Star it if it saved you a trial.</h2>
+        <p>Stars help other researchers find QuOptuna and steer what we build next.</p>
+      </div>
+      <div class="qo-star-side">
+        <div class="qo-stats">
+          <div class="qo-stat star">
+            <div class="v"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l3.09 6.26L22 9.27l-5 4.87 1.18 6.88L12 17.77l-6.18 3.25L7 14.14 2 9.27l6.91-1.01L12 2z"/></svg><span id="stat-stars">—</span></div>
+            <div class="k">GitHub stars</div>
+          </div>
+          <div class="qo-stat dl">
+            <div class="v"><span id="stat-dl">—</span></div>
+            <div class="k">PyPI / month</div>
+          </div>
+        </div>
+        <a class="qo-star-btn" href={REPO} target="_blank" rel="noopener">
+          <svg class="gh" viewBox="0 0 16 16" fill="currentColor"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27.68 0 1.36.09 2 .27 1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8z"/></svg>
+          Star on GitHub
+        </a>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- ============================ FEATURES ============================ -->
 <section class="qo-section" id="features">
   <div class="qo-wrap">
     <div class="qo-sec-head">
       <div class="qo-eyebrow">Capabilities</div>
-      <h2>Everything a real optimization run needs.</h2>
-      <p>Not a toy — QuOptuna ships the search, the guardrails, and the explanation in one package.</p>
+      <h2>Everything a real run needs.</h2>
     </div>
     <div class="qo-fgrid">
-      {features.map((f) => (
-        <div class={`qo-fcard${f.alt ? " alt" : ""}`}>
-          <div class="qo-ic">
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" set:html={f.icon} />
-          </div>
-          <h3>{f.title}</h3>
-          <p>{f.body}</p>
-        </div>
-      ))}
+      <div class="qo-fcard"><div class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M4 12h10M4 18h7"/></svg></div><h3>6-step wizard</h3><p>Dataset → Report. State persists across restarts.</p></div>
+      <div class="qo-fcard"><div class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><path d="M12 3v9l6 3"/></svg></div><h3>Samplers &amp; pruners</h3><p>TPE, random, grid — with ASHA / Hyperband early stopping.</p></div>
+      <div class="qo-fcard alt"><div class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l8 4v6c0 5-4 7-8 8-4-1-8-3-8-8V7z"/></svg></div><h3>Fairness-aware</h3><p>Constrained or multi-objective on disparity metrics.</p></div>
+      <div class="qo-fcard"><div class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 20V10M10 20V4M16 20v-7M22 20H2"/></svg></div><h3>Explainable</h3><p>SHAP, metric curves, confusion matrices on demand.</p></div>
+      <div class="qo-fcard alt"><div class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 4h16v12H4z"/><path d="M8 20h8M12 16v4"/></svg></div><h3>AI reports</h3><p>Governance-ready summaries via OpenAI, Gemini, or Anthropic.</p></div>
+      <div class="qo-fcard"><div class="qo-ic"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12l4-8 5 16 4-10 5 2"/></svg></div><h3>Multiclass &amp; durable</h3><p>One-vs-rest macro-F1, SQLite runs that survive crashes.</p></div>
     </div>
   </div>
 </section>
 
-<!-- ============================ DUALITY / MODELS ============================ -->
+<!-- ============================ MODEL CATALOG (double funnel) ============================ -->
 <section class="qo-section" id="models">
   <div class="qo-wrap">
     <div class="qo-sec-head">
       <div class="qo-eyebrow">Model catalog</div>
       <h2>Two search spaces, one objective.</h2>
-      <p>A conditional space suggests the model first, then only that model's parameters — so the sampler never wastes trials on irrelevant knobs.</p>
     </div>
-    <div class="qo-duality">
-      <div class="qo-side q">
-        <h3>Quantum · PennyLane</h3>
-        <ul class="qo-mlist">{quantumModels.map((m) => <li>{m}</li>)}</ul>
-      </div>
-      <div class="mid">⟷</div>
-      <div class="qo-side c">
-        <h3>Classical · scikit-learn</h3>
-        <ul class="qo-mlist">{classicalModels.map((m) => <li>{m}</li>)}</ul>
-        <p style="font-size:13px;color:var(--qo-ink-3);margin:16px 0 0">
-          Baselines run in the same study, scored on the same validation split.
-        </p>
+    <div class="qo-funnel">
+      <div class="stage">
+        <svg class="funnels" viewBox="0 0 1000 340" preserveAspectRatio="none" aria-hidden="true">
+          <style>
+            .funnels .fq { fill: var(--qo-quantum); }
+            .funnels .fc { fill: var(--qo-classical); }
+            .funnels .sq { stroke: var(--qo-quantum); } .funnels .sc { stroke: var(--qo-classical); }
+          </style>
+          <defs>
+            <linearGradient id="qo-fq" x1="0" y1="0" x2="1" y2="0">
+              <stop class="fq" offset="0" stop-opacity="0.34"/>
+              <stop class="fq" offset="0.7" stop-opacity="0.14"/>
+              <stop class="fq" offset="1" stop-opacity="0.05"/>
+            </linearGradient>
+            <linearGradient id="qo-fc" x1="1" y1="0" x2="0" y2="0">
+              <stop class="fc" offset="0" stop-opacity="0.34"/>
+              <stop class="fc" offset="0.7" stop-opacity="0.14"/>
+              <stop class="fc" offset="1" stop-opacity="0.05"/>
+            </linearGradient>
+            <filter id="qo-soft" x="-20%" y="-20%" width="140%" height="140%">
+              <feGaussianBlur stdDeviation="6" result="b"/>
+              <feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge>
+            </filter>
+          </defs>
+          <g filter="url(#qo-soft)" opacity="0.9">
+            <path class="sq" d="M8,8 C4,120 4,220 8,332 C 180,314 360,250 470,190 C 486,182 486,158 470,150 C 360,90 180,26 8,8 Z" fill="url(#qo-fq)" stroke-opacity="0.4" stroke-width="1.5"/>
+            <path class="sc" d="M992,8 C996,120 996,220 992,332 C 820,314 640,250 530,190 C 514,182 514,158 530,150 C 640,90 820,26 992,8 Z" fill="url(#qo-fc)" stroke-opacity="0.4" stroke-width="1.5"/>
+          </g>
+        </svg>
+        <canvas id="duality-cvs" aria-hidden="true"></canvas>
+
+        <div class="qo-fmouth q">
+          <div class="qo-fmouth-head">
+            <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="2"/><ellipse cx="12" cy="12" rx="10" ry="4.2"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(60 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4.2" transform="rotate(120 12 12)"/></svg></span>
+            <h3>Quantum · PennyLane</h3><span class="tally">9</span>
+          </div>
+          <ul class="qo-mlist"><li style="--i:1">CircuitCentric</li><li style="--i:2">DataReuploading</li><li style="--i:3">DressedQuantumCircuit</li><li style="--i:4">ProjectedQuantumKernel</li><li style="--i:5">QuantumKitchenSinks</li><li style="--i:6">QuantumMetricLearner</li><li style="--i:7">TreeTensor</li><li style="--i:8">IQPKernel</li><li style="--i:9">Separable</li></ul>
+        </div>
+
+        <div class="qo-waist">
+          <div class="orb"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="4"/><circle cx="12" cy="12" r="1" fill="currentColor"/></svg></div>
+          <div class="label">one objective</div>
+        </div>
+
+        <div class="qo-fmouth c">
+          <div class="qo-fmouth-head">
+            <span class="badge"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 19V5M20 19V9M12 19V13"/><path d="M3 19h18"/></svg></span>
+            <h3>Classical · scikit-learn</h3><span class="tally">4</span>
+          </div>
+          <ul class="qo-mlist"><li style="--i:1">SVC</li><li style="--i:2">SVC (linear)</li><li style="--i:3">MLPClassifier</li><li style="--i:4">Perceptron</li></ul>
+        </div>
       </div>
     </div>
   </div>
 </section>
 
-<!-- ============================ FLOW ============================ -->
+<!-- ============================ FLOW / PIPELINE ============================ -->
 <section class="qo-section" id="how-it-works">
   <div class="qo-wrap">
     <div class="qo-sec-head">
       <div class="qo-eyebrow">End to end</div>
       <h2>From a CSV to a report.</h2>
-      <p>The same pipeline drives the web wizard, the headless CLI, and the Python API.</p>
     </div>
-    <div class="qo-flow">
-      {steps.map((s) => (
-        <div class="qo-step"><div class="n">{s.n}</div><h4>{s.h}</h4><p>{s.p}</p></div>
-      ))}
+    <div class="qo-tron">
+      <div class="qo-flow">
+        <div class="qo-step"><div class="node"><span class="n">1</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 5h16v14H4z"/><path d="M4 9h16M9 9v10"/></svg></div><h4>Dataset</h4><p>CSV or UCI</p></div>
+        <div class="qo-step"><div class="node"><span class="n">2</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M4 6h16M7 12h10M10 18h4"/></svg></div><h4>Features</h4><p>Pick &amp; encode</p></div>
+        <div class="qo-step"><div class="node"><span class="n">3</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M12 2v3M12 19v3M2 12h3M19 12h3M5 5l2 2M17 17l2 2M19 5l-2 2M7 17l-2 2"/></svg></div><h4>Configure</h4><p>Models, sampler</p></div>
+        <div class="qo-step"><div class="node"><span class="n">4</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17l5-6 4 4 6-8"/><path d="M3 21h18"/></svg></div><h4>Optimize</h4><p>Live trials</p></div>
+        <div class="qo-step"><div class="node"><span class="n">5</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="11" cy="11" r="7"/><path d="M21 21l-4-4"/></svg></div><h4>Analyze</h4><p>SHAP &amp; metrics</p></div>
+        <div class="qo-step"><div class="node"><span class="n">6</span><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M6 2h9l3 3v17H6z"/><path d="M9 12h6M9 16h6"/></svg></div><h4>Report</h4><p>AI summary</p></div>
+      </div>
     </div>
   </div>
 </section>
@@ -162,84 +188,191 @@ const steps = [
 <section class="qo-cta-band">
   <div class="qo-wrap">
     <h2>Boot the whole app with one command.</h2>
-    <p><code>uvx quoptuna</code> serves the UI and API on a single port and opens your browser — no Node, no checkout.</p>
+    <p><code>uvx quoptuna</code> serves the UI and API on a single port — no Node, no checkout.</p>
     <div class="qo-cta">
       <a class="qo-btn qo-btn-primary" href={href("getting-started/installation")}>Read the quickstart →</a>
       <a class="qo-btn qo-btn-secondary" href={href("reference/python-api")}>Browse the API reference</a>
     </div>
   </div>
 </section>
+</div>
 
 <script>
-  // Hero canvas: a converging "trial field" — points drift toward an optimum,
-  // colored across the quantum→classical axis. Quiet, subject-grounded motion.
   const reduce = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
-  const hero = document.querySelector(".qo-hero");
-  if (hero && !reduce) {
-    const cvs = document.createElement("canvas");
-    cvs.setAttribute("aria-hidden", "true");
-    Object.assign(cvs.style, {
-      position: "absolute", inset: "0", width: "100%", height: "100%",
-      opacity: "0.6", pointerEvents: "none", zIndex: "0",
-    });
-    (hero as HTMLElement).style.position = "relative";
-    hero.prepend(cvs);
-    const inner = hero.querySelector(".qo-wrap") as HTMLElement | null;
-    if (inner) { inner.style.position = "relative"; inner.style.zIndex = "1"; }
 
-    const ctx = cvs.getContext("2d")!;
+  // ---- Space starfield: twinkling dust over the WHOLE page; varied sizes;
+  //      click drops a gravity well that slowly pulls particles in, then fades.
+  const space = document.getElementById("qo-space") as HTMLCanvasElement | null;
+  if (space && !reduce) {
+    const sx = space.getContext("2d")!;
     const DPR = Math.min(window.devicePixelRatio || 1, 2);
     let W = 0, H = 0;
-    const pts: { x: number; y: number; tx: number; ty: number; t: number; s: number }[] = [];
-
-    const hex = (v: string) => {
-      const c = getComputedStyle(document.documentElement).getPropertyValue(v).trim();
-      return c || "#7c3aed";
-    };
-    const lerp = (a: string, b: string, t: number) => {
-      const p = (x: string) => {
-        x = x.replace("#", "");
-        return [parseInt(x.slice(0, 2), 16), parseInt(x.slice(2, 4), 16), parseInt(x.slice(4, 6), 16)];
-      };
-      // fall back gracefully if a token isn't hex
-      if (!a.startsWith("#") || !b.startsWith("#")) return a;
-      const A = p(a), B = p(b);
-      return `rgb(${Math.round(A[0] + (B[0] - A[0]) * t)},${Math.round(A[1] + (B[1] - A[1]) * t)},${Math.round(A[2] + (B[2] - A[2]) * t)})`;
-    };
-
-    function resize() {
-      const r = cvs.getBoundingClientRect();
-      W = r.width; H = r.height;
-      cvs.width = W * DPR; cvs.height = H * DPR;
-      ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-      if (!pts.length) {
-        for (let i = 0; i < 60; i++) {
-          pts.push({
-            x: Math.random() * W, y: Math.random() * H,
-            tx: W * (0.6 + Math.random() * 0.14), ty: H * (0.42 + Math.random() * 0.16),
-            t: Math.random(), s: 1 + Math.random() * 2,
-          });
-        }
+    const stars: { x: number; y: number; r: number; hx: number; hy: number; vx: number; vy: number; tw: number; tws: number; c: boolean }[] = [];
+    const svar = (v: string) => (getComputedStyle(document.documentElement).getPropertyValue(v).trim() || "#7c3aed");
+    const docHeight = () => Math.max(document.body.scrollHeight, document.documentElement.scrollHeight, window.innerHeight);
+    function sResize() {
+      W = window.innerWidth; H = docHeight();
+      space!.style.height = H + "px";
+      space!.width = W * DPR; space!.height = H * DPR; sx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      const target = Math.round(W * H / 14000);
+      stars.length = 0;
+      for (let i = 0; i < target; i++) {
+        const big = Math.random() < 0.14;
+        const r = big ? (2 + Math.random() * 2.2) : (0.3 + Math.random() * 1.1);
+        stars.push({
+          x: Math.random() * W, y: Math.random() * H, r, hx: 0, hy: 0,
+          vx: (Math.random() - 0.5) * 0.05, vy: (Math.random() - 0.5) * 0.05,
+          tw: Math.random() * 6.28, tws: (0.008 + Math.random() * 0.015) * (big ? 0.7 : 1),
+          c: Math.random() < 0.5,
+        });
       }
+      for (const s of stars) { s.hx = s.x; s.hy = s.y; }
     }
-    function frame() {
-      if (!W) { requestAnimationFrame(frame); return; }
-      const q = hex("--qo-quantum"), c = hex("--qo-classical");
-      ctx.clearRect(0, 0, W, H);
-      for (const p of pts) {
-        p.x += (p.tx - p.x) * 0.006; p.y += (p.ty - p.y) * 0.006;
-        if (Math.abs(p.tx - p.x) < 6 && Math.abs(p.ty - p.y) < 6) {
-          p.x = Math.random() * W; p.y = Math.random() * H;
+    const wells: { x: number; y: number; life: number }[] = [];
+    document.addEventListener("click", (e) => {
+      if ((e.target as Element)?.closest("a, button, input, textarea, select, label")) return;
+      wells.push({ x: e.pageX, y: e.pageY, life: 1 });
+      if (wells.length > 4) wells.shift();
+    });
+    function sFrame() {
+      if (!W) { requestAnimationFrame(sFrame); return; }
+      const q = svar("--qo-quantum"), c = svar("--qo-classical");
+      sx.clearRect(0, 0, W, H);
+      for (const w of wells) w.life -= 0.006;
+      for (let k = wells.length - 1; k >= 0; k--) if (wells[k].life <= 0) wells.splice(k, 1);
+      for (const s of stars) {
+        for (const w of wells) {
+          const dx = w.x - s.x, dy = w.y - s.y, d2 = dx*dx + dy*dy, R = 260;
+          if (d2 < R*R) { const d = Math.sqrt(d2) || 1; const pull = (1 - d/R) * w.life * 0.045;
+            s.vx += (dx/d) * pull; s.vy += (dy/d) * pull; }
         }
-        ctx.beginPath();
-        ctx.fillStyle = lerp(q, c, p.t);
-        ctx.arc(p.x, p.y, p.s, 0, 6.283);
-        ctx.fill();
+        s.vx += (s.hx - s.x) * 0.0004; s.vy += (s.hy - s.y) * 0.0004;
+        s.x += s.vx; s.y += s.vy; s.vx *= 0.97; s.vy *= 0.97; s.tw += s.tws;
+        if (s.x < 0) s.x = W; if (s.x > W) s.x = 0;
+        if (s.y < 0) s.y = H; if (s.y > H) s.y = 0;
+        sx.globalAlpha = 0.25 + (Math.sin(s.tw) * 0.5 + 0.5) * 0.5;
+        sx.fillStyle = s.c ? q : c;
+        sx.beginPath(); sx.arc(s.x, s.y, s.r, 0, 6.283); sx.fill();
       }
-      requestAnimationFrame(frame);
+      sx.globalAlpha = 1;
+      requestAnimationFrame(sFrame);
     }
-    window.addEventListener("resize", resize);
-    resize();
-    requestAnimationFrame(frame);
+    window.addEventListener("resize", sResize); sResize(); requestAnimationFrame(sFrame);
+    window.addEventListener("load", sResize);
+    setTimeout(sResize, 600);
+
+    // ---- Cursor halo: a soft violet→orange gradient trailing the pointer ----
+    const halo = document.getElementById("qo-halo");
+    if (halo && window.matchMedia("(pointer:fine)").matches) {
+      let hx = window.innerWidth / 2, hy = window.innerHeight / 2, tx = hx, ty = hy;
+      window.addEventListener("pointermove", (e) => { tx = e.clientX; ty = e.clientY; halo.classList.add("on"); });
+      window.addEventListener("pointerleave", () => halo.classList.remove("on"));
+      (function haloFrame() {
+        hx += (tx - hx) * 0.1; hy += (ty - hy) * 0.1;
+        halo.style.transform = `translate3d(${hx}px, ${hy}px, 0)`;
+        requestAnimationFrame(haloFrame);
+      })();
+    }
   }
+
+  // ---- Hero: dots drift toward one gravity spot (the optimum) and fade ----
+  const cvs = document.getElementById("hero-cvs") as HTMLCanvasElement | null;
+  if (cvs && !reduce) {
+    const ctx = cvs.getContext("2d")!; const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    let W = 0, H = 0;
+    const pts: { x: number; y: number; t: number; s: number }[] = [];
+    const hex = (v: string) => (getComputedStyle(document.documentElement).getPropertyValue(v).trim() || "#7c3aed");
+    const lerp = (a: string, b: string, t: number) => {
+      if (!a.startsWith("#") || !b.startsWith("#")) return a;
+      const p = (x: string) => { x = x.replace("#",""); return [parseInt(x.slice(0,2),16),parseInt(x.slice(2,4),16),parseInt(x.slice(4,6),16)]; };
+      const A = p(a), B = p(b);
+      return `rgb(${Math.round(A[0]+(B[0]-A[0])*t)},${Math.round(A[1]+(B[1]-A[1])*t)},${Math.round(A[2]+(B[2]-A[2])*t)})`;
+    };
+    let gx = 0, gy = 0;
+    function resize() { const r = cvs!.getBoundingClientRect(); W = r.width; H = r.height;
+      cvs!.width = W*DPR; cvs!.height = H*DPR; ctx.setTransform(DPR,0,0,DPR,0,0);
+      gx = W*0.67; gy = H*0.5;
+      if (!pts.length) for (let i=0;i<64;i++) pts.push({ x:Math.random()*W, y:Math.random()*H, t:Math.random(), s:1+Math.random()*2 }); }
+    function frame() { if (!W) { requestAnimationFrame(frame); return; }
+      const q = hex("--qo-quantum"), c = hex("--qo-classical"); ctx.clearRect(0,0,W,H);
+      for (const p of pts) { p.x += (gx-p.x)*0.006; p.y += (gy-p.y)*0.006;
+        const d = Math.hypot(gx-p.x, gy-p.y);
+        if (d < 8) { p.x=Math.random()*W; p.y=Math.random()*H; }
+        ctx.globalAlpha = Math.min(1, d/(W*0.42));
+        ctx.beginPath(); ctx.fillStyle = lerp(q,c,p.t); ctx.arc(p.x,p.y,p.s,0,6.283); ctx.fill(); }
+      ctx.globalAlpha = 1;
+      requestAnimationFrame(frame); }
+    window.addEventListener("resize", resize); resize(); requestAnimationFrame(frame);
+  }
+
+  // ---- Double-funnel flow: particles sweep the bell walls into the bullseye ----
+  const dcvs = document.getElementById("duality-cvs") as HTMLCanvasElement | null;
+  if (dcvs && !reduce) {
+    const dctx = dcvs.getContext("2d")!;
+    const DPR = Math.min(window.devicePixelRatio || 1, 2);
+    const N = 46;
+    let W = 0, H = 0, cx = 0, cy = 0;
+    const parts: { side: number; lane: number; s: number; v: number; p: number }[] = [];
+    const cvar = (v: string) => (getComputedStyle(document.documentElement).getPropertyValue(v).trim() || "#7c3aed");
+    const easeIn = (t: number) => t * t;
+    function reset(p: any, i: number, seed: number) {
+      p.side = (i % 2 === 0) ? -1 : 1;
+      p.lane = ((i * 2654435761) % 1000) / 1000;
+      p.s = 1 + (((i * 40503) % 100) / 100) * 1.4;
+      p.v = 0.0040 + (((i * 92821) % 100) / 100) * 0.0018;
+      p.p = seed;
+    }
+    function dresize() {
+      const r = dcvs!.getBoundingClientRect(); W = r.width; H = r.height; cx = W / 2; cy = H / 2;
+      dcvs!.width = W * DPR; dcvs!.height = H * DPR; dctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      if (!parts.length && W) for (let i = 0; i < N; i++) { const p: any = {}; reset(p, i, i / N); parts.push(p); }
+    }
+    function dframe() {
+      if (!W) { requestAnimationFrame(dframe); return; }
+      const q = cvar("--qo-quantum"), c = cvar("--qo-classical");
+      dctx.clearRect(0, 0, W, H);
+      const mouthX = 0.02 * W, mouthHalf = 0.48 * H;
+      for (let i = 0; i < parts.length; i++) {
+        const p = parts[i];
+        p.p += p.v;
+        if (p.p >= 1) { reset(p, i, 0); continue; }
+        const t = easeIn(p.p);
+        const startX = p.side < 0 ? mouthX : W - mouthX;
+        const startY = cy + (p.lane - 0.5) * 2 * mouthHalf;
+        const x = startX + (cx - startX) * t;
+        const spread = Math.pow(1 - t, 1.4);
+        const y = cy + (startY - cy) * spread;
+        const fade = Math.sin(p.p * Math.PI);
+        const col = p.side < 0 ? q : c;
+        dctx.globalAlpha = fade * 0.82; dctx.fillStyle = col;
+        dctx.beginPath(); dctx.arc(x, y, p.s, 0, 6.283); dctx.fill();
+        dctx.globalAlpha = fade * 0.16;
+        dctx.beginPath(); dctx.arc(x, y, p.s * 2.4, 0, 6.283); dctx.fill();
+      }
+      requestAnimationFrame(dframe);
+    }
+    window.addEventListener("resize", dresize); dresize(); requestAnimationFrame(dframe);
+  }
+
+  const fmt = (n: number) => n >= 1000 ? (n/1000).toFixed(n >= 10000 ? 0 : 1) + "k" : String(n);
+
+  // ---- Global scroll-reveal ----
+  if (!reduce) {
+    const targets = document.querySelectorAll(".qo-sec-head, .qo-fgrid, .qo-funnel, .qo-tron .qo-flow, .qo-star-inner, .qo-stats, .qo-cta-band .qo-wrap, .qo-term");
+    targets.forEach((el) => el.classList.add("qo-reveal"));
+    const io = new IntersectionObserver((entries) => {
+      for (const e of entries) if (e.isIntersecting) { e.target.classList.add("in"); io.unobserve(e.target); }
+    }, { threshold: 0.12, rootMargin: "0px 0px -8% 0px" });
+    targets.forEach((el) => io.observe(el));
+  } else {
+    document.querySelectorAll(".qo-reveal").forEach((el) => el.classList.add("in"));
+  }
+
+  // ---- Live stats: GitHub stars + PyPI monthly downloads (fail silently) ----
+  fetch("https://api.github.com/repos/Qentora/quoptuna").then(r => r.ok ? r.json() : null)
+    .then(d => { if (d && typeof d.stargazers_count === "number") { const el = document.getElementById("stat-stars"); if (el) el.textContent = fmt(d.stargazers_count); } })
+    .catch(() => {});
+  fetch("https://pypistats.org/api/packages/quoptuna/recent").then(r => r.ok ? r.json() : null)
+    .then(d => { if (d && d.data && typeof d.data.last_month === "number") { const el = document.getElementById("stat-dl"); if (el) el.textContent = fmt(d.data.last_month); } })
+    .catch(() => {});
 </script>

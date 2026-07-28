@@ -9,12 +9,15 @@ the outgoing response, both passed via ``store_options``.
 """
 
 import logging
+from collections.abc import Awaitable, Callable
 from typing import Any, Optional
+from urllib.parse import urlencode
 
 from auth0_server_python.auth_server.server_client import ServerClient
 from auth0_server_python.auth_types import StateData, TransactionData
 from auth0_server_python.store.abstract import AbstractDataStore
 from fastapi import HTTPException, Request, Response
+from fastapi.responses import RedirectResponse
 
 from quoptuna.server.core.config import settings
 
@@ -22,6 +25,7 @@ logger = logging.getLogger(__name__)
 
 SESSION_COOKIE = "_a0_session"
 TRANSACTION_COOKIE = "_a0_tx"
+PUBLIC_AUTH_PATHS = frozenset({"/api/v1/health"})
 
 
 class CookieStore(AbstractDataStore):
@@ -107,6 +111,44 @@ async def get_current_user(request: Request) -> Optional[dict]:
     return await get_auth_client().get_user({"request": request})
 
 
+def _is_public_auth_path(path: str) -> bool:
+    """Keep the login flow and infrastructure health check reachable."""
+    return path == "/auth" or path.startswith("/auth/") or path in PUBLIC_AUTH_PATHS
+
+
+async def redirect_unauthenticated_requests(
+    request: Request,
+    call_next: Callable[[Request], Awaitable[Response]],
+) -> Response:
+    """Redirect every unauthenticated request into the Auth0 login flow."""
+    if not settings.AUTH_ENABLED or _is_public_auth_path(request.url.path):
+        return await call_next(request)
+
+    if await get_current_user(request) is not None:
+        return await call_next(request)
+
+    return_to = request.url.path
+    if request.url.query:
+        return_to = f"{return_to}?{request.url.query}"
+    login_query = urlencode({"returnTo": return_to})
+    return RedirectResponse(url=f"/auth/login?{login_query}", status_code=307)
+
+
+def enforce_approved_user(user: dict) -> dict:
+    """Require a verified identity whose email is explicitly approved."""
+    configured = settings.AUTH_ALLOWED_EMAILS
+    entries = configured.split(",") if isinstance(configured, str) else configured
+    allowed = {
+        email.strip().lower() for email in entries if isinstance(email, str) and email.strip()
+    }
+    email = str(user.get("email") or "").strip().lower()
+    if settings.AUTH_REQUIRE_VERIFIED_EMAIL and user.get("email_verified") is not True:
+        raise HTTPException(status_code=403, detail="A verified email address is required")
+    if allowed and email not in allowed:
+        raise HTTPException(status_code=403, detail="This email address is not approved")
+    return user
+
+
 async def require_user(request: Request) -> Optional[dict]:
     """FastAPI dependency: 401 unless a valid session exists.
 
@@ -118,4 +160,4 @@ async def require_user(request: Request) -> Optional[dict]:
     user = await get_current_user(request)
     if user is None:
         raise HTTPException(status_code=401, detail="Not authenticated")
-    return user
+    return enforce_approved_user(user)
