@@ -16,9 +16,7 @@ def test_application_network_supports_ipv6_database_egress():
 
 
 def test_instance_bootstrap_uses_available_al2023_packages_and_compose_env():
-    template = (
-        ROOT / "infra/terraform/application/user_data.sh.tftpl"
-    ).read_text(encoding="utf-8")
+    template = (ROOT / "infra/terraform/application/user_data.sh.tftpl").read_text(encoding="utf-8")
 
     assert "dnf install -y docker jq\n" in template
     assert "awscli2" not in template
@@ -43,16 +41,11 @@ def test_shell_cleanup_traps_are_scoped_to_subshells():
 def test_update_ignores_stale_instance_output_after_partial_apply():
     operation = (ROOT / "infra/scripts/_operation.sh").read_text(encoding="utf-8")
 
-    assert (
-        'terraform -chdir="$APPLICATION_DIR" state show aws_instance.app'
-        in operation
-    )
+    assert 'terraform -chdir="$APPLICATION_DIR" state show aws_instance.app' in operation
 
 
 def test_runtime_uses_host_network_for_supabase_ipv6():
-    compose = (ROOT / "infra/runtime/docker-compose.prod.yml").read_text(
-        encoding="utf-8"
-    )
+    compose = (ROOT / "infra/runtime/docker-compose.prod.yml").read_text(encoding="utf-8")
     caddy = (ROOT / "infra/runtime/Caddyfile").read_text(encoding="utf-8")
 
     assert compose.count("network_mode: host") == HOST_NETWORK_SERVICE_COUNT
