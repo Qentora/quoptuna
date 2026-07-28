@@ -56,15 +56,10 @@ def disable_auth(monkeypatch) -> None:
 def test_unauthenticated_page_redirects_to_login_with_return_path(monkeypatch):
     enable_auth(monkeypatch)
 
-    response = TestClient(build_test_app()).get(
-        "/settings/?tab=runs", follow_redirects=False
-    )
+    response = TestClient(build_test_app()).get("/settings/?tab=runs", follow_redirects=False)
 
     assert response.status_code == REDIRECT_STATUS
-    assert (
-        response.headers["location"]
-        == "/auth/login?returnTo=%2Fsettings%2F%3Ftab%3Druns"
-    )
+    assert response.headers["location"] == "/auth/login?returnTo=%2Fsettings%2F%3Ftab%3Druns"
 
 
 def test_unauthenticated_api_request_redirects_to_login(monkeypatch):
