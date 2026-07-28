@@ -7,7 +7,8 @@ from quoptuna.infra_tui.runner import redact_output, script_command, validate_en
 
 def test_script_command_is_allowlisted(tmp_path: Path) -> None:
     assert script_command("status", "dev", terraform_dir=tmp_path) == [
-        str(tmp_path / "scripts/status.sh"), "dev"
+        str(tmp_path / "scripts/status.sh"),
+        "dev",
     ]
 
 

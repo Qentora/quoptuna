@@ -112,9 +112,7 @@ def enforce_approved_user(user: dict) -> dict:
     configured = settings.AUTH_ALLOWED_EMAILS
     entries = configured.split(",") if isinstance(configured, str) else configured
     allowed = {
-        email.strip().lower()
-        for email in entries
-        if isinstance(email, str) and email.strip()
+        email.strip().lower() for email in entries if isinstance(email, str) and email.strip()
     }
     email = str(user.get("email") or "").strip().lower()
     if settings.AUTH_REQUIRE_VERIFIED_EMAIL and user.get("email_verified") is not True:
