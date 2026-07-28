@@ -3,10 +3,9 @@ services:
     image: ${IMAGE_URI}
     container_name: quoptuna
     restart: unless-stopped
+    network_mode: host
     env_file:
       - /opt/quoptuna/runtime.env
-    expose:
-      - "8000"
     healthcheck:
       test:
         - CMD
@@ -27,12 +26,9 @@ services:
     image: caddy:2.10-alpine
     container_name: quoptuna-caddy
     restart: unless-stopped
+    network_mode: host
     environment:
       DOMAIN_NAME: ${DOMAIN_NAME}
-    ports:
-      - "80:80"
-      - "443:443"
-      - "443:443/udp"
     volumes:
       - /opt/quoptuna/Caddyfile:/etc/caddy/Caddyfile:ro
       - caddy_data:/data
