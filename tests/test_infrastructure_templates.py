@@ -2,8 +2,8 @@
 
 from pathlib import Path
 
-
 ROOT = Path(__file__).parents[1]
+HOST_NETWORK_SERVICE_COUNT = 2
 
 
 def test_application_network_supports_ipv6_database_egress():
@@ -55,6 +55,6 @@ def test_runtime_uses_host_network_for_supabase_ipv6():
     )
     caddy = (ROOT / "infra/runtime/Caddyfile").read_text(encoding="utf-8")
 
-    assert compose.count("network_mode: host") == 2
+    assert compose.count("network_mode: host") == HOST_NETWORK_SERVICE_COUNT
     assert "reverse_proxy 127.0.0.1:8000" in caddy
     assert "reverse_proxy app:8000" not in caddy
