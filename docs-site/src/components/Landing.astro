@@ -372,7 +372,12 @@ const REPO = "https://github.com/Qentora/quoptuna";
   fetch("https://api.github.com/repos/Qentora/quoptuna").then(r => r.ok ? r.json() : null)
     .then(d => { if (d && typeof d.stargazers_count === "number") { const el = document.getElementById("stat-stars"); if (el) el.textContent = fmt(d.stargazers_count); } })
     .catch(() => {});
-  fetch("https://pypistats.org/api/packages/quoptuna/recent").then(r => r.ok ? r.json() : null)
-    .then(d => { if (d && d.data && typeof d.data.last_month === "number") { const el = document.getElementById("stat-dl"); if (el) el.textContent = fmt(d.data.last_month); } })
+  // PyPI monthly downloads via shields.io (CORS-enabled; pypistats.org sends no
+  // CORS headers so the browser blocks it). Returns e.g. "1k/month".
+  fetch("https://img.shields.io/pypi/dm/quoptuna.json").then(r => r.ok ? r.json() : null)
+    .then(d => {
+      const raw = d && (d.value || d.message);
+      if (raw) { const el = document.getElementById("stat-dl"); if (el) el.textContent = String(raw).replace(/\/month$/, "").trim(); }
+    })
     .catch(() => {});
 </script>
