@@ -7,7 +7,10 @@ import argparse
 import json
 import os
 import shlex
+import sys
 from pathlib import Path
+
+QUOTED_VALUE_LENGTH = 2
 
 DEPLOYMENT_KEYS = {
     "AWS_PROFILE",
@@ -48,13 +51,14 @@ def read_dotenv(path: Path) -> dict[str, str]:
         if line.startswith("export "):
             line = line[7:].lstrip()
         if "=" not in line:
-            raise ValueError(f"{path}:{number}: expected KEY=VALUE")
+            message = f"{path}:{number}: expected KEY=VALUE"
+            raise ValueError(message)
         key, value = line.split("=", 1)
         key = key.strip()
         if key not in DEPLOYMENT_KEYS | RUNTIME_KEYS:
             continue
         value = value.strip()
-        if len(value) >= 2 and value[0] == value[-1] and value[0] in {"'", '"'}:
+        if len(value) >= QUOTED_VALUE_LENGTH and value[0] == value[-1] and value[0] in {"'", '"'}:
             value = value[1:-1]
         values[key] = value
     return values
@@ -71,7 +75,7 @@ def merged_values(path: Path) -> dict[str, str]:
 def export_values(values: dict[str, str]) -> None:
     for key in sorted(DEPLOYMENT_KEYS):
         if key in values:
-            print(f"export {key}={shlex.quote(values[key])}")
+            sys.stdout.write(f"export {key}={shlex.quote(values[key])}\n")
 
 
 def runtime_secret(
@@ -112,17 +116,16 @@ def main() -> None:
         return
     if not all((args.environment, args.bucket, args.region, args.domain)):
         parser.error("secret requires --environment, --bucket, --region, and --domain")
-    print(
-        json.dumps(
-            runtime_secret(
-                values,
-                environment=args.environment,
-                bucket=args.bucket,
-                region=args.region,
-                domain=args.domain,
-            )
+    payload = json.dumps(
+        runtime_secret(
+            values,
+            environment=args.environment,
+            bucket=args.bucket,
+            region=args.region,
+            domain=args.domain,
         )
     )
+    sys.stdout.write(f"{payload}\n")
 
 
 if __name__ == "__main__":
