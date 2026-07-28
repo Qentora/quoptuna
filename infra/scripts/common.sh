@@ -144,10 +144,10 @@ application_var_file() {
     }' >"$target"
 }
 
-sync_runtime_secret() {
+sync_runtime_secret() (
   local temp_dir secret_file secret_name bucket
   temp_dir="$(mktemp -d)"
-  trap 'rm -rf "$temp_dir"' RETURN
+  trap 'rm -rf "$temp_dir"' EXIT
   secret_file="$temp_dir/runtime.json"
   secret_name="$(foundation_output runtime_secret_name)"
   bucket="$(foundation_output artifact_bucket)"
@@ -157,7 +157,7 @@ sync_runtime_secret() {
   aws secretsmanager put-secret-value --secret-id "$secret_name" \
     --secret-string "file://$secret_file" >/dev/null
   log "Runtime secret updated"
-}
+)
 
 instance_output() {
   terraform -chdir="$APPLICATION_DIR" output -raw "$1"
@@ -178,12 +178,12 @@ wait_for_ssm() {
   die "Instance did not become available in SSM"
 }
 
-run_ssm() {
+run_ssm() (
   local instance_id="$1"
   local command="$2"
   local temp_dir input_file command_id status
   temp_dir="$(mktemp -d)"
-  trap 'rm -rf "$temp_dir"' RETURN
+  trap 'rm -rf "$temp_dir"' EXIT
   input_file="$temp_dir/command.json"
   jq -n --arg instance "$instance_id" --arg command "$command" '{
     DocumentName: "AWS-RunShellScript",
@@ -203,7 +203,7 @@ run_ssm() {
       --instance-id "$instance_id" --query StandardErrorContent --output text >&2
     return 1
   fi
-}
+)
 
 active_work_total() {
   local instance_id="$1"

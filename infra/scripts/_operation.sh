@@ -23,10 +23,10 @@ apply_foundation() {
   fi
 }
 
-apply_application() {
+apply_application() (
   local temp_dir var_file
   temp_dir="$(mktemp -d)"
-  trap 'rm -rf "$temp_dir"' RETURN
+  trap 'rm -rf "$temp_dir"' EXIT
   var_file="$temp_dir/application.tfvars.json"
   application_var_file "$var_file"
   terraform_init "$APPLICATION_DIR" application
@@ -35,7 +35,7 @@ apply_application() {
   else
     terraform -chdir="$APPLICATION_DIR" apply -auto-approve -var-file="$var_file"
   fi
-}
+)
 
 BUILT_IMAGE_URI=""
 
@@ -67,6 +67,7 @@ deploy_image() {
   aws s3 cp "$RUNTIME_DIR/Caddyfile" \
     "s3://$bucket/deployment/$ENVIRONMENT/Caddyfile" >/dev/null
   wait_for_ssm "$instance_id"
+  run_ssm "$instance_id" "cloud-init status --wait"
   command="set -euo pipefail
 mkdir -p /opt/quoptuna
 aws s3 cp s3://$bucket/deployment/$ENVIRONMENT/docker-compose.yml /opt/quoptuna/docker-compose.yml
@@ -77,7 +78,7 @@ chmod 600 /opt/quoptuna/runtime.json /opt/quoptuna/runtime.env
 printf 'IMAGE_URI=%s\\nDOMAIN_NAME=%s\\n' '$image_uri' '$DOMAIN_NAME' > /opt/quoptuna/compose.env
 aws ecr get-login-password --region '$AWS_REGION' | docker login --username AWS --password-stdin '${repository%%/*}'
 cd /opt/quoptuna
-docker compose --env-file compose.env -f docker-compose.yml pull
+docker compose --env-file compose.env -f docker-compose.yml pull --quiet
 docker compose --env-file compose.env -f docker-compose.yml up -d --remove-orphans
 docker image prune -f"
   run_ssm "$instance_id" "$command"
@@ -119,7 +120,7 @@ update_infrastructure() {
   require_command git
   bootstrap_state
   terraform_init "$APPLICATION_DIR" application
-  if terraform -chdir="$APPLICATION_DIR" output -raw instance_id >/dev/null 2>&1; then
+  if terraform -chdir="$APPLICATION_DIR" state show aws_instance.app >/dev/null 2>&1; then
     local existing_instance
     existing_instance="$(instance_output instance_id)"
     require_running_instance "$existing_instance"
@@ -214,11 +215,11 @@ status_infrastructure() {
   fi
 }
 
-empty_versioned_bucket() {
+empty_versioned_bucket() (
   local bucket="$1"
   local response objects delete_file
   delete_file="$(mktemp)"
-  trap 'rm -f "$delete_file"' RETURN
+  trap 'rm -f "$delete_file"' EXIT
   while true; do
     response="$(aws s3api list-object-versions --bucket "$bucket" --output json)"
     objects="$(printf '%s' "$response" | jq '[
@@ -228,9 +229,9 @@ empty_versioned_bucket() {
     jq -n --argjson objects "$objects" '{Objects:$objects,Quiet:true}' >"$delete_file"
     aws s3api delete-objects --bucket "$bucket" --delete "file://$delete_file" >/dev/null
   done
-}
+)
 
-destroy_infrastructure() {
+destroy_infrastructure() (
   local instance_id temp_dir var_file bucket
   local tf_args=(
     "-var=aws_region=$AWS_REGION"
@@ -249,7 +250,7 @@ destroy_infrastructure() {
   fi
   delete_dns_record
   temp_dir="$(mktemp -d)"
-  trap 'rm -rf "$temp_dir"' RETURN
+  trap 'rm -rf "$temp_dir"' EXIT
   var_file="$temp_dir/application.tfvars.json"
   application_var_file "$var_file"
   terraform -chdir="$APPLICATION_DIR" destroy -auto-approve -var-file="$var_file"
@@ -264,7 +265,7 @@ destroy_infrastructure() {
   empty_versioned_bucket "$bucket"
   terraform -chdir="$FOUNDATION_DIR" destroy -auto-approve "${tf_args[@]}"
   log "All environment AWS resources deleted; Supabase and Terraform state remain"
-}
+)
 
 case "$ACTION" in
   create) create_infrastructure ;;

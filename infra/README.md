@@ -21,8 +21,9 @@ cp .env.deploy.example .env.deploy
 aws sts get-caller-identity
 ```
 
-Use a globally unique `TF_STATE_BUCKET`. For Supabase, use an IPv4-compatible
-pooler URL with `sslmode=require` if the direct endpoint is IPv6-only.
+Use a globally unique `TF_STATE_BUCKET`. The EC2 network is dual-stack, so it
+can use Supabase's IPv6-only direct database endpoint. An IPv4-compatible
+session-pooler URL with `sslmode=require` is also supported.
 
 ## Auth0 approved emails
 

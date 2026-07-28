@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-dnf install -y docker jq awscli2
+# AWS CLI v2 is preinstalled on Amazon Linux 2023.
+dnf install -y docker jq
 systemctl enable --now docker
 mkdir -p /usr/local/lib/docker/cli-plugins /opt/quoptuna
 curl -fsSL \
@@ -43,7 +44,7 @@ Wants=network-online.target
 [Service]
 Type=oneshot
 ExecStart=/usr/local/bin/quoptuna-refresh-dns
-ExecStart=/bin/bash -c 'test ! -f /opt/quoptuna/docker-compose.yml || docker compose -f /opt/quoptuna/docker-compose.yml up -d'
+ExecStart=/bin/bash -c 'test ! -f /opt/quoptuna/docker-compose.yml || docker compose --env-file /opt/quoptuna/compose.env -f /opt/quoptuna/docker-compose.yml up -d'
 RemainAfterExit=yes
 
 [Install]
