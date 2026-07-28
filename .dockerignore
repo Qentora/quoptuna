@@ -10,11 +10,11 @@
 db
 uploads
 analysis
-frontend
 backend
 docs
 docs-site
 tests
+src/quoptuna/web
 **/__pycache__
 *.pyc
 .DS_Store

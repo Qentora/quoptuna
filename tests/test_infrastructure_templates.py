@@ -51,3 +51,14 @@ def test_runtime_uses_host_network_for_supabase_ipv6():
     assert compose.count("network_mode: host") == HOST_NETWORK_SERVICE_COUNT
     assert "reverse_proxy 127.0.0.1:8000" in caddy
     assert "reverse_proxy app:8000" not in caddy
+
+
+def test_production_image_builds_frontend_from_source():
+    dockerfile = (ROOT / "Dockerfile.production").read_text(encoding="utf-8")
+    dockerignore = (ROOT / ".dockerignore").read_text(encoding="utf-8").splitlines()
+
+    assert "FROM node:22-alpine AS frontend" in dockerfile
+    assert "RUN npm run build" in dockerfile
+    assert "COPY --from=frontend /frontend/out ./src/quoptuna/web" in dockerfile
+    assert "frontend" not in dockerignore
+    assert "src/quoptuna/web" in dockerignore
