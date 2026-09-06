@@ -17,7 +17,7 @@ from quoptuna.backend.utils.data_utils.data import (
     preprocess_data,
     stratified_train_test_split,
 )
-from quoptuna.backend.utils.storage import ensure_db_dir, optuna_db_path
+from quoptuna.backend.utils.storage import ensure_db_dir, optuna_db_path, optuna_storage_url
 from quoptuna.backend.xai.fairness import FAIRNESS_METRICS, WORST_DISPARITY, compute_disparity
 
 logging.getLogger().setLevel(logging.INFO)
@@ -182,7 +182,7 @@ class Optimizer:
         self.val_x = self.val_y = None
         ensure_db_dir()
         self.data_path = str(optuna_db_path(self.db_name))
-        self.storage_location = f"sqlite:///{self.data_path}"
+        self.storage_location = optuna_storage_url(self.db_name)
         self.study_name = study_name
         self.study = None
         self.model_types = model_types or DEFAULT_MODEL_TYPES

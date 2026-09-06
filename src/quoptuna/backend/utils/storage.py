@@ -52,8 +52,15 @@ def optuna_storage_url(db_name: str) -> str:
         url = settings.DATABASE_URL
     else:
         return f"sqlite:///{optuna_db_path(db_name)}"
-    if url.startswith("postgresql://"):
-        url = url.replace("postgresql://", "postgresql+psycopg://", 1)
+    # Optuna's RDB backend compares its native TrialValueType/StudyDirection
+    # Postgres enums against a ``::VARCHAR``-cast parameter in generated SQL
+    # (e.g. the ORDER BY CASE in get_best_trial()). psycopg 3 surfaces this as
+    # "operator does not exist: trialvaluetype = character varying"; psycopg2
+    # does not hit the same adaptation path, so Optuna storage always uses it
+    # regardless of which driver the rest of the app uses for DATABASE_URL.
+    if url.startswith(("postgresql://", "postgresql+psycopg://")):
+        url = url.split("://", 1)[1]
+        url = f"postgresql+psycopg2://{url}"
     parsed = urlparse(url)
     options = quote(f"-csearch_path={settings.OPTUNA_DB_SCHEMA}", safe="")
     separator = "&" if parsed.query else ""

@@ -50,6 +50,7 @@ dependencies = [
     "auth0-server-python>=1.0.0b1,<2",
     "sqlmodel>=0.0.22,<0.1.0",
     "psycopg[binary]>=3.2.0,<4.0.0",
+    "psycopg2-binary>=2.9.0,<3.0.0",
     "boto3>=1.35.0,<2.0.0",
     "textual>=0.70.0,<1.0.0",
 ]

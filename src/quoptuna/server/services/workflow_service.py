@@ -824,5 +824,5 @@ class WorkflowExecutor:
             return final_result
 
         except Exception as e:
-            logger.error(f"Workflow execution failed: {e!s}")
+            logger.exception(f"Workflow execution failed: {e!s}")
             raise WorkflowExecutionError(f"Execution failed: {e!s}") from e
