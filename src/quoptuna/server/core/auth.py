@@ -121,7 +121,11 @@ async def redirect_unauthenticated_requests(
     call_next: Callable[[Request], Awaitable[Response]],
 ) -> Response:
     """Redirect every unauthenticated request into the Auth0 login flow."""
-    if not settings.AUTH_ENABLED or _is_public_auth_path(request.url.path):
+    if (
+        request.method == "OPTIONS"
+        or not settings.AUTH_ENABLED
+        or _is_public_auth_path(request.url.path)
+    ):
         return await call_next(request)
 
     if await get_current_user(request) is not None:

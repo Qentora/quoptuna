@@ -2,6 +2,16 @@
 
 import { initialWorkflowData } from '@/components/optimizer/types';
 import type { WorkflowData } from '@/components/optimizer/types';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -54,6 +64,7 @@ export default function RunsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [openingId, setOpeningId] = useState<string | null>(null);
+  const [pendingRemoval, setPendingRemoval] = useState<PastRun | null>(null);
 
   const { data: runs = [], isLoading } = useQuery({
     queryKey: ['optimization-runs'],
@@ -167,6 +178,8 @@ export default function RunsPage() {
       await queryClient.invalidateQueries({ queryKey: ['optimization-runs'] });
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Could not delete run');
+    } finally {
+      setPendingRemoval(null);
     }
   };
 
@@ -239,7 +252,7 @@ export default function RunsPage() {
                       type="button"
                       size="sm"
                       variant="outline"
-                      onClick={() => void removeRun(run)}
+                      onClick={() => setPendingRemoval(run)}
                     >
                       <CircleSlash className="h-4 w-4" />
                       Cancel
@@ -320,7 +333,7 @@ export default function RunsPage() {
                         size="sm"
                         variant="ghost"
                         aria-label="Delete run"
-                        onClick={() => void removeRun(run)}
+                        onClick={() => setPendingRemoval(run)}
                       >
                         <Trash2 className="h-4 w-4" />
                       </Button>
@@ -332,6 +345,41 @@ export default function RunsPage() {
           </Table>
         )}
       </section>
+
+      <AlertDialog
+        open={pendingRemoval !== null}
+        onOpenChange={(open) => {
+          if (!open) setPendingRemoval(null);
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>
+              {pendingRemoval && ACTIVE_STATUSES.includes(pendingRemoval.status)
+                ? 'Cancel this optimization?'
+                : 'Delete this run?'}
+            </AlertDialogTitle>
+            <AlertDialogDescription>
+              {pendingRemoval && ACTIVE_STATUSES.includes(pendingRemoval.status)
+                ? `This will stop "${pendingRemoval.study_name ?? pendingRemoval.id}" and its trials so far cannot be resumed.`
+                : `This will permanently delete "${pendingRemoval?.study_name ?? pendingRemoval?.id}" and its trial history. This action cannot be undone.`}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Keep run</AlertDialogCancel>
+            <AlertDialogAction
+              variant="destructive"
+              onClick={() => {
+                if (pendingRemoval) void removeRun(pendingRemoval);
+              }}
+            >
+              {pendingRemoval && ACTIVE_STATUSES.includes(pendingRemoval.status)
+                ? 'Cancel optimization'
+                : 'Delete run'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </PageShell>
   );
 }
