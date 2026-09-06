@@ -16,6 +16,7 @@ Settings can be supplied via a `.env` file or the process environment.
 | `MAX_UPLOAD_SIZE` | 100 MB | Maximum upload size |
 | `DEFAULT_N_TRIALS` | `100` | Default number of Optuna trials |
 | `DEFAULT_TIMEOUT` | `3600` s | Default run timeout |
+| `APP_ENV` | `development` | Set to `production` to enable production safety checks |
 | `CORS_ORIGINS` | — | Comma-separated list of allowed origins |
 | `APP_BASE_URL` | `http://localhost:8000` | Base URL for generated links |
 
@@ -76,6 +77,28 @@ Authentication is enforced **only when all** of these are set. When unset, `/api
 | `AUTH0_CLIENT_SECRET` | Auth0 application client secret |
 | `AUTH0_SECRET` | 64-char hex session secret (`openssl rand -hex 32`) |
 
+### Access control
+
+Authenticating is not the same as being approved. Once a session exists,
+QuOptuna additionally enforces these checks on every authenticated user:
+
+| Variable | Default | Purpose |
+| --- | --- | --- |
+| `AUTH_ALLOWED_EMAILS` | empty | Comma-separated approved email addresses. When empty, **any** authenticated Auth0 user is allowed |
+| `AUTH_REQUIRE_VERIFIED_EMAIL` | `true` | Reject users whose Auth0 `email_verified` is not `true` |
+
+Both failures return **403**. Matching is case-insensitive and ignores
+surrounding whitespace.
+
+:::caution
+When `APP_ENV=production` and Auth0 is configured, the server **refuses to
+start** unless `AUTH_ALLOWED_EMAILS` is non-empty. This prevents publishing a
+deployment that any Auth0 tenant user could sign in to.
+:::
+
+`/api/v1/health` stays public so load balancers and health checks work without
+a session.
+
 ## Optimizer performance toggles
 
 | Variable | Default | Purpose |
@@ -88,4 +111,5 @@ Authentication is enforced **only when all** of these are set. When unset, `/api
 
 - [CLI reference](/reference/cli/)
 - [REST API reference](/reference/rest-api/)
+- [Deploy the AWS infrastructure](/how-to/deploy-infrastructure/)
 - [Python API reference](/reference/python-api/)

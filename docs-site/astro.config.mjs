@@ -81,6 +81,7 @@ export default defineConfig({
             { slug: "how-to/use-multiclass" },
             { slug: "how-to/generate-reports" },
             { slug: "how-to/migrate-to-supabase" },
+            { slug: "how-to/deploy-infrastructure" },
             { slug: "how-to/deploy-this-site" },
           ],
         },

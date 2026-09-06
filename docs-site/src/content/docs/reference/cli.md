@@ -1,6 +1,6 @@
 ---
 title: CLI reference
-description: The quoptuna command-line interface — the run and optimize subcommands and their options.
+description: The quoptuna command-line interface — the run, optimize, migration, and infrastructure subcommands and their options.
 ---
 
 The `quoptuna` command is a [Typer](https://typer.tiangolo.com/) application. Invoking `quoptuna` with no subcommand is equivalent to `quoptuna run`.
@@ -110,9 +110,46 @@ quoptuna optimize --csv data.csv --target label --trials 3
 The `optimize` defaults (trials=3, sampler=random, pruner=none, max-steps=20) are tuned for a fast smoke-test run, not a production search — raise them for real optimization.
 :::
 
+## `quoptuna infra`
+
+Open the Textual console for Terraform-backed infrastructure operations:
+create, deploy, update, pause, resume, status, and destroy.
+
+```bash
+quoptuna infra --environment dev --env-file .env.deploy
+```
+
+| Option | Default | Description |
+| --- | --- | --- |
+| `--environment <e>`, `-e` | `dev` | Target environment (`dev` or `production`) |
+| `--env-file <path>` | none | Deployment `.env` file; falls back to the process environment |
+| `--terraform-dir <path>` | `infra` | Directory holding `scripts/` and `terraform/` |
+
+See [Deploy the AWS infrastructure](/how-to/deploy-infrastructure/) for
+prerequisites and what each operation does.
+
+## `quoptuna active-work`
+
+Print active optimization and analysis counts as JSON. Used by the `pause`
+operation to refuse stopping a machine while trials are still running.
+
+```bash
+quoptuna active-work
+```
+
+## `quoptuna deployment-check`
+
+Print deployment readiness checks as JSON. **Exits with code 1** when the
+deployment is unhealthy, so it can gate a deploy step in CI.
+
+```bash
+quoptuna deployment-check
+```
+
 ## See also
 
 - [REST API reference](/reference/rest-api/)
 - [Python API reference](/reference/python-api/)
 - [Model catalog](/reference/models/)
 - [Configuration reference](/reference/configuration/)
+- [Deploy the AWS infrastructure](/how-to/deploy-infrastructure/)
