@@ -4,6 +4,18 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+### Added
+- Documented the `quoptuna infra`, `active-work`, and `deployment-check` CLI commands.
+- New "Deploy the AWS infrastructure" how-to covering prerequisites, the deployment
+  file, the Textual console options, every operation and script flag, and troubleshooting.
+- Documented `AUTH_ALLOWED_EMAILS`, `AUTH_REQUIRE_VERIFIED_EMAIL`, and `APP_ENV`,
+  including the production start-up check and the public `/api/v1/health` path.
+- Added `QuantumBoltzmannMachine` to the model catalog and a new image-shaped models
+  section for `QuanvolutionalNeuralNetwork`, `WeiNet`, and `ConvolutionalNeuralNetwork`.
+
+### Changed
+- Clarified that the model catalog lists registry keys, while `/api/v1/models`
+  returns display names.
 
 ## [0.1.3]
 ### Changed
