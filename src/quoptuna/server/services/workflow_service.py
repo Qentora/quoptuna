@@ -13,7 +13,12 @@ import pandas as pd
 from ucimlrepo import fetch_ucirepo
 
 from quoptuna import XAI, DataPreparation, Optimizer, XAIConfig
+from quoptuna.backend.utils.data_utils.resampling import resample_train_split
 from quoptuna.backend.utils.storage import DEFAULT_DB_NAME
+from quoptuna.server.services.sensitive import (
+    resolve_sensitive_series,
+    resolve_sensitive_test_series,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -322,12 +327,39 @@ class WorkflowExecutor:
             passthrough_columns=data.get("passthrough_columns"),
         )
 
+        # Rebalance the TRAIN split only (test stays representative of the
+        # real class distribution); applies uniformly to every model type,
+        # quantum included, since it happens before Optimizer ever sees the
+        # data rather than via a per-model class_weight constructor arg.
+        #
+        # A sensitive column, if configured, must be resampled in lockstep
+        # (resolved from the raw file HERE, while x_train.index is still
+        # positional into it — resampling below invalidates that positional
+        # index) so the fairness audit stays row-aligned to the resampled
+        # training data that downstream nodes actually persist/train on.
+        resampling = config.get("resampling", "none")
+        sensitive_train = None
+        sensitive_column = config.get("sensitive_feature")
+        if resampling != "none" and sensitive_column:
+            sens_train_raw, _ = resolve_sensitive_series(
+                config.get("dataset_id", ""), sensitive_column, data_prep.x_train, data_prep.x_test
+            )
+            sensitive_train = sens_train_raw
+
+        x_train, y_train, sensitive_train = resample_train_split(
+            data_prep.x_train,
+            data_prep.y_train,
+            strategy=resampling,
+            sensitive_train=sensitive_train,
+        )
+
         return {
             "type": "split_data",
-            "x_train": data_prep.x_train,
+            "x_train": x_train,
             "x_test": data_prep.x_test,
-            "y_train": data_prep.y_train,
+            "y_train": y_train,
             "y_test": data_prep.y_test,
+            "sensitive_train": sensitive_train,
             "x_columns": data["x_columns"],
             "y_column": data["y_column"],
             "task_spec": task_spec.to_dict(),
@@ -536,13 +568,11 @@ class WorkflowExecutor:
             )
         sensitive_test = None
         if fairness_mode != "off":
-            from quoptuna.server.services.sensitive import resolve_sensitive_series
-
             column = opt_config.get("sensitive_feature")
             if not column:
                 raise WorkflowExecutionError("Fairness-aware search requires a sensitive_feature")
-            _, sens_test = resolve_sensitive_series(
-                opt_config.get("dataset_id", ""), column, x_train_df, x_test_df
+            sens_test = resolve_sensitive_test_series(
+                opt_config.get("dataset_id", ""), column, x_test_df
             )
             sensitive_test = sens_test.to_numpy()
 

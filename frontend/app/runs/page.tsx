@@ -115,6 +115,7 @@ export default function RunsPage() {
           favorableClass: req.favorable_class != null ? String(req.favorable_class) : null,
           sensitiveFeature: req.sensitive_feature ?? null,
           categoricalEncoding: req.categorical_encoding ?? 'ordinal',
+          resampling: req.resampling ?? 'none',
         },
         configuration: {
           studyName: req.study_name ?? run.study_name ?? 'my-optimization-study',

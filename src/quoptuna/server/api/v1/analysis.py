@@ -629,6 +629,7 @@ async def update_snapshot_fairness(snapshot_id: str, request: SnapshotFairnessRe
             mitigate=request.mitigate,
             constraint=request.constraint,
             task_spec=_task_spec(opt_result),
+            resampled_sensitive_train=opt_result.get("sensitive_train"),
         )
         payload = dict(snapshot["payload"])
         payload["fairness"] = {
@@ -1140,15 +1141,30 @@ async def generate_study_plots(request: StudyPlotsRequest):
 MAX_SENSITIVE_GROUPS = 20
 
 
-def _resolve_sensitive_series(optimization_id: str, sensitive_feature: Optional[str], xai):
+def _resolve_sensitive_series(
+    optimization_id: str,
+    sensitive_feature: Optional[str],
+    xai,
+    resampled_sensitive_train=None,
+):
     """Load the raw dataset column and align it to the train/test split.
 
     ``DataPreparation.preprocess`` resets the feature index to a RangeIndex
     before its seeded ``train_test_split``, so split indices are positional
     row numbers into the raw dataframe (post feature-selection, which only
     selects columns).
+
+    When the run used TRAIN resampling, ``xai.data["x_train"]`` is the
+    resampled frame (no longer positional into the raw file); the caller must
+    then pass ``resampled_sensitive_train`` — the sensitive series already
+    resampled in lockstep at split time (persisted on the run's result as
+    ``sensitive_train``) — instead of re-deriving it positionally.
     """
-    from quoptuna.server.services.sensitive import SensitiveColumnError, resolve_sensitive_series
+    from quoptuna.server.services.sensitive import (
+        SensitiveColumnError,
+        resolve_sensitive_series,
+        resolve_sensitive_test_series,
+    )
 
     job = get_job(optimization_id)
     request = OptimizationRequest(**job["request"])
@@ -1160,9 +1176,13 @@ def _resolve_sensitive_series(optimization_id: str, sensitive_feature: Optional[
         )
 
     try:
-        sens_train, sens_test = resolve_sensitive_series(
-            request.dataset_id, column, xai.data.get("x_train"), xai.x_test
-        )
+        if resampled_sensitive_train is not None:
+            sens_train = resampled_sensitive_train
+            sens_test = resolve_sensitive_test_series(request.dataset_id, column, xai.x_test)
+        else:
+            sens_train, sens_test = resolve_sensitive_series(
+                request.dataset_id, column, xai.data.get("x_train"), xai.x_test
+            )
     except SensitiveColumnError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return column, sens_train, sens_test
@@ -1176,11 +1196,12 @@ def _compute_fairness_payload(
     mitigate: bool = False,
     constraint: str = "equalized_odds",
     task_spec: Optional[dict] = None,
+    resampled_sensitive_train=None,
 ) -> dict:
     from quoptuna.backend.xai import fairness as fairness_mod
 
     column, sens_train, sens_test = _resolve_sensitive_series(
-        optimization_id, sensitive_feature, xai
+        optimization_id, sensitive_feature, xai, resampled_sensitive_train
     )
 
     # Multiclass tasks are audited on the favorable-class-vs-rest outcome.
@@ -1246,6 +1267,7 @@ async def generate_fairness(request: FairnessRequest):
             mitigate=request.mitigate,
             constraint=request.constraint,
             task_spec=_task_spec(opt_result),
+            resampled_sensitive_train=opt_result.get("sensitive_train"),
         )
         return {
             "optimization_id": request.optimization_id,

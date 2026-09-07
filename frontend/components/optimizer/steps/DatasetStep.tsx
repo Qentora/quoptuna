@@ -68,6 +68,7 @@ export function DatasetStep({ workflowData, setWorkflowData, setFooter }: StepPr
         favorableClass: null,
         sensitiveFeature: null,
         categoricalEncoding: 'ordinal',
+        resampling: 'none',
       },
     }));
   };
