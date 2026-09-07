@@ -73,11 +73,35 @@ Runs FastAPI and the Next.js frontend separately so both hot-reload. This needs
 Node 18+ for the frontend.
 
 ```bash
-make dev        # FastAPI on :8000 + Next.js on :3000
+cp frontend/.env.example frontend/.env.local   # point the UI at the API
+make dev                                       # FastAPI on :8000 + Next.js on :3000
 ```
 
 Individual targets are also available: `make run_backend`, `make run_frontend`,
 `make run_streamlit`, and `make run_cli`.
+
+:::caution
+`frontend/.env.local` is required in dev mode. It sets `NEXT_PUBLIC_API_URL`,
+which defaults to empty so the packaged build calls its co-served API on the
+same origin. Without it the UI on `:3000` posts to itself and every API call
+returns 404 from Next.js instead of reaching FastAPI on `:8000`. The npm tasks
+below create the file for you.
+:::
+
+#### Windows (no `make` required)
+
+`make` targets rely on bash, `pkill`, and `lsof`, none of which exist on a stock
+Windows install. Every target has an npm equivalent that runs on plain
+PowerShell or CMD with just Node 18+:
+
+```powershell
+npm run dev            # same as: make dev
+npm run dev:backend    # same as: make run_backend
+npm run dev:frontend   # same as: make run_frontend
+npm run help           # list every task
+```
+
+See [Contributing](/contributing/) for the full Make ↔ npm table.
 
 ### Docker
 

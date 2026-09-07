@@ -10,7 +10,13 @@ Requirements: Python 3.11 or 3.12, [uv](https://docs.astral.sh/uv/), and (only f
 git clone https://github.com/Qentora/quoptuna.git && cd quoptuna
 uv sync                      # install Python dependencies
 uv run pre-commit install    # lint/format hooks
+cp frontend/.env.example frontend/.env.local   # only for frontend work
 ```
+
+`frontend/.env.local` sets `NEXT_PUBLIC_API_URL=http://localhost:8000`. It is
+gitignored and defaults to empty (same-origin) for the packaged build, so
+without it the dev UI on `:3000` calls itself and every API request 404s from
+Next.js. `npm run dev` creates it automatically.
 
 Useful commands (see the `Makefile` for the full list):
 
@@ -22,6 +28,19 @@ uv run mypy .                # type-check
 make run_backend             # FastAPI on :8000 (--reload)
 make run_frontend            # Next.js dev server on :3000
 cd docs-site && npm run dev  # documentation site (Astro/Starlight)
+```
+
+On Windows (no `make`, bash, or `lsof` needed — just Node 18+), every target has
+an npm equivalent backed by `scripts/run.mjs`:
+
+```powershell
+npm run dev            # backend + frontend, Ctrl+C stops both
+npm run dev:backend    # = make run_backend
+npm run dev:frontend   # = make run_frontend
+npm run install:all    # = make install_backend + make install_frontend
+npm run lint           # = make lint
+npm run test           # = make tests
+npm run help           # list every task
 ```
 
 ## Making changes

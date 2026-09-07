@@ -42,6 +42,41 @@ make install_frontend
 | `make coverage` | Run tests with coverage |
 | `make pre-commit` | Run pre-commit hooks |
 
+## Windows: npm equivalents
+
+The Makefile needs bash, `pkill`, and `lsof`, so it does not run on a stock
+Windows install. `scripts/run.mjs` reimplements every target in Node (no extra
+dependencies — Node 18+ is all you need), exposed as npm scripts in the root
+`package.json`. These also work on macOS and Linux.
+
+| Make target | npm equivalent |
+| --- | --- |
+| `make dev` / `make run_cli` | `npm run dev` |
+| `make run_backend` | `npm run dev:backend` |
+| `make run_frontend` | `npm run dev:frontend` |
+| `make run_streamlit` | `npm run dev:streamlit` |
+| `make install_backend` | `npm run install:backend` |
+| `make install_frontend` | `npm run install:frontend` |
+| — | `npm run install:all` (both of the above) |
+| `make init` | `npm run init` (clears caches, then `uv sync`) |
+| `make build` | `npm run build` |
+| `make build_package` | `npm run build:package` |
+| `make format` | `npm run format` |
+| `make lint` | `npm run lint` |
+| `make lint-fix` | `npm run lint:fix` |
+| `make tests` | `npm run test` |
+| `make coverage` | `npm run coverage` |
+| `make pre-commit` | `npm run precommit` |
+| `make clean` | `npm run clean` (frees ports 8000/3000 via `netstat` + `taskkill`) |
+| `make clean_python_cache` | `npm run clean:cache` |
+| `make clean_all` | `npm run clean:all` |
+| `make help` | `npm run help` |
+
+`npm run dev` starts both servers and stops both on Ctrl+C, killing the whole
+process tree so ports 8000 and 3000 are released. It also creates
+`frontend/.env.local` from `.env.example` when missing, so the UI on `:3000`
+calls the API on `:8000` rather than 404-ing against itself.
+
 ## Quality checks
 
 Run these before opening a PR:

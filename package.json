@@ -1,0 +1,32 @@
+{
+  "name": "quoptuna-dev",
+  "private": true,
+  "version": "0.0.0",
+  "type": "module",
+  "description": "Cross-platform (Windows-friendly) task runner mirroring the Makefile targets.",
+  "scripts": {
+    "help": "node scripts/run.mjs help",
+    "install:all": "node scripts/run.mjs install",
+    "install:backend": "node scripts/run.mjs install:backend",
+    "install:frontend": "node scripts/run.mjs install:frontend",
+    "init": "node scripts/run.mjs init",
+    "dev": "node scripts/run.mjs dev",
+    "dev:backend": "node scripts/run.mjs dev:backend",
+    "dev:frontend": "node scripts/run.mjs dev:frontend",
+    "dev:streamlit": "node scripts/run.mjs dev:streamlit",
+    "format": "node scripts/run.mjs format",
+    "lint": "node scripts/run.mjs lint",
+    "lint:fix": "node scripts/run.mjs lint:fix",
+    "test": "node scripts/run.mjs test",
+    "coverage": "node scripts/run.mjs coverage",
+    "precommit": "node scripts/run.mjs precommit",
+    "build": "node scripts/run.mjs build",
+    "build:package": "node scripts/run.mjs build:package",
+    "clean": "node scripts/run.mjs clean",
+    "clean:cache": "node scripts/run.mjs clean:cache",
+    "clean:all": "node scripts/run.mjs clean:all"
+  },
+  "engines": {
+    "node": ">=18"
+  }
+}
