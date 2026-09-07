@@ -1312,6 +1312,22 @@ wheels = [
 ]
 
 [[package]]
+name = "imbalanced-learn"
+version = "0.12.4"
+source = { registry = "https://pypi.org/simple" }
+dependencies = [
+    { name = "joblib" },
+    { name = "numpy" },
+    { name = "scikit-learn" },
+    { name = "scipy" },
+    { name = "threadpoolctl" },
+]
+sdist = { url = "https://files.pythonhosted.org/packages/30/41/8b15f1df14ff38f1fdd4eb2b128478d99c38db4a14292270639ae9d65447/imbalanced-learn-0.12.4.tar.gz", hash = "sha256:8153ba385d296b07d97e0901a2624a86c06b48c94c2f92da3a5354827697b7a3", size = 478372 }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/d8/0d/c3bfccc5d460eec8ff56889802aa88f5d07280d5282b307a74558e6edc44/imbalanced_learn-0.12.4-py3-none-any.whl", hash = "sha256:d47fc599160d3ea882e712a3a6b02bdd353c1a6436d8d68d41b1922e6ee4a703", size = 258324 },
+]
+
+[[package]]
 name = "importlib-metadata"
 version = "8.9.0"
 source = { registry = "https://pypi.org/simple" }
@@ -3281,6 +3297,7 @@ dependencies = [
     { name = "fairlearn" },
     { name = "fastapi" },
     { name = "flax" },
+    { name = "imbalanced-learn" },
     { name = "jax" },
     { name = "jaxlib" },
     { name = "langchain" },
@@ -3330,6 +3347,7 @@ requires-dist = [
     { name = "fairlearn", specifier = ">=0.11.0" },
     { name = "fastapi", specifier = ">=0.115.0" },
     { name = "flax", specifier = "==0.9.0" },
+    { name = "imbalanced-learn", specifier = ">=0.12.0,<0.13.0" },
     { name = "jax", specifier = "==0.7.1" },
     { name = "jaxlib", specifier = "==0.7.1" },
     { name = "langchain", specifier = ">=0.3.17" },
