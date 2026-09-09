@@ -12,6 +12,8 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 
+import jax
+import jax.numpy as jnp
 import numpy as np
 import pennylane as qml
 from sklearn.base import BaseEstimator, ClassifierMixin
@@ -249,6 +251,7 @@ class SeparableKernelClassifier(BaseEstimator, ClassifierMixin):
         jit=True,
         random_state=42,
         scaling=1.0,
+        max_vmap=4096,
         dev_type="default.qubit",
         qnode_kwargs={"interface": "jax", "diff_method": None},
     ):
@@ -271,9 +274,14 @@ class SeparableKernelClassifier(BaseEstimator, ClassifierMixin):
             dev_type (str): string specifying the pennylane device type; e.g. 'default.qubit'.
             qnode_kwargs (str): the keyword arguments passed to the circuit qnode.
             scaling (float): Factor by which to scale the input data.
+            max_vmap (int): Maximum number of kernel entries evaluated in a
+                single vectorised call. Bounds peak memory during
+                ``precompute_kernel``, which is otherwise quadratic in the
+                number of samples.
         """
         # attributes that do not depend on data
         self.encoding_layers = encoding_layers
+        self.max_vmap = max_vmap
         self.dev_type = dev_type
         self.qnode_kwargs = qnode_kwargs
         self.jit = jit
@@ -289,6 +297,7 @@ class SeparableKernelClassifier(BaseEstimator, ClassifierMixin):
         self.n_qubits_ = None
         self.scaler = None  # data scaler will be fitted on training data
         self.circuit = None
+        self.forward = None
 
     def generate_key(self):
         return jax.random.PRNGKey(self.rng.integers(1000000))
@@ -340,12 +349,24 @@ class SeparableKernelClassifier(BaseEstimator, ClassifierMixin):
         dim1 = len(X1)
         dim2 = len(X2)
 
-        # concatenate all pairs of vectors
-        Z = np.array([np.concatenate((X1[i], X2[j])) for i in range(dim1) for j in range(dim2)])
-        self.construct_circuit()
-        kernel_values = [self.forward(z) for z in Z]
-        # reshape the values into the kernel matrix
-        kernel_matrix = np.reshape(kernel_values, (dim1, dim2))
+        if self.forward is None:
+            self.construct_circuit()
+        batched_forward = jax.vmap(self.forward)
+
+        # The Gram matrix has dim1*dim2 entries, so the pairs it is built from
+        # are materialised a block of rows at a time rather than all at once,
+        # and each block is evaluated in one vectorised call instead of a
+        # Python loop over individual pairs.
+        rows_per_block = max(1, self.max_vmap // dim2) if dim2 else 1
+        kernel_matrix = np.empty((dim1, dim2), dtype=float)
+        for start in range(0, dim1, rows_per_block):
+            stop = min(start + rows_per_block, dim1)
+            pairs = np.concatenate(
+                [np.repeat(X1[start:stop], dim2, axis=0), np.tile(X2, (stop - start, 1))],
+                axis=1,
+            )
+            values = np.asarray(batched_forward(jnp.asarray(pairs)))
+            kernel_matrix[start:stop] = values.reshape(stop - start, dim2)
 
         return kernel_matrix
 

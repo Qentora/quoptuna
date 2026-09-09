@@ -21,6 +21,9 @@ import pennylane as qml
 from quoptuna.backend.base.pennylane_models.qml_benchmarks import (  # noqa: E402
     jax_config as _jax_config,  # applies the QUOPTUNA_JAX_X64 precision setting
 )
+from quoptuna.backend.base.pennylane_models.qml_benchmarks.jax_config import (
+    sampling_precision,
+)
 from sklearn.base import BaseEstimator, ClassifierMixin
 from sklearn.linear_model import LogisticRegression
 from sklearn.preprocessing import MinMaxScaler, StandardScaler
@@ -148,9 +151,18 @@ class QuantumKitchenSinks(BaseEstimator, ClassifierMixin):
 
         if self.jit:
             circuit = jax.jit(circuit)
-        circuit = chunk_vmapped_fn(jax.vmap(circuit), 0, self.max_vmap)
+        chunked = chunk_vmapped_fn(jax.vmap(circuit), 0, self.max_vmap)
 
-        self.forward = circuit
+        # This is the only shot-based model in the catalogue. PennyLane
+        # evaluates qml.sample through a host callback whose declared result
+        # dtype has to match the one NumPy actually produces, which on Windows
+        # means running with 64-bit JAX disabled; sampling_precision() is a
+        # no-op wherever sampling under x64 already works.
+        def forward(*args):
+            with sampling_precision():
+                return chunked(*args)
+
+        self.forward = forward
 
     def initialize(self, n_features, classes=None):
         """Initialize attributes that depend on the number of features and the class labels.
