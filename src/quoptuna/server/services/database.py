@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from contextlib import contextmanager
 from functools import lru_cache
+from pathlib import Path
 from typing import Iterator
 
 from sqlmodel import Session, SQLModel, create_engine
@@ -51,9 +52,29 @@ def _engine_kwargs(url: str) -> dict:
     return {"pool_pre_ping": True, "pool_recycle": 1800}
 
 
+def _ensure_sqlite_parent(url: str) -> None:
+    """Create the directory holding a SQLite file.
+
+    ``db/`` is gitignored, so a fresh clone has no such directory and SQLite
+    reports "unable to open database file" instead of creating the database.
+    """
+    if not url.startswith("sqlite"):
+        return
+    _, separator, path = url.partition(":///")
+    if not separator:
+        return
+    path = path.split("?", 1)[0]
+    if not path or path.startswith(":memory:"):
+        return
+    parent = Path(path).parent
+    if str(parent) not in ("", "."):
+        parent.mkdir(parents=True, exist_ok=True)
+
+
 @lru_cache(maxsize=8)
 def get_engine(url: str | None = None):
     url = url or _database_url()
+    _ensure_sqlite_parent(url)
     return create_engine(url, **_engine_kwargs(url))
 
 

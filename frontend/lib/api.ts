@@ -127,6 +127,9 @@ export interface OptimizationRequest {
   favorable_class?: string | number;
   sensitive_feature?: string;
   categorical_encoding?: 'ordinal' | 'onehot';
+  // Class-imbalance handling for the TRAIN split only; applies to every model
+  // type, including quantum models (no class_weight equivalent of their own).
+  resampling?: 'none' | 'oversample' | 'undersample';
   // Search strategy: sampler + optional early-stopping pruner (ASHA/Hyperband).
   sampler?: 'tpe' | 'random' | 'grid';
   pruner?: 'none' | 'asha' | 'hyperband';

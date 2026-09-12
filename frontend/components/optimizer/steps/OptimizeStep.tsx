@@ -147,6 +147,7 @@ export function OptimizeStep({ workflowData, setWorkflowData, setFooter }: StepP
         favorable_class: features.favorableClass ?? undefined,
         sensitive_feature: features.sensitiveFeature ?? undefined,
         categorical_encoding: features.categoricalEncoding,
+        resampling: features.resampling,
         sampler: configuration.sampler,
         pruner: configuration.pruner,
         fairness_mode: configuration.fairnessMode,

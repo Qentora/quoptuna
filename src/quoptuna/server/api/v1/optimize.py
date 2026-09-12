@@ -59,6 +59,13 @@ class OptimizationRequest(BaseModel):
     # How categorical feature columns are encoded: "ordinal" (1 column per
     # feature — fast, quantum-friendly) or "onehot" (1 column per category).
     categorical_encoding: Literal["ordinal", "onehot"] = "ordinal"
+    # Class-imbalance handling for the TRAIN split only: "none" (default),
+    # "oversample" (duplicate minority rows via RandomOverSampler), or
+    # "undersample" (drop majority rows via RandomUnderSampler). Applies
+    # uniformly to every model type, quantum included — unlike class_weight
+    # (SVC/SVClinear/Perceptron only), this happens before Optimizer ever
+    # sees the data.
+    resampling: Literal["none", "oversample", "undersample"] = "none"
     # Optional overrides to shrink Optuna's search (defaults use the full space).
     model_types: Optional[List[str]] = None
     search_space: Optional[Dict[str, List[Any]]] = None
@@ -168,6 +175,15 @@ def build_workflow(
     if request.favorable_class is not None:
         label_config["favorable_class"] = request.favorable_class
 
+    split_config: Dict[str, Any] = {
+        **label_config,
+        "resampling": request.resampling,
+        # Needed to resample the sensitive column alongside x_train/y_train so
+        # it stays row-aligned; only used when resampling != "none".
+        "sensitive_feature": request.sensitive_feature,
+        "dataset_id": request.dataset_id,
+    }
+
     nodes = [
         data_node,
         {
@@ -181,7 +197,7 @@ def build_workflow(
                 },
             },
         },
-        {"id": "split", "data": {"type": "train-test-split", "config": label_config}},
+        {"id": "split", "data": {"type": "train-test-split", "config": split_config}},
         {"id": "label_encode", "data": {"type": "label-encoding", "config": label_config}},
         {
             "id": "model",

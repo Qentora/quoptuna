@@ -104,6 +104,7 @@ a session.
 | Variable | Default | Purpose |
 | --- | --- | --- |
 | `QUOPTUNA_JAX_X64` | on | Set `0` for float32 — roughly halves simulator memory/compute |
+| `QUOPTUNA_SAMPLING_FLOAT32` | `auto` | Precision for shot-based circuits (QuantumKitchenSinks). `auto` detects platforms where PennyLane's sampling callback needs 32-bit — Windows, where NumPy's default integer is int32 — and is a no-op on Linux/macOS. Force with `1`/`0`. |
 | `QUOPTUNA_OVR_N_JOBS` | off | Thread count for multiclass OvR sub-fits |
 | `QUOPTUNA_LOG_FILE` | `db/logs/quoptuna.log` | Override the rotating log path |
 

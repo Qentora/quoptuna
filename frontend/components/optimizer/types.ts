@@ -45,6 +45,11 @@ export interface WorkflowData {
     sensitiveFeature: string | null;
     // How categorical feature columns are encoded server-side.
     categoricalEncoding: 'ordinal' | 'onehot';
+    // Class-imbalance handling for the TRAIN split only: duplicate minority
+    // rows ('oversample'), drop majority rows ('undersample'), or leave as-is.
+    // Applies to every model type, including quantum models (which have no
+    // class_weight hook of their own).
+    resampling: 'none' | 'oversample' | 'undersample';
   };
   configuration: {
     studyName: string;
@@ -122,6 +127,7 @@ export const initialWorkflowData: WorkflowData = {
     favorableClass: null,
     sensitiveFeature: null,
     categoricalEncoding: 'ordinal',
+    resampling: 'none',
   },
   configuration: {
     studyName: 'my-optimization-study',

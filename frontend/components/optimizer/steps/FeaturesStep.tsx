@@ -42,6 +42,7 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
     favorableClass,
     sensitiveFeature,
     categoricalEncoding,
+    resampling,
   } = workflowData.features;
   const [search, setSearch] = useState('');
 
@@ -64,6 +65,12 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
     setWorkflowData((prev) => ({
       ...prev,
       features: { ...prev.features, categoricalEncoding: value },
+    }));
+
+  const setResampling = (value: 'none' | 'oversample' | 'undersample') =>
+    setWorkflowData((prev) => ({
+      ...prev,
+      features: { ...prev.features, resampling: value },
     }));
 
   const filteredColumns = useMemo(() => {
@@ -445,6 +452,28 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
                 How categorical columns become numbers. Ordinal keeps one column per feature (faster
                 for quantum models); one-hot adds a column per category.
                 {!hasCategoricalSelected && ' No categorical features are currently selected.'}
+              </FieldDescription>
+            </Field>
+
+            <Field>
+              <FieldLabel htmlFor="resampling">Class imbalance (train split only)</FieldLabel>
+              <Select
+                value={resampling}
+                onValueChange={(v) => setResampling(v as 'none' | 'oversample' | 'undersample')}
+              >
+                <SelectTrigger id="resampling" className="w-full">
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="none">None</SelectItem>
+                  <SelectItem value="oversample">Oversample minority class</SelectItem>
+                  <SelectItem value="undersample">Undersample majority class</SelectItem>
+                </SelectContent>
+              </Select>
+              <FieldDescription>
+                Rebalances only the training split (test stays representative). Applies to every
+                model type, including quantum models, which have no class_weight equivalent of
+                their own.
               </FieldDescription>
             </Field>
 
