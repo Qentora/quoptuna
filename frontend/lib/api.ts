@@ -559,13 +559,124 @@ export interface ReportRequest {
   model_name: string;
   dataset_description?: string;
   sensitive_feature?: string;
+  // Prompt overrides (Settings → AI Report Generation); omit for the defaults.
+  analyst_instructions?: string;
+  reviewer_instructions?: string;
+  enable_review?: boolean;
+  // Which evidence families reach the agents. All default to true server-side.
   include_fairness?: boolean;
+  include_fairness_search?: boolean;
+  include_pareto?: boolean;
+  include_shap_detail?: boolean;
+  include_trial_history?: boolean;
+  include_study_plots?: boolean;
+  attach_figures?: boolean;
+  max_trial_rows?: number;
 }
 
 export interface ReportResponse {
   optimization_id: string;
+  report_id?: string;
   status: string;
   report_markdown: string;
+  /** Figure ids the report actually references (resolve to `figures/<id>.png`). */
+  referenced_figures?: string[];
+  /** Figure ids the agent invented; removed before the report was saved. */
+  dropped_figures?: string[];
+  /** Markdown contract violations the normalizer could not repair. */
+  markdown_issues?: string[];
+  reviewed?: boolean;
+  context_summary?: {
+    figures: number;
+    trials_included: number;
+    trials_recorded: number | null;
+    fairness_audit_included: boolean | null;
+    fairness_mode: string | null;
+    pareto_points: number;
+    omissions: number;
+  };
+}
+
+/** UI-facing documentation for one report setting, served by the backend. */
+export interface ReportPromptSetting {
+  key: string;
+  label: string;
+  type: 'prompt' | 'boolean' | 'integer';
+  description: string;
+  when: string;
+  default?: unknown;
+  default_ref?: string;
+  minimum?: number;
+  maximum?: number;
+}
+
+export interface ReportPrompts {
+  prompts: { analyst: string; reviewer: string };
+  settings: ReportPromptSetting[];
+  markdown_contract: string;
+  report_skeleton: string;
+}
+
+/** The built-in agent prompts plus the documented settings the UI exposes. */
+export async function getReportPrompts(): Promise<ReportPrompts> {
+  return request<ReportPrompts>('/api/v1/analysis/report-prompts');
+}
+
+export interface ReportContextFigure {
+  id: string;
+  title: string;
+  group: 'performance' | 'shap' | 'fairness' | 'study';
+  kind: 'image' | 'plotly';
+  path: string;
+  note?: string;
+  source?: string;
+}
+
+export interface ReportContextResponse {
+  snapshot_id: string;
+  /** The full evidence bundle; see `report_context.build_context` for the schema. */
+  context: Record<string, any> & { figures: ReportContextFigure[]; omissions: string[] };
+  /** The exact markdown rendering of the bundle that the analyst agent reads. */
+  evidence_markdown?: string;
+}
+
+/** The structured evidence bundle behind a snapshot's reports (no base64). */
+export async function getReportContext(snapshotId: string): Promise<ReportContextResponse> {
+  return request<ReportContextResponse>(`/api/v1/analysis/snapshots/${snapshotId}/context`);
+}
+
+/** URL of the one-click research dump (context, evidence, figures, tables, reports). */
+export function researchBundleUrl(snapshotId: string): string {
+  return `${API_BASE_URL}/api/v1/analysis/snapshots/${snapshotId}/bundle`;
+}
+
+/**
+ * Fetch the research dump as a Blob.
+ *
+ * Goes through `fetch` rather than a plain link so the Auth0 session cookie is
+ * sent cross-origin in dev, and so a failure surfaces as an error instead of
+ * navigating the user to a JSON error page.
+ */
+export async function downloadResearchBundle(
+  snapshotId: string
+): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetch(researchBundleUrl(snapshotId), { credentials: 'include' });
+  if (!response.ok) {
+    let detail = response.statusText;
+    try {
+      detail = (await response.json()).detail || detail;
+    } catch {
+      // no JSON body
+    }
+    if (response.status === 401) throw new UnauthorizedError(detail);
+    throw new Error(detail);
+  }
+  const disposition = response.headers.get('content-disposition') || '';
+  const match = /filename="?([^";]+)"?/.exec(disposition);
+  return {
+    blob: await response.blob(),
+    filename: match?.[1] || `quoptuna-research-dump-${snapshotId}.zip`,
+  };
 }
 
 export interface AnalysisConfig {
@@ -654,6 +765,10 @@ export interface PersistedReport {
   provider: string;
   model_name: string;
   created_at: string;
+  completed_at?: string | null;
+  /** Failure detail, set when status is 'failed'. */
+  error?: string | null;
+  dataset_description?: string | null;
 }
 
 export async function listSnapshotReports(snapshotId: string): Promise<PersistedReport[]> {

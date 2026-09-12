@@ -16,18 +16,21 @@ import matplotlib as mpl
 mpl.use("Agg")
 
 import numpy as np
-from fastapi import APIRouter, BackgroundTasks, HTTPException
-from pydantic import BaseModel, ConfigDict
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Response
+from pydantic import BaseModel, ConfigDict, Field
 
 from quoptuna.backend.utils.storage import DEFAULT_DB_NAME
+from quoptuna.backend.xai import prompts as report_prompts
+from quoptuna.backend.xai import report_context
 
 # Access optimization results stored by the optimize module.
 from quoptuna.server.api.v1.optimize import (
     OptimizationRequest,
     build_workflow,
     get_job,
+    serialize_study_trials,
 )
-from quoptuna.server.services import analysis_store
+from quoptuna.server.services import analysis_store, dataset_registry, research_bundle
 from quoptuna.server.services.storage import optuna_storage_url
 from quoptuna.server.services.workflow_service import (
     WorkflowExecutor,
@@ -68,7 +71,43 @@ class MetricsRequest(BaseModel):
     subset_size: int = 50
 
 
-class ReportRequest(BaseModel):
+class ReportInclusionOptions(BaseModel):
+    """Which evidence families reach the report agents.
+
+    Defaults mirror ``report_prompts.REPORT_PROMPT_SETTINGS``, which is what the
+    Settings page renders and documents, so an older client that sends none of
+    these still gets the full bundle.
+    """
+
+    # Include a fairness audit in the report when a protected attribute is
+    # available (stored with the run or given here).
+    include_fairness: bool = True
+    # Search-time fairness configuration: mode, disparity metric, threshold and
+    # per-trial disparities. Without it a constrained run reads as unconstrained.
+    include_fairness_search: bool = True
+    # Pareto front of a multi-objective run (the front *is* the result).
+    include_pareto: bool = True
+    include_shap_detail: bool = True
+    include_trial_history: bool = True
+    include_study_plots: bool = True
+    # Attach rendered figures to the request (off for text-only/cheap models).
+    attach_figures: bool = True
+    max_trial_rows: int = Field(default=40, ge=0, le=500)
+
+    def inclusions(self) -> report_context.ReportInclusions:
+        return report_context.ReportInclusions(
+            fairness=self.include_fairness,
+            fairness_search=self.include_fairness_search,
+            pareto=self.include_pareto,
+            shap_detail=self.include_shap_detail,
+            trial_history=self.include_trial_history,
+            study_plots=self.include_study_plots,
+            figures=self.attach_figures,
+            max_trial_rows=self.max_trial_rows,
+        )
+
+
+class ReportRequest(ReportInclusionOptions):
     # "model_name" collides with Pydantic's protected "model_" namespace; opt out.
     model_config = ConfigDict(protected_namespaces=())
 
@@ -80,10 +119,12 @@ class ReportRequest(BaseModel):
     api_key: str
     model_name: str = "gpt-4o"
     dataset_description: Optional[str] = None
-    # Include a fairness audit in the report when a protected attribute is
-    # available (stored with the run or given here).
     sensitive_feature: Optional[str] = None
-    include_fairness: bool = True
+    # Prompt overrides from Settings; empty falls back to the built-in prompts.
+    analyst_instructions: Optional[str] = None
+    reviewer_instructions: Optional[str] = None
+    # The reviewer pass is what catches ungrounded numbers and broken tables.
+    enable_review: bool = True
 
 
 class AnalysisJobRequest(BaseModel):
@@ -1280,15 +1321,185 @@ async def generate_fairness(request: FairnessRequest):
         raise HTTPException(status_code=500, detail=f"Failed to compute fairness: {e!s}")
 
 
+def _run_view(optimization_id: str) -> Optional[dict]:
+    """The optimization job as a plain dict, or ``None`` when it is unknown.
+
+    The report path must degrade rather than fail: a snapshot can outlive the
+    run record it came from (a wiped hot cache plus a pruned store), and a
+    report grounded in the snapshot alone is still worth producing.
+    """
+    try:
+        job = get_job(optimization_id)
+    except HTTPException:
+        return None
+    result = job.get("result") or {}
+    return {**job, "best_trial_number": result.get("best_trial_number")}
+
+
+def _run_trials(run: Optional[dict]) -> list[dict]:
+    """Trial history for a run, read back from the Optuna study when needed."""
+    if not run:
+        return []
+    trials = run.get("trials")
+    if trials:
+        return list(trials)
+    request_data = run.get("request") or {}
+    study_name = request_data.get("study_name")
+    if not study_name:
+        return []
+    try:
+        return serialize_study_trials(
+            str(request_data.get("database_name") or DEFAULT_DB_NAME), study_name
+        )
+    except Exception as exc:
+        logger.warning("Could not serialize trials for the report context: %s", exc)
+        return []
+
+
+def _run_pareto(run: Optional[dict]) -> list[dict]:
+    """Pareto front of a multi-objective run, recomputed if not cached.
+
+    ``pareto_trials`` is only set on the job by the background task that ran the
+    search, so it is absent for any run resumed after a restart even though the
+    study on disk still holds the front.
+    """
+    if not run:
+        return []
+    cached = run.get("pareto_trials")
+    if cached:
+        return list(cached)
+    request_data = run.get("request") or {}
+    study_name = request_data.get("study_name")
+    if not study_name:
+        return []
+    try:
+        from optuna import load_study
+
+        study = load_study(
+            storage=optuna_storage_url(str(request_data.get("database_name") or DEFAULT_DB_NAME)),
+            study_name=study_name,
+            sampler=None,
+        )
+        if len(study.directions) <= 1:
+            return []
+        return [
+            {"trial": trial.number, "values": list(trial.values), "params": trial.params}
+            for trial in study.best_trials
+        ]
+    except Exception as exc:
+        logger.warning("Could not load the Pareto front for the report context: %s", exc)
+        return []
+
+
+def _report_context(
+    snapshot: dict,
+    *,
+    options: ReportInclusionOptions,
+    dataset_description: Optional[str] = None,
+    prompt_names: Optional[dict[str, str]] = None,
+) -> tuple[dict, Optional[dict], list[dict], list[dict]]:
+    """Build the evidence bundle for a snapshot, plus the raw run data it used."""
+    optimization_id = snapshot["optimization_id"]
+    run = _run_view(optimization_id)
+    trials = _run_trials(run)
+    pareto = _run_pareto(run)
+    dataset_id = ((run or {}).get("request") or {}).get("dataset_id")
+    dataset = dataset_registry.get(dataset_id) if dataset_id else None
+    context = report_context.build_context(
+        optimization_id=optimization_id,
+        snapshot=snapshot,
+        run=run,
+        dataset=dict(dataset) if dataset else None,
+        trials=trials,
+        pareto_trials=pareto,
+        dataset_description=dataset_description,
+        inclusions=options.inclusions(),
+        prompts=prompt_names or {},
+    )
+    return context, run, trials, pareto
+
+
+def _completed_snapshot(snapshot_id: str, optimization_id: Optional[str] = None) -> dict:
+    snapshot = analysis_store.get_snapshot(snapshot_id)
+    if not snapshot or snapshot.get("revision", 0) < 1 or not snapshot.get("payload"):
+        raise HTTPException(status_code=404, detail="Completed analysis snapshot not found")
+    if optimization_id and snapshot["optimization_id"] != optimization_id:
+        raise HTTPException(status_code=409, detail="A completed analysis snapshot is required")
+    return snapshot
+
+
+@router.get("/report-prompts")
+async def get_report_prompts():
+    """Default agent prompts and the documented settings the UI exposes."""
+    return {
+        "prompts": report_prompts.default_prompts(),
+        "settings": report_prompts.REPORT_PROMPT_SETTINGS,
+        "markdown_contract": report_prompts.MARKDOWN_CONTRACT,
+        "report_skeleton": report_prompts.REPORT_SKELETON,
+    }
+
+
+@router.get("/snapshots/{snapshot_id}/context")
+async def get_report_context(snapshot_id: str, include_evidence_markdown: bool = True):
+    """The structured evidence bundle the report agents are given.
+
+    Served without any base64: figures are described by the manifest and
+    downloaded through the bundle endpoint.
+    """
+    snapshot = _completed_snapshot(snapshot_id)
+    context, _, _, _ = _report_context(snapshot, options=ReportInclusionOptions())
+    body: dict[str, Any] = {"snapshot_id": snapshot_id, "context": context}
+    if include_evidence_markdown:
+        body["evidence_markdown"] = report_context.render_markdown(context)
+    return body
+
+
+@router.get("/snapshots/{snapshot_id}/bundle")
+async def download_research_bundle(snapshot_id: str):
+    """One-click research dump: context, evidence, figures, tables and reports.
+
+    Built with the *default* inclusions rather than the caller's report settings:
+    the dump is the archive of what the run produced, so it must stay complete
+    even when a report deliberately left some of it out.
+    """
+    snapshot = _completed_snapshot(snapshot_id)
+    context, run, trials, pareto = _report_context(snapshot, options=ReportInclusionOptions())
+    reports = [
+        report
+        for report in analysis_store.list_reports(snapshot_id)
+        if report.get("snapshot_revision") == snapshot["revision"]
+    ]
+    try:
+        archive = research_bundle.build_zip(
+            context=context,
+            payload=snapshot.get("payload") or {},
+            reports=reports,
+            evidence_markdown=report_context.render_markdown(context),
+            prompts={
+                f"{name}.default": text for name, text in report_prompts.default_prompts().items()
+            },
+            run=run,
+            trials=trials,
+            pareto_trials=pareto,
+        )
+    except Exception as exc:
+        logger.exception("Failed to build the research bundle for snapshot %s", snapshot_id)
+        raise HTTPException(status_code=500, detail=f"Failed to build the bundle: {exc!s}")
+    filename = research_bundle.bundle_filename(context)
+    return Response(
+        content=archive,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.post("/report")
 async def generate_ai_report(request: ReportRequest):
     """Generate and persist a report strictly from a completed snapshot."""
     if not request.api_key:
         raise HTTPException(status_code=400, detail="An LLM api_key is required")
 
-    snapshot = analysis_store.get_snapshot(request.analysis_snapshot_id)
-    if not snapshot or snapshot["optimization_id"] != request.optimization_id:
-        raise HTTPException(status_code=409, detail="A completed analysis snapshot is required")
+    snapshot = _completed_snapshot(request.analysis_snapshot_id, request.optimization_id)
     if snapshot["revision"] != request.analysis_revision:
         raise HTTPException(
             status_code=409,
@@ -1305,42 +1516,34 @@ async def generate_ai_report(request: ReportRequest):
     try:
         from quoptuna.backend.xai import report_agent
 
-        evidence: dict[str, Any] = {
-            "metrics": payload["metrics"],
-            "feature_importance": payload.get("feature_importance"),
-            "confusion_matrix": payload.get("confusion_data"),
-            "curves": payload.get("curves_data"),
-            "task_type": payload.get("task_type"),
-            "class_labels": payload.get("class_labels"),
-        }
-        if request.include_fairness and payload.get("fairness"):
-            fairness = payload["fairness"]
-            evidence["fairness_metrics"] = fairness.get("metrics")
-            evidence["fairness_mitigation"] = fairness.get("mitigation")
+        context, _, _, _ = _report_context(
+            snapshot,
+            options=request,
+            dataset_description=request.dataset_description,
+            prompt_names={
+                "analyst": "custom" if (request.analyst_instructions or "").strip() else "default",
+                "reviewer": "custom"
+                if (request.reviewer_instructions or "").strip()
+                else "default",
+            },
+        )
+        images = (
+            research_bundle.image_map(payload, context.get("figures") or [])
+            if request.attach_figures
+            else {}
+        )
 
-        images = dict(payload.get("plots") or {})
-        if payload.get("confusion_matrix_plot"):
-            images["confusion_matrix"] = payload["confusion_matrix_plot"]
-        fairness = payload.get("fairness") or {}
-        if request.include_fairness:
-            images.update(
-                {f"fairness_{name}": value for name, value in (fairness.get("plots") or {}).items()}
-            )
-            mitigation = fairness.get("mitigation") or {}
-            if mitigation.get("comparison_plot"):
-                images["fairness_mitigation_comparison"] = mitigation["comparison_plot"]
-
-        markdown = await report_agent.generate_report(
-            report=evidence,
+        result = await report_agent.generate_report(
+            context=context,
             images=images,
             api_key=request.api_key,
             model_name=request.model_name,
             provider=request.llm_provider,
+            analyst_instructions=request.analyst_instructions,
+            reviewer_instructions=request.reviewer_instructions,
+            enable_review=request.enable_review,
         )
-
-        if request.dataset_description:
-            markdown = f"> Dataset: {request.dataset_description}\n\n{markdown}"
-
+        markdown = result["markdown"]
         analysis_store.complete_report(report_id, markdown)
 
         return {
@@ -1348,6 +1551,22 @@ async def generate_ai_report(request: ReportRequest):
             "report_id": report_id,
             "status": "completed",
             "report_markdown": markdown,
+            # Diagnostics the UI surfaces: which figures the report actually
+            # references, what was dropped as invented, and residual markdown
+            # issues the normalizer could not repair.
+            "referenced_figures": result.get("referenced_figures") or [],
+            "dropped_figures": result.get("dropped_figures") or [],
+            "markdown_issues": result.get("lint") or [],
+            "reviewed": result.get("reviewed", False),
+            "context_summary": {
+                "figures": len(context.get("figures") or []),
+                "trials_included": len((context.get("optimization") or {}).get("trials") or []),
+                "trials_recorded": (context.get("optimization") or {}).get("n_trials_recorded"),
+                "fairness_audit_included": (context.get("fairness") or {}).get("audit_included"),
+                "fairness_mode": ((context.get("fairness") or {}).get("search") or {}).get("mode"),
+                "pareto_points": (context.get("pareto_front") or {}).get("n_points") or 0,
+                "omissions": len(context.get("omissions") or []),
+            },
         }
     except HTTPException as exc:
         analysis_store.fail_report(report_id, str(exc.detail))

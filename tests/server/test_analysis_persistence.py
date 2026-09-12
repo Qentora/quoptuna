@@ -1,6 +1,9 @@
 """Regression tests for durable analysis snapshots and snapshot-backed reports."""
 
+import asyncio
 import base64
+import io
+import zipfile
 from pathlib import Path
 
 import pytest
@@ -70,8 +73,9 @@ def test_reports_persist_and_run_cleanup_removes_artifacts(isolated_store):
     assert not (analysis_store.ARTIFACT_ROOT / "run-1").exists()
 
 
-@pytest.mark.asyncio
-async def test_report_uses_snapshot_without_rebuilding_xai(isolated_store, monkeypatch):
+def test_report_uses_snapshot_without_rebuilding_xai(isolated_store, monkeypatch):
+    # Driven through asyncio.run rather than pytest.mark.asyncio: pytest-asyncio
+    # is not a project dependency, so a coroutine test would be silently skipped.
     job = analysis_store.create_job("run-1", {})
     analysis_store.complete_job(
         job["id"],
@@ -87,22 +91,61 @@ async def test_report_uses_snapshot_without_rebuilding_xai(isolated_store, monke
     def forbidden(*args, **kwargs):
         raise AssertionError
 
+    captured = {}
+
     async def fake_generate_report(**kwargs):
-        assert kwargs["report"]["metrics"]["accuracy"] == 0.8  # noqa: PLR2004
-        return "# Snapshot report"
+        context = kwargs["context"]
+        assert context["performance"]["headline"]["accuracy"] == 0.8  # noqa: PLR2004
+        captured["context"] = context
+        return {"markdown": "# Snapshot report\n", "lint": [], "reviewed": True}
 
     monkeypatch.setattr(analysis, "build_xai", forbidden)
     monkeypatch.setattr(report_agent, "generate_report", fake_generate_report)
-    response = await analysis.generate_ai_report(
-        analysis.ReportRequest(
-            optimization_id="run-1",
-            analysis_snapshot_id=snapshot["id"],
-            analysis_revision=snapshot["revision"],
-            api_key="not-persisted",
-            llm_provider="openai",
-            model_name="test-model",
+    response = asyncio.run(
+        analysis.generate_ai_report(
+            analysis.ReportRequest(
+                optimization_id="run-1",
+                analysis_snapshot_id=snapshot["id"],
+                analysis_revision=snapshot["revision"],
+                api_key="not-persisted",
+                llm_provider="openai",
+                model_name="test-model",
+            )
         )
     )
 
-    assert response["report_markdown"] == "# Snapshot report"
-    assert analysis_store.list_reports(snapshot["id"])[0]["markdown"] == "# Snapshot report"
+    assert response["report_markdown"] == "# Snapshot report\n"
+    assert analysis_store.list_reports(snapshot["id"])[0]["markdown"] == "# Snapshot report\n"
+    # A snapshot whose run record is gone still yields a bundle, with the gap
+    # recorded rather than silently dropped.
+    assert any("Run configuration" in note for note in captured["context"]["omissions"])
+
+
+def test_context_and_bundle_endpoints_serve_a_completed_snapshot(isolated_store):
+    """The research dump is reachable for any completed snapshot, report or not."""
+    image = "data:image/png;base64," + base64.b64encode(b"bundle-png").decode()
+    job = analysis_store.create_job("run-2", {})
+    analysis_store.complete_job(
+        job["id"],
+        {
+            "metrics": {"accuracy": 0.9},
+            "plots": {"bar": image},
+            "confusion_matrix_plot": image,
+        },
+    )
+    snapshot = analysis_store.get_snapshot(job["snapshot_id"])
+
+    context = asyncio.run(analysis.get_report_context(snapshot["id"]))
+    assert context["context"]["analysis"]["snapshot_id"] == snapshot["id"]
+    assert {figure["id"] for figure in context["context"]["figures"]} == {
+        "shap_bar",
+        "confusion_matrix",
+    }
+    assert "## Figure manifest" in context["evidence_markdown"]
+
+    response = asyncio.run(analysis.download_research_bundle(snapshot["id"]))
+    assert response.media_type == "application/zip"
+    with zipfile.ZipFile(io.BytesIO(response.body)) as archive:
+        names = set(archive.namelist())
+        assert {"context.json", "evidence.md", "figures/shap_bar.png"} <= names
+        assert archive.read("figures/shap_bar.png") == b"bundle-png"

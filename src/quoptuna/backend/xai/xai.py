@@ -9,6 +9,7 @@ from pathlib import Path
 from typing import TYPE_CHECKING, Literal
 
 import matplotlib.pyplot as plt
+import numpy as np
 import pandas as pd
 import shap
 from shap import Explainer
@@ -452,7 +453,7 @@ class XAI:
         """
         # Imported lazily: pulls in litellm/openai, which the sklearn-only
         # XAI paths (tests, SHAP endpoints) should not pay for.
-        from quoptuna.backend.xai import report_agent  # noqa: PLC0415
+        from quoptuna.backend.xai import report_agent, report_context
 
         report = self.get_report()
         if task_spec and task_spec.get("kind") == "multiclass":
@@ -480,27 +481,53 @@ class XAI:
             }
         images = self._generate_report_images(num_waterfall_plots)
 
-        if fairness:
-            report["fairness_metrics"] = fairness.get("metrics")
-            for name, url in (fairness.get("plots") or {}).items():
-                images[f"fairness_{name}"] = url
-            mitigation = fairness.get("mitigation")
-            if mitigation:
-                report["fairness_mitigation"] = {
-                    "constraint": mitigation.get("constraint"),
-                    "before": mitigation.get("before"),
-                    "after": mitigation.get("after"),
-                }
-                if mitigation.get("comparison_plot"):
-                    images["fairness_mitigation_comparison"] = mitigation["comparison_plot"]
-
-        return await report_agent.generate_report(
-            report=report,
-            images=images,
+        # Shape the loose report/images into the same evidence bundle the server
+        # builds, so this path gets the identical prompts, figure manifest and
+        # markdown normalisation. There is no Optuna run behind it, so the search
+        # configuration and trial history are absent — build_context records that.
+        confusion_plot = images.pop("confusion_matrix", None)
+        payload = {
+            "metrics": report,
+            "plots": images,
+            "confusion_matrix_plot": confusion_plot,
+            "task_type": (task_spec or {}).get("kind", "binary"),
+            "class_labels": (task_spec or {}).get("class_labels"),
+            "feature_importance": self._feature_importance(),
+            "fairness": fairness,
+            "warnings": {},
+        }
+        snapshot = {
+            "id": None,
+            "optimization_id": "",
+            "revision": 0,
+            "config": {"trial_number": None, "class_index": self._plot_class_index()},
+            "payload": payload,
+        }
+        context = report_context.build_context(optimization_id="", snapshot=snapshot)
+        result = await report_agent.generate_report(
+            context=context,
+            images=report_context.figure_images(payload, context["figures"]),
             api_key=api_key,
             model_name=model_name,
             provider=provider,
         )
+        return result["markdown"]
+
+    def _feature_importance(self) -> list[dict]:
+        """Mean |SHAP| per feature, descending; empty when SHAP is unavailable."""
+        values = getattr(self.shap_values, "values", None)
+        if values is None:
+            return []
+        magnitude = np.abs(np.asarray(values, dtype=float))
+        if magnitude.ndim > 2:  # noqa: PLR2004
+            magnitude = magnitude.mean(axis=-1)
+        means = magnitude.mean(axis=0)
+        names = self.feature_names or [f"feature_{i}" for i in range(len(means))]
+        importance = [
+            {"feature": str(name), "importance": float(value)} for name, value in zip(names, means)
+        ]
+        importance.sort(key=lambda item: item["importance"], reverse=True)
+        return importance
 
     def generate_report_with_langchain(
         self,
@@ -512,7 +539,7 @@ class XAI:
         """Deprecated sync shim kept for the legacy Streamlit UI; delegates to
         the Agents SDK pipeline.
         """
-        import asyncio  # noqa: PLC0415
+        import asyncio
 
         return asyncio.run(
             self.generate_report_with_llm(

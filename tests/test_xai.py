@@ -140,3 +140,66 @@ def test_get_heatmap_plot(trained_model_sample, load_data):
     heatmap_plot = xai.get_heatmap_plot(class_index=0)
     assert isinstance(heatmap_plot, str)
     assert heatmap_plot.startswith("data:image/png;base64,")
+
+
+class _StubXAI:
+    """Minimal stand-in exercising the report path without fitting a model.
+
+    ``XAI.generate_report_with_llm`` only touches these four members, so binding
+    the real method to a stub covers the evidence-bundle shaping (which is where
+    the legacy Streamlit path broke when the agent API changed) without paying
+    for a SHAP explainer.
+    """
+
+    PNG = "data:image/png;base64,ZmFrZQ=="
+
+    def get_report(self):
+        return {
+            "f1_score": 0.9,
+            "accuracy": 0.92,
+            "confusion_matrix": [[5, 1], [1, 5]],
+            "roc_auc_score": "Only one class present in y_true",
+        }
+
+    def _generate_report_images(self, num_waterfall_plots):
+        assert num_waterfall_plots == 2  # noqa: PLR2004
+        return {"bar": self.PNG, "waterfall_0": self.PNG, "confusion_matrix": self.PNG}
+
+    def _plot_class_index(self):
+        return 0
+
+    def _feature_importance(self):
+        return [{"feature": "age", "importance": 0.5}]
+
+
+def test_legacy_report_path_builds_the_shared_evidence_bundle(monkeypatch):
+    import asyncio
+
+    from quoptuna.backend.xai import report_agent
+
+    captured = {}
+
+    async def fake_generate_report(**kwargs):
+        captured.update(kwargs)
+        return {"markdown": "# Legacy report\n", "lint": []}
+
+    monkeypatch.setattr(report_agent, "generate_report", fake_generate_report)
+
+    markdown = asyncio.run(
+        XAI.generate_report_with_llm(
+            _StubXAI(), api_key="k", provider="openai", num_waterfall_plots=2
+        )
+    )
+
+    assert markdown == "# Legacy report\n"
+    context = captured["context"]
+    assert context["performance"]["headline"]["f1_score"] == 0.9  # noqa: PLR2004
+    assert context["explainability"]["feature_importance"][0]["feature"] == "age"
+    # Figure ids match the shared naming rule, index suffix included.
+    ids = {figure["id"] for figure in context["figures"]}
+    assert {"shap_bar", "shap_waterfall_0", "confusion_matrix"} == ids
+    assert set(captured["images"]) == ids
+    # A metric that failed to compute is declared, not silently missing.
+    assert any("roc_auc_score" in note for note in context["omissions"])
+    # No Optuna run behind this path; the agent is told so.
+    assert any("Run configuration" in note for note in context["omissions"])
