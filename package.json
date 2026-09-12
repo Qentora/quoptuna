@@ -24,7 +24,11 @@
     "build:package": "node scripts/run.mjs build:package",
     "clean": "node scripts/run.mjs clean",
     "clean:cache": "node scripts/run.mjs clean:cache",
-    "clean:all": "node scripts/run.mjs clean:all"
+    "clean:all": "node scripts/run.mjs clean:all",
+    "gpu:check": "node scripts/run.mjs gpu:check",
+    "gpu:setup": "node scripts/run.mjs gpu:setup",
+    "dev:gpu": "node scripts/run.mjs dev:gpu",
+    "dev-gpu": "node scripts/run.mjs dev:gpu"
   },
   "engines": {
     "node": ">=18"

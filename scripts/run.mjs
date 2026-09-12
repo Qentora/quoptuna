@@ -10,6 +10,15 @@ import { cp, rm } from "node:fs/promises";
 import { existsSync, readdirSync } from "node:fs";
 import path from "node:path";
 import { fileURLToPath } from "node:url";
+import {
+  backendUrlForBrowser,
+  gpuBackendCommand,
+  gpuBlocker,
+  gpuVenvStatus,
+  linuxSpawn,
+  reportGpu,
+  setupGpu,
+} from "./gpu.mjs";
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), "..");
 const isWindows = process.platform === "win32";
@@ -147,6 +156,57 @@ function runBoth() {
   frontend.on("exit", shutdown);
 }
 
+/** Start the GPU backend (Linux side) plus the frontend, stopping both on Ctrl+C. */
+function runBothGpu() {
+  const venv = gpuVenvStatus();
+  log("Starting QuOptuna dev environment (GPU)...");
+  log("");
+  log(`GPU:      ${venv.device ?? "unknown"} (JAX backend '${venv.backend}')`);
+  log("Precision: float32 (QUOPTUNA_JAX_X64=0 - required for GPU throughput)");
+  log("");
+  log("Note: the GPU wins on wide circuits - kernel models (IQP, projected)");
+  log("      at ~12+ features, or variational models at ~30+. Below that the");
+  log("      circuits are too small to cover kernel-launch overhead and the");
+  log("      CPU (npm run dev) is faster. Measured on an RTX 5080: 14-16x");
+  log("      faster at 12-14 qubits, ~6x slower on a 4-qubit default mix.");
+  log("");
+  const backend = linuxSpawn(gpuBackendCommand(ROOT, BACKEND_PORT));
+
+  // Resolve after the backend starts so the distro is definitely running.
+  const apiUrl = backendUrlForBrowser(BACKEND_PORT);
+  log(`Backend:  ${apiUrl} (API docs: /api/docs)`);
+  log(`Frontend: http://localhost:${FRONTEND_PORT}`);
+  log("");
+  log("Press Ctrl+C to stop both services");
+  log("");
+
+  const frontend = spawn("npm run dev", {
+    stdio: "inherit",
+    shell: true,
+    detached: !isWindows,
+    cwd: path.join(ROOT, "frontend"),
+    // Next.js keeps variables already present in the environment, so this
+    // wins over frontend/.env.local without editing the user's file.
+    env: { ...process.env, NEXT_PUBLIC_API_URL: apiUrl },
+  });
+
+  let shuttingDown = false;
+  const shutdown = () => {
+    if (shuttingDown) return;
+    shuttingDown = true;
+    log("");
+    log("Stopping services...");
+    killTree(backend.pid);
+    killTree(frontend.pid);
+    killPort(FRONTEND_PORT);
+    process.exit(0);
+  };
+  process.on("SIGINT", shutdown);
+  process.on("SIGTERM", shutdown);
+  backend.on("exit", shutdown);
+  frontend.on("exit", shutdown);
+}
+
 const tasks = {
   help() {
     log("QuOptuna Development Commands (npm run <task>)");
@@ -162,6 +222,11 @@ const tasks = {
     log("  dev:backend        - Run FastAPI backend (port 8000)");
     log("  dev:frontend       - Run Next.js frontend (port 3000)");
     log("  dev:streamlit      - Run legacy Streamlit interface");
+    log("");
+    log("GPU (NVIDIA; on Windows the backend runs inside WSL2):");
+    log("  gpu:check          - Report whether the GPU path is usable");
+    log("  gpu:setup          - Create the CUDA environment (one-off)");
+    log("  dev:gpu            - Run backend on GPU + frontend (Ctrl+C stops both)");
     log("");
     log("Code Quality:");
     log("  format             - Format the code (ruff)");
@@ -221,6 +286,26 @@ const tasks = {
     await ensureFrontendEnv();
     log(`Starting Next.js frontend on http://localhost:${FRONTEND_PORT}...`);
     run("npm run dev", { cwd: path.join(ROOT, "frontend") });
+  },
+
+  "gpu:check": () => process.exit(reportGpu(ROOT)),
+
+  "gpu:setup": () => process.exit(setupGpu(ROOT)),
+
+  async "dev:gpu"() {
+    const blocker = gpuBlocker();
+    if (blocker) {
+      log("Cannot start the GPU backend:");
+      log("");
+      log(blocker);
+      process.exit(1);
+    }
+    if (!gpuVenvStatus().ready) {
+      log("The GPU environment is not set up yet. Run: npm run gpu:setup");
+      process.exit(1);
+    }
+    await ensureFrontendEnv();
+    runBothGpu();
   },
 
   "dev:streamlit"() {
