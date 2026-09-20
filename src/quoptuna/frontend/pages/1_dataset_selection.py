@@ -7,6 +7,7 @@ import streamlit as st
 from ucimlrepo import fetch_ucirepo
 
 from quoptuna.backend.utils.data_utils.data import mock_csv_data
+from quoptuna.datasets import BUNDLED_DATASETS, bundled_dataset_path
 
 
 def initialize_session_state():
@@ -36,6 +37,7 @@ def fetch_uci_dataset():
         "Banknote Authentication": 267,
         "Heart Disease": 45,
         "Ionosphere": 225,
+        "Wireless Indoor Localization": 422,
     }
 
     dataset_choice = st.radio(
@@ -68,24 +70,38 @@ def fetch_uci_dataset():
     if st.button("Load UCI Dataset", type="primary"):
         try:
             with st.spinner(f"Fetching dataset {dataset_id}..."):
-                dataset = fetch_ucirepo(id=dataset_id)
+                bundled_path = bundled_dataset_path(int(dataset_id))
 
-                # Combine features and targets
-                X = dataset.data.features
-                y = dataset.data.targets
-                df = pd.concat([X, y], axis=1)
+                if bundled_path is not None:
+                    # Shipped with the package - no network round-trip needed.
+                    df = pd.read_csv(bundled_path)
+                    entry = BUNDLED_DATASETS[int(dataset_id)]
+                    metadata = {
+                        "name": entry["name"],
+                        "uci_id": int(dataset_id),
+                        "num_instances": entry["num_instances"],
+                        "num_features": entry["num_features"],
+                        "abstract": entry["description"],
+                    }
+                else:
+                    dataset = fetch_ucirepo(id=dataset_id)
+
+                    # Combine features and targets
+                    X = dataset.data.features
+                    y = dataset.data.targets
+                    df = pd.concat([X, y], axis=1)
+                    metadata = dataset.metadata
 
                 # Store in session state
                 st.session_state["dataset_df"] = df
                 st.session_state["dataset_name"] = dataset_name
-                st.session_state["dataset_metadata"] = dataset.metadata
+                st.session_state["dataset_metadata"] = metadata
                 st.session_state["dataset_loaded"] = True
 
                 st.success(f"✅ Dataset '{dataset_name}' loaded successfully!")
 
                 # Display metadata
                 with st.expander("📋 Dataset Metadata", expanded=True):
-                    metadata = dataset.metadata
                     col1, col2 = st.columns(2)
                     with col1:
                         st.metric("Instances", metadata.get("num_instances", "N/A"))

@@ -146,6 +146,17 @@ ignore = [
     "FBT003",
     "BLE001",
 ]
+# One-off maintenance scripts: they print progress to the console and bail out
+# with `raise SystemExit("...")` rather than defining exception classes.
+"scripts/**" = [
+    "T201",     # print
+    "INP001",   # implicit namespace package
+    "TRY003",   # long messages outside the exception class
+    "EM101",
+    "EM102",    # exception message string placement
+    "PERF401",  # manual list comprehension (kept to mirror the source notebook)
+    "PLR2004",  # magic-value comparison
+]
 # FastAPI/service application code relocated from the backend sub-project, which
 # used a deliberately relaxed ruleset. Correctness rules (F, E, W, N, I) stay
 # active here; the codes below are opinion/style rules typical of web app code.
@@ -252,4 +263,4 @@ where = ["src"]
 # Bundle the statically-exported frontend (generated into src/quoptuna/web at
 # build time) into the wheel so `uvx quoptuna` can serve the UI without Node.
 [tool.setuptools.package-data]
-quoptuna = ["web/**/*"]
+quoptuna = ["web/**/*", "datasets/*.csv"]
