@@ -29,11 +29,20 @@ def _now() -> str:
     return datetime.now().isoformat()
 
 
+def _opt_int(value: Any) -> int | None:
+    return None if value is None else int(value)
+
+
 def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     return {
         "trial_number": config.get("trial_number"),
         "use_proba": bool(config.get("use_proba", True)),
         "subset_size": int(config.get("subset_size", 50)),
+        # SHAP cost knobs. Part of the config key on purpose: a snapshot taken
+        # at a coarser background/eval budget must not be served for a request
+        # asking for a finer one.
+        "background_size": _opt_int(config.get("background_size")),
+        "max_evals": _opt_int(config.get("max_evals")),
         "class_index": int(config.get("class_index", 0)),
         "sample_index": int(config.get("sample_index", 0)),
     }

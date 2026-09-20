@@ -12,7 +12,8 @@ import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import shap
-from shap import Explainer
+from shap import Explainer, maskers
+from shap.utils import sample as shap_sample
 from sklearn.metrics import (
     ConfusionMatrixDisplay,
     average_precision_score,
@@ -40,6 +41,13 @@ BINARY_CLASS_COUNT = 2
 DATA_KEY = "x_train"
 DEFAULT_MAX_DISPLAY = 20
 DEFAULT_SUBSET_SIZE = 100
+# Background (masker) rows used to estimate the expectation SHAP marginalises
+# over. Model calls scale linearly with this, so it is kept small and — unlike
+# before — independent of how many rows we explain.
+DEFAULT_BACKGROUND_SIZE = 25
+# Permutation evals per explained row, as a multiple of the 2*n_features+1
+# floor SHAP enforces. 3 permutations is the quality/speed compromise.
+DEFAULT_EVAL_PERMUTATIONS = 3
 NON_CLASS_SHAP_PLOT_TYPES = Literal["bar", "beeswarm", "violin", "heatmap"]
 CLASS_SHAP_PLOT_TYPES = Literal["waterfall"]
 CONFUSION_MATRIX_PLOT_TYPES = Literal["confusion_matrix"]
@@ -52,6 +60,12 @@ class XAIConfig:
     onsubset: bool = True
     feature_names: list[str] | None = None
     subset_size: int = DEFAULT_SUBSET_SIZE
+    background_size: int = DEFAULT_BACKGROUND_SIZE
+    # Explicit per-row eval budget; when None it is derived from
+    # ``eval_permutations`` once the feature count is known.
+    max_evals: int | None = None
+    eval_permutations: int = DEFAULT_EVAL_PERMUTATIONS
+    algorithm: str = "permutation"
     max_display: int = DEFAULT_MAX_DISPLAY
     data_key: str = DATA_KEY
     x_test_key: str = "x_test"
@@ -78,6 +92,10 @@ class XAI:
         self.onsubset: bool = self.config.onsubset
         self.feature_names: list[str] | None = self.config.feature_names
         self.subset_size: int = self.config.subset_size
+        self.background_size: int = self.config.background_size
+        self.max_evals: int | None = self.config.max_evals
+        self.eval_permutations: int = self.config.eval_permutations
+        self.algorithm: str = self.config.algorithm
         self.max_display: int = self.config.max_display
         self.data_key: str = self.config.data_key
         self.x_test_key: str = self.config.x_test_key
@@ -177,11 +195,25 @@ class XAI:
             return -1
 
     def _get_explainer(self) -> Explainer:
+        """Build the explainer over a small, subsampled background.
+
+        Model calls scale as ``rows_explained x evals x background_rows``. The
+        background previously reused the explained subset (and SHAP's default
+        ``Independent(max_samples=100)`` kept all of it), making cost quadratic
+        in ``subset_size``; sampling it down to ``background_size`` makes the
+        background a fixed, cheap factor.
+        """
         predict_method = self.model.predict_proba if self.use_proba else self.model.predict
         data = self._validate_and_get_data()
-        if self.onsubset:
-            data = data.iloc[: self.subset_size]
-        return Explainer(model=predict_method, masker=data, feature_names=self.feature_names)
+        n_background = max(1, min(self.background_size, len(data)))
+        background = shap_sample(data, n_background, random_state=0)
+        masker = maskers.Independent(background, max_samples=n_background)
+        return Explainer(
+            model=predict_method,
+            masker=masker,
+            feature_names=self.feature_names,
+            algorithm=self.algorithm,
+        )
 
     def validate_predict_proba(self) -> bool:
         if not hasattr(self.model, "predict_proba"):
@@ -196,11 +228,25 @@ class XAI:
             raise TypeError(msg)
         return data
 
+    def _resolve_max_evals(self, n_features: int) -> int:
+        """Per-row masked evaluations, floored at SHAP's ``2 * n_features + 1``.
+
+        Without this SHAP takes its own defaults: 500 evals for the permutation
+        path, or a full ``2 ** n_features`` sweep when it auto-selects the exact
+        explainer for narrow datasets.
+        """
+        floor = 2 * n_features + 1
+        if self.max_evals is None:
+            return max(1, self.eval_permutations) * floor
+        return max(self.max_evals, floor)
+
     def _get_shap_values(self) -> shap.Explanation:
         data = self._validate_and_get_data()
         if self.onsubset:
             data = data.iloc[: self.subset_size]
-        return self.explainer(data)
+        if self.algorithm != "permutation":
+            return self.explainer(data)
+        return self.explainer(data, max_evals=self._resolve_max_evals(data.shape[1]))
 
     def _get_shap_values_each_class(
         self, shap_values: shap.Explanation

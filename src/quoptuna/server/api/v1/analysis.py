@@ -58,6 +58,11 @@ class SHAPRequest(BaseModel):
     sample_index: int = 0
     use_proba: bool = True
     subset_size: int = 50
+    # Background rows the masker marginalises over, and per-row masked
+    # evaluations. None keeps the XAIConfig defaults (25 / 3 permutations);
+    # both trade SHAP precision for wall-clock roughly linearly.
+    background_size: Optional[int] = None
+    max_evals: Optional[int] = None
     # Which class's SHAP values to slice/plot when values are per-class
     # (multiclass). None keeps the default (positive class for binary,
     # class 0 for multiclass).
@@ -69,6 +74,8 @@ class MetricsRequest(BaseModel):
     trial_number: Optional[int] = None
     use_proba: bool = True
     subset_size: int = 50
+    background_size: Optional[int] = None
+    max_evals: Optional[int] = None
 
 
 class ReportInclusionOptions(BaseModel):
@@ -132,6 +139,8 @@ class AnalysisJobRequest(BaseModel):
     trial_number: Optional[int] = None
     use_proba: bool = True
     subset_size: int = 50
+    background_size: Optional[int] = None
+    max_evals: Optional[int] = None
     class_index: int = 0
     sample_index: int = 0
 
@@ -500,6 +509,8 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
         trial_number=trial,
         use_proba=config["use_proba"],
         subset_size=config["subset_size"],
+        background_size=config.get("background_size"),
+        max_evals=config.get("max_evals"),
     )
     shap_request = SHAPRequest(
         optimization_id=request.optimization_id,
@@ -507,6 +518,8 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
         sample_index=config["sample_index"],
         use_proba=config["use_proba"],
         subset_size=config["subset_size"],
+        background_size=config.get("background_size"),
+        max_evals=config.get("max_evals"),
         class_index=config["class_index"],
     )
     warnings: dict[str, str] = {}
@@ -530,6 +543,8 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
             trial_number=trial,
             use_proba=config["use_proba"],
             subset_size=config["subset_size"],
+            background_size=config.get("background_size"),
+            max_evals=config.get("max_evals"),
         )
         token = _job_xai.set(shared_xai)
         # SHAP and metrics are the required core sections. Existing endpoint
@@ -702,6 +717,8 @@ async def generate_shap_data(request: SHAPRequest):
             trial_number=request.trial_number,
             use_proba=request.use_proba,
             subset_size=request.subset_size,
+            background_size=request.background_size,
+            max_evals=request.max_evals,
         )
         class_index = _plot_class_index(xai, request.class_index)
         payload = _shap_data_payload(xai.shap_values, class_index)
@@ -731,6 +748,8 @@ async def generate_shap_analysis(request: SHAPRequest):
             trial_number=request.trial_number,
             use_proba=request.use_proba,
             subset_size=request.subset_size,
+            background_size=request.background_size,
+            max_evals=request.max_evals,
         )
 
         # Per-class SHAP values (ndim > 2) must be sliced to one class for plotting.
@@ -771,6 +790,8 @@ async def generate_metrics(request: MetricsRequest):
             trial_number=request.trial_number,
             use_proba=request.use_proba,
             subset_size=request.subset_size,
+            background_size=request.background_size,
+            max_evals=request.max_evals,
         )
 
         from sklearn.metrics import average_precision_score, roc_auc_score
@@ -884,6 +905,8 @@ async def generate_curves(request: MetricsRequest):
             trial_number=request.trial_number,
             use_proba=request.use_proba,
             subset_size=request.subset_size,
+            background_size=request.background_size,
+            max_evals=request.max_evals,
         )
     except HTTPException:
         raise
@@ -1021,6 +1044,8 @@ async def generate_curves_data(request: MetricsRequest):
             trial_number=request.trial_number,
             use_proba=request.use_proba,
             subset_size=request.subset_size,
+            background_size=request.background_size,
+            max_evals=request.max_evals,
         )
     except HTTPException:
         raise
@@ -1078,6 +1103,8 @@ async def generate_confusion_matrix_data(request: MetricsRequest):
             trial_number=request.trial_number,
             use_proba=request.use_proba,
             subset_size=request.subset_size,
+            background_size=request.background_size,
+            max_evals=request.max_evals,
         )
         cm = xai.get_confusion_matrix()
         try:
@@ -1112,6 +1139,8 @@ async def generate_feature_importance_data(request: MetricsRequest):
             trial_number=request.trial_number,
             use_proba=request.use_proba,
             subset_size=request.subset_size,
+            background_size=request.background_size,
+            max_evals=request.max_evals,
         )
         importance = _feature_importance_from_xai(xai)
         return {

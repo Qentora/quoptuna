@@ -43,6 +43,8 @@ def build_xai(
     trial_number: int | None = None,
     use_proba: bool = True,
     subset_size: int = 50,
+    background_size: int | None = None,
+    max_evals: int | None = None,
 ):
     """Retrain a study trial and build an ``XAI`` instance for it.
 
@@ -85,7 +87,13 @@ def build_xai(
         "y_test": opt_result["y_test"],
     }
 
-    xai_config = XAIConfig(use_proba=use_proba, onsubset=True, subset_size=subset_size)
+    xai_config = XAIConfig(
+        use_proba=use_proba,
+        onsubset=True,
+        subset_size=subset_size,
+        max_evals=max_evals,
+        **({} if background_size is None else {"background_size": background_size}),
+    )
     return XAI(model=model, data=data_dict, config=xai_config)
 
 

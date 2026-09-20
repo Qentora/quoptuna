@@ -330,6 +330,16 @@ def optimize(  # noqa: PLR0913
     study_name: str = typer.Option(None, "--study-name", help="Optuna study name."),
     db_name: str = typer.Option("cli_runs", "--db-name", help="Optuna storage database name."),
     subset_size: int = typer.Option(30, "--subset-size", help="Analysis subset size."),
+    background_size: int = typer.Option(
+        None,
+        "--background-size",
+        help="SHAP background rows (default 25). Model calls scale linearly with it.",
+    ),
+    shap_max_evals: int = typer.Option(
+        None,
+        "--shap-max-evals",
+        help="Masked evals per explained row (default 3 * (2 * n_features + 1)).",
+    ),
     no_analyze: bool = typer.Option(
         False, "--no-analyze", help="Skip the post-run analysis summary."
     ),
@@ -377,6 +387,8 @@ def optimize(  # noqa: PLR0913
             db_name=db_name,
             analyze=not no_analyze,
             subset_size=subset_size,
+            background_size=background_size,
+            shap_max_evals=shap_max_evals,
         )
     except Exception as exc:
         console.print(f"[red]Optimization failed:[/red] {exc}")
