@@ -23,13 +23,17 @@ import { Metric } from '@/components/ui/metric';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   type AnalysedModel,
+  type AnalysisJob,
   type AnalysisRevisionSummary,
   type AnalysisSnapshot,
   type AnalysisSnapshotPayload,
+  type AnalysisSnapshotSummary,
   type ConfusionMatrixData,
   type CurvesData,
   type FeatureImportanceData,
   type ShapData,
+  cancelAnalysisJob,
+  findActiveAnalysisJob,
   getAnalysisJob,
   getAnalysisRevision,
   getAnalysisSnapshot,
@@ -39,8 +43,8 @@ import {
   updateSnapshotFairness,
 } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { BarChart3, Download, History, Loader2, Scale } from 'lucide-react';
-import { Fragment, useCallback, useEffect, useState } from 'react';
+import { BarChart3, Download, History, Loader2, Scale, Square } from 'lucide-react';
+import { Fragment, useCallback, useEffect, useRef, useState } from 'react';
 import {
   Bar,
   BarChart,
@@ -58,7 +62,12 @@ import { ErrorBanner } from '../NavButtons';
 import { PlotSkeleton, PlotlyFigure } from '../PlotlyFigure';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
-import { AnalysisHistoryTable, RevisionBadge, formatTimestamp } from '../revisions';
+import {
+  AnalysisHistoryTable,
+  RevisionBadge,
+  SnapshotHistoryTable,
+  formatTimestamp,
+} from '../revisions';
 import type { FairnessMetrics, WorkflowData } from '../types';
 
 const STUDY_PLOTS: Array<{ id: string; label: string; wide?: boolean }> = [
@@ -92,11 +101,20 @@ const ANALYSIS_STEPS: { id: string; label: string }[] = [
   { id: 'study_plots', label: 'Study plots' },
 ];
 
-function AnalysisProgress({ section }: { section: string | null }) {
+function AnalysisProgress({
+  section,
+  rows,
+}: {
+  section: string | null;
+  rows: { done: number; total: number } | null;
+}) {
   // `fairness` runs in the same group as study plots; show it as that step.
   const normalized = section === 'fairness' ? 'study_plots' : section;
   const activeIndex = ANALYSIS_STEPS.findIndex((step) => step.id === normalized);
   const current = ANALYSIS_STEPS[activeIndex];
+  // SHAP explains one row at a time and is by far the longest step, so it
+  // reports a real count rather than leaving the step bar to guess.
+  const percent = rows && rows.total > 0 ? Math.round((rows.done / rows.total) * 100) : null;
 
   return (
     <div className="flex flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3">
@@ -110,7 +128,22 @@ function AnalysisProgress({ section }: { section: string | null }) {
             step {activeIndex + 1} of {ANALYSIS_STEPS.length}
           </span>
         )}
+        {percent !== null && rows && (
+          <span className="ml-auto text-muted-foreground text-xs tabular-nums">
+            row {rows.done} of {rows.total} · {percent}%
+          </span>
+        )}
       </div>
+      {/* Decorative, like the step pips below: the "row X of Y" text beside the
+          label is what carries the count to assistive tech. */}
+      {percent !== null && (
+        <div className="h-1.5 w-full overflow-hidden rounded-full bg-muted" aria-hidden="true">
+          <div
+            className="h-full rounded-full bg-brand transition-[width] duration-300"
+            style={{ width: `${percent}%` }}
+          />
+        </div>
+      )}
       <div className="flex gap-1" aria-hidden="true">
         {ANALYSIS_STEPS.map((step, index) => (
           <div
@@ -142,6 +175,7 @@ function initialEmptyAnalysis(current: WorkflowData['analysis']): WorkflowData['
     ...current,
     snapshotId: null,
     snapshotRevision: null,
+    jobId: null,
     config: null,
     featureImportance: null,
     plots: {},
@@ -179,16 +213,35 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
   const [analysedModel, setAnalysedModel] = useState<AnalysedModel | null>(null);
   // Which section the background job is on, for the progress label.
   const [currentSection, setCurrentSection] = useState<string | null>(null);
+  // Rows explained / rows to explain, while SHAP is running.
+  const [rowProgress, setRowProgress] = useState<{ done: number; total: number } | null>(null);
   // Every completed analysis of this snapshot, newest first.
   const [revisions, setRevisions] = useState<AnalysisRevisionSummary[]>([]);
+  // Every completed analysis of this optimization, across trials and settings.
+  // The revision list above covers one snapshot only, so it is empty the first
+  // time a given set of options is analysed — this is what stays populated.
+  const [snapshots, setSnapshots] = useState<AnalysisSnapshotSummary[]>([]);
+  const [loadingSnapshot, setLoadingSnapshot] = useState(false);
+  const [isStopping, setIsStopping] = useState(false);
   // Non-null while an older revision is on screen instead of the latest.
   const [viewingRevision, setViewingRevision] = useState<number | null>(null);
   const [loadingRevision, setLoadingRevision] = useState<number | null>(null);
+  // True until the reattach check below has finished. The restore effect must
+  // not clear the page to "idle" before we know whether a job is still running.
+  const [resuming, setResuming] = useState(true);
+  const resumeAttempted = useRef(false);
 
   const applySnapshot = useCallback(
     (snapshot: AnalysisSnapshot) => {
       const payload = snapshot.payload;
       setViewingRevision(null);
+      // Bring the option controls in line with what is on screen. A snapshot
+      // resumed after a reload can carry settings the local state never saw,
+      // and the restore effect below would then clear it as unmatched.
+      setUseProba(snapshot.config.use_proba);
+      setSubsetSize(snapshot.config.subset_size);
+      setShapClassIndex(snapshot.config.class_index);
+      setSampleIndex(snapshot.config.sample_index);
       setCurvesData(payload.curves_data);
       setConfusionData(payload.confusion_data);
       setImportanceData(payload.importance_data);
@@ -200,6 +253,8 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
         analysis: {
           snapshotId: snapshot.id,
           snapshotRevision: snapshot.revision,
+          // A snapshot on screen means nothing is in flight.
+          jobId: null,
           status: 'completed',
           config: {
             trialNumber: snapshot.config.trial_number,
@@ -233,6 +288,36 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
   useEffect(() => {
     void refreshRevisions(analysis.snapshotId);
   }, [analysis.snapshotId, refreshRevisions]);
+
+  const refreshSnapshots = useCallback(async (optimizationId: string | null) => {
+    if (!optimizationId) {
+      setSnapshots([]);
+      return;
+    }
+    setSnapshots(await listAnalysisSnapshots(optimizationId).catch(() => []));
+  }, []);
+
+  useEffect(() => {
+    void refreshSnapshots(optimization.executionId);
+  }, [optimization.executionId, refreshSnapshots]);
+
+  /** Load a completed analysis taken at different settings. */
+  const loadSnapshot = useCallback(
+    async (snapshotId: string) => {
+      setLoadingSnapshot(true);
+      setError(null);
+      try {
+        // applySnapshot syncs the option controls, so the restore effect below
+        // matches this snapshot rather than clearing it as unrelated.
+        applySnapshot(await getAnalysisSnapshot(snapshotId));
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not load that analysis');
+      } finally {
+        setLoadingSnapshot(false);
+      }
+    },
+    [applySnapshot]
+  );
 
   /**
    * Put an earlier revision of this snapshot on screen.
@@ -294,10 +379,144 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
     }
   }, [analysis.snapshotId, applySnapshot]);
 
+  /**
+   * Poll a job to completion and apply its snapshot.
+   *
+   * Shared by a freshly started run and by one picked back up after a reload,
+   * so a resumed analysis renders its partial sections and its result exactly
+   * as the original tab would have.
+   */
+  const followJob = useCallback(
+    async (started: AnalysisJob) => {
+      let job = started;
+      let shownPartial = Boolean(job.partial);
+      let polls = 0;
+      while (job.status === 'pending' || job.status === 'running') {
+        // Poll quickly at first: data prep and a kernel-model fit can both
+        // finish inside a second, and a flat 1s interval skips straight to
+        // SHAP without ever showing them.
+        polls += 1;
+        await new Promise((resolve) => setTimeout(resolve, polls <= 6 ? 250 : 1000));
+        job = await getAnalysisJob(job.id);
+        setCurrentSection(job.current_section ?? null);
+        setRowProgress(
+          job.progress_total ? { done: job.progress_done ?? 0, total: job.progress_total } : null
+        );
+        // Render SHAP and metrics as soon as the job publishes them rather
+        // than waiting for the derived sections to finish.
+        if (!shownPartial && job.partial) {
+          shownPartial = true;
+          const partial = job.partial;
+          setWorkflowData((prev) => ({
+            ...prev,
+            analysis: {
+              ...prev.analysis,
+              featureImportance: partial.feature_importance ?? null,
+              plots: partial.plots ?? {},
+              metrics: partial.metrics ?? null,
+              confusionMatrixPlot: partial.confusion_matrix_plot ?? null,
+            },
+          }));
+        }
+        setWorkflowData((prev) => ({
+          ...prev,
+          analysis: {
+            ...prev.analysis,
+            status: job.status === 'cancelled' ? 'idle' : job.status,
+          },
+        }));
+      }
+      setCurrentSection(null);
+      setRowProgress(null);
+      // The job is over either way: drop the id so a later reload does not
+      // try to reattach to finished work.
+      setWorkflowData((prev) => ({ ...prev, analysis: { ...prev.analysis, jobId: null } }));
+      if (job.status === 'cancelled') {
+        // Nothing was written, so there is no snapshot to apply. The restore
+        // effect puts back whatever completed analysis matches these settings.
+        setWorkflowData((prev) => ({ ...prev, analysis: { ...prev.analysis, status: 'idle' } }));
+        return;
+      }
+      if (job.status === 'failed') throw new Error(job.error || 'Analysis failed');
+      applySnapshot(await getAnalysisSnapshot(job.snapshot_id));
+      // A run always adds a revision; pull both lists in so the history shows it.
+      void refreshRevisions(job.snapshot_id);
+      void refreshSnapshots(optimization.executionId);
+    },
+    [applySnapshot, optimization.executionId, refreshRevisions, refreshSnapshots, setWorkflowData]
+  );
+
+  /**
+   * Pick an analysis back up after a reload.
+   *
+   * A refresh drops the polling loop but not the work: the job keeps running
+   * server-side. Reattach by the persisted job id, falling back to asking the
+   * server what is still running for this optimization — that covers a cleared
+   * localStorage, and a second tab.
+   */
+  useEffect(() => {
+    const optimizationId = optimization.executionId;
+    if (resumeAttempted.current) return;
+    if (!optimizationId) {
+      setResuming(false);
+      return;
+    }
+    resumeAttempted.current = true;
+    let cancelled = false;
+    // Set once this effect owns the polling. Strict mode mounts, unmounts and
+    // remounts in development; without releasing the guard on a cleanup that
+    // ran before we committed, the remount would skip the reattach entirely.
+    let committed = false;
+    const resume = async () => {
+      const persistedId = analysis.jobId;
+      const job = persistedId
+        ? await getAnalysisJob(persistedId).catch(() => null)
+        : await findActiveAnalysisJob(optimizationId).catch(() => null);
+      if (cancelled) return;
+      if (!job || (job.status !== 'pending' && job.status !== 'running')) {
+        // Nothing in flight. Drop a stale id and let the restore effect load
+        // whatever completed snapshot matches the current settings.
+        if (persistedId) {
+          setWorkflowData((prev) => ({ ...prev, analysis: { ...prev.analysis, jobId: null } }));
+        }
+        return;
+      }
+      committed = true;
+      // Narrowed by the guard above; pinned so the callback below keeps it.
+      const startedAs: 'pending' | 'running' = job.status;
+      setIsGenerating(true);
+      setWorkflowData((prev) => ({
+        ...prev,
+        analysis: {
+          ...prev.analysis,
+          snapshotId: job.snapshot_id,
+          jobId: job.id,
+          status: startedAs,
+        },
+      }));
+      try {
+        await followJob(job);
+      } catch (err) {
+        if (!cancelled) setError(err instanceof Error ? err.message : 'Analysis failed');
+      } finally {
+        setCurrentSection(null);
+        setRowProgress(null);
+        setIsGenerating(false);
+      }
+    };
+    void resume().finally(() => {
+      if (!cancelled) setResuming(false);
+    });
+    return () => {
+      cancelled = true;
+      if (!committed) resumeAttempted.current = false;
+    };
+  }, [optimization.executionId, analysis.jobId, followJob, setWorkflowData]);
+
   // Restore persisted data only; this effect never starts computation.
   useEffect(() => {
     const optimizationId = optimization.executionId;
-    if (!optimizationId || isGenerating) return;
+    if (!optimizationId || isGenerating || resuming) return;
     let cancelled = false;
     const restore = async () => {
       const snapshots = await listAnalysisSnapshots(optimizationId);
@@ -338,6 +557,7 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
     shapClassIndex,
     sampleIndex,
     isGenerating,
+    resuming,
     applySnapshot,
     setWorkflowData,
   ]);
@@ -367,50 +587,43 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
       });
       setWorkflowData((prev) => ({
         ...prev,
-        analysis: { ...prev.analysis, snapshotId: started.snapshot_id, status: 'pending' },
+        analysis: {
+          ...prev.analysis,
+          snapshotId: started.snapshot_id,
+          jobId: started.id,
+          status: 'pending',
+          // Recorded now rather than at completion: a reload mid-run restores
+          // the option controls from here.
+          config: {
+            trialNumber: trial ?? null,
+            useProba,
+            subsetSize,
+            classIndex: shapClassIndex,
+            sampleIndex,
+          },
+        },
       }));
-      let job = started;
-      let shownPartial = false;
-      let polls = 0;
-      while (job.status === 'pending' || job.status === 'running') {
-        // Poll quickly at first: data prep and a kernel-model fit can both
-        // finish inside a second, and a flat 1s interval skips straight to
-        // SHAP without ever showing them.
-        polls += 1;
-        await new Promise((resolve) => setTimeout(resolve, polls <= 6 ? 250 : 1000));
-        job = await getAnalysisJob(started.id);
-        setCurrentSection(job.current_section ?? null);
-        // Render SHAP and metrics as soon as the job publishes them rather
-        // than waiting for the derived sections to finish.
-        if (!shownPartial && job.partial) {
-          shownPartial = true;
-          const partial = job.partial;
-          setWorkflowData((prev) => ({
-            ...prev,
-            analysis: {
-              ...prev.analysis,
-              featureImportance: partial.feature_importance ?? null,
-              plots: partial.plots ?? {},
-              metrics: partial.metrics ?? null,
-              confusionMatrixPlot: partial.confusion_matrix_plot ?? null,
-            },
-          }));
-        }
-        setWorkflowData((prev) => ({
-          ...prev,
-          analysis: { ...prev.analysis, status: job.status },
-        }));
-      }
-      setCurrentSection(null);
-      if (job.status === 'failed') throw new Error(job.error || 'Analysis failed');
-      applySnapshot(await getAnalysisSnapshot(started.snapshot_id));
-      // A run always adds a revision; pull it in so the history shows this one.
-      void refreshRevisions(started.snapshot_id);
+      await followJob(started);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed');
     } finally {
       setCurrentSection(null);
+      setRowProgress(null);
       setIsGenerating(false);
+    }
+  };
+
+  const stopAnalysis = async () => {
+    const jobId = analysis.jobId;
+    if (!jobId) return;
+    setIsStopping(true);
+    try {
+      await cancelAnalysisJob(jobId);
+      // The poll loop sees the status change and unwinds; no state reset here.
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not stop the analysis');
+    } finally {
+      setIsStopping(false);
     }
   };
 
@@ -523,17 +736,37 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
             )}
           </p>
         )}
-        <Button type="button" size="sm" onClick={runAnalysis} disabled={isGenerating}>
-          {isGenerating ? (
-            <Loader2 className="h-4 w-4 animate-spin" />
-          ) : (
-            <BarChart3 className="h-4 w-4" />
+        <div className="flex items-center gap-2">
+          <Button type="button" size="sm" onClick={runAnalysis} disabled={isGenerating}>
+            {isGenerating ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <BarChart3 className="h-4 w-4" />
+            )}
+            {isGenerating ? 'Analyzing…' : hasSHAP ? 'Re-run analysis' : 'Run analysis'}
+          </Button>
+          {/* An analysis can run for minutes; without this the only way out of
+              one started by mistake is to wait it out. */}
+          {isGenerating && analysis.jobId && (
+            <Button
+              type="button"
+              size="sm"
+              variant="destructive"
+              onClick={() => void stopAnalysis()}
+              disabled={isStopping}
+            >
+              {isStopping ? (
+                <Loader2 className="h-4 w-4 animate-spin" />
+              ) : (
+                <Square className="h-4 w-4" />
+              )}
+              {isStopping ? 'Stopping…' : 'Stop'}
+            </Button>
           )}
-          {isGenerating ? 'Analyzing…' : hasSHAP ? 'Re-run analysis' : 'Run analysis'}
-        </Button>
+        </div>
       </div>
 
-      {isGenerating && <AnalysisProgress section={currentSection} />}
+      {isGenerating && <AnalysisProgress section={currentSection} rows={rowProgress} />}
 
       <ErrorBanner message={error} />
 
@@ -995,24 +1228,36 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
         </div>
       )}
 
-      {revisions.length > 0 && (
+      {snapshots.length > 0 && (
         <Card>
           <CardHeader>
             <CardTitle className="flex items-center gap-2">
               <History className="h-4 w-4" /> Analysis history
             </CardTitle>
             <CardDescription>
-              Every completed analysis of this trial at these settings, newest first.
+              Previous analyses of this optimization. Loading one brings back its results and the
+              settings it was run at.
             </CardDescription>
           </CardHeader>
-          <CardContent>
-            <AnalysisHistoryTable
-              revisions={revisions}
-              currentRevision={latestRevision}
-              viewingRevision={shownRevision}
-              busyRevision={loadingRevision}
-              onView={(revision) => void viewRevision(revision)}
+          <CardContent className="flex flex-col gap-6">
+            <SnapshotHistoryTable
+              snapshots={snapshots}
+              currentSnapshotId={analysis.snapshotId}
+              busy={loadingSnapshot || isGenerating}
+              onLoad={(snapshotId) => void loadSnapshot(snapshotId)}
             />
+            {revisions.length > 0 && (
+              <div className="flex flex-col gap-2">
+                <p className="font-medium text-sm">Re-runs of the loaded analysis</p>
+                <AnalysisHistoryTable
+                  revisions={revisions}
+                  currentRevision={latestRevision}
+                  viewingRevision={shownRevision}
+                  busyRevision={loadingRevision}
+                  onView={(revision) => void viewRevision(revision)}
+                />
+              </div>
+            )}
           </CardContent>
         </Card>
       )}

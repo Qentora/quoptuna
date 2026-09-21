@@ -10,8 +10,8 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import type { AnalysisRevisionSummary } from '@/lib/api';
-import { Eye } from 'lucide-react';
+import type { AnalysisRevisionSummary, AnalysisSnapshotSummary } from '@/lib/api';
+import { Eye, Loader2 } from 'lucide-react';
 
 /** ISO timestamp -> locale string, falling back to the raw value. */
 export function formatTimestamp(value: string): string {
@@ -126,10 +126,14 @@ export function AnalysisHistoryTable({
                       type="button"
                       variant="ghost"
                       size="sm"
-                      disabled={busyRevision !== null || item.revision === viewingRevision}
+                      disabled={busyRevision !== null}
                       onClick={() => onView(item.revision)}
                     >
-                      <Eye className="h-4 w-4" />
+                      {busyRevision === item.revision ? (
+                        <Loader2 className="h-4 w-4 animate-spin" />
+                      ) : (
+                        <Eye className="h-4 w-4" />
+                      )}
                       {item.revision === viewingRevision ? 'Viewing' : 'View'}
                     </Button>
                   )}
@@ -139,6 +143,75 @@ export function AnalysisHistoryTable({
           </TableBody>
         </Table>
       </div>
+    </div>
+  );
+}
+
+/**
+ * Every analysis this optimization has, across settings.
+ *
+ * The revision table above only covers one snapshot — one trial at one set of
+ * options — so on a first run at new settings it is empty and there is nothing
+ * to go back to. This is the list that answers "what have I already analysed".
+ */
+export function SnapshotHistoryTable({
+  snapshots,
+  currentSnapshotId,
+  busy,
+  onLoad,
+}: {
+  snapshots: AnalysisSnapshotSummary[];
+  currentSnapshotId: string | null;
+  busy: boolean;
+  onLoad: (snapshotId: string) => void;
+}) {
+  return (
+    <div className="overflow-x-auto rounded-md border border-border">
+      <Table>
+        <TableHeader>
+          <TableRow>
+            <TableHead>Completed</TableHead>
+            <TableHead>Trial</TableHead>
+            <TableHead>Settings</TableHead>
+            <TableHead>Analyses</TableHead>
+            <TableHead className="text-right">Actions</TableHead>
+          </TableRow>
+        </TableHeader>
+        <TableBody>
+          {snapshots.map((item) => {
+            const isCurrent = item.id === currentSnapshotId;
+            return (
+              <TableRow key={item.id} className={isCurrent ? 'bg-muted/50' : ''}>
+                <TableCell className="whitespace-nowrap font-mono text-xs">
+                  {formatTimestamp(item.completed_at)}
+                </TableCell>
+                <TableCell className="whitespace-nowrap tabular-nums">
+                  {item.config.trial_number ?? 'best'}
+                </TableCell>
+                <TableCell className="whitespace-nowrap text-muted-foreground text-xs">
+                  {item.config.subset_size} rows · {item.config.use_proba ? 'proba' : 'labels'} ·
+                  class {item.config.class_index}
+                </TableCell>
+                <TableCell className="tabular-nums">
+                  {isCurrent ? <Badge variant="emerald">loaded</Badge> : item.revision}
+                </TableCell>
+                <TableCell className="text-right whitespace-nowrap">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={busy || isCurrent}
+                    onClick={() => onLoad(item.id)}
+                  >
+                    <Eye className="h-4 w-4" />
+                    {isCurrent ? 'Loaded' : 'Load'}
+                  </Button>
+                </TableCell>
+              </TableRow>
+            );
+          })}
+        </TableBody>
+      </Table>
     </div>
   );
 }

@@ -94,6 +94,9 @@ export interface WorkflowData {
   analysis: {
     snapshotId: string | null;
     snapshotRevision: number | null;
+    /** Analysis job still in flight, kept so a browser refresh can reattach to
+     *  it instead of losing a run that is still going server-side. */
+    jobId: string | null;
     status: 'idle' | 'pending' | 'running' | 'completed' | 'failed';
     config: {
       trialNumber: number | null;
@@ -150,6 +153,7 @@ export const initialWorkflowData: WorkflowData = {
   analysis: {
     snapshotId: null,
     snapshotRevision: null,
+    jobId: null,
     status: 'idle',
     config: null,
     featureImportance: null,

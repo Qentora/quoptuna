@@ -6,6 +6,8 @@ import asyncio
 import base64
 import io
 import logging
+import threading
+import time
 from contextvars import ContextVar
 from datetime import datetime
 from typing import Any, List, Optional, cast
@@ -22,7 +24,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from quoptuna.backend.utils.storage import DEFAULT_DB_NAME
 from quoptuna.backend.xai import prompts as report_prompts
-from quoptuna.backend.xai import report_context
+from quoptuna.backend.xai import report_context, shap_progress
 
 # Access optimization results stored by the optimize module.
 from quoptuna.server.api.v1.optimize import (
@@ -566,7 +568,90 @@ def _shap_data_payload(
     }
 
 
-async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
+def _shap_progress_sink(job_id: str, min_interval: float = 1.0):
+    """Persist SHAP's row progress, throttled to one write per second.
+
+    A write per explained row would cost more than the explanation itself on a
+    fast model. The final row always writes, so the UI never stalls one short
+    of complete.
+    """
+    last = 0.0
+
+    def sink(done: int, total: int) -> None:
+        nonlocal last
+        now = time.monotonic()
+        if done < total and now - last < min_interval:
+            return
+        last = now
+        analysis_store.update_job(job_id, progress_done=done, progress_total=total)
+        # Called once per explained row, which makes it the finest-grained
+        # place to honour a stop request inside the longest step.
+        _stop_if_cancelled(job_id)
+
+    return sink
+
+
+class _JobCancelled(BaseException):
+    """Raised inside a running analysis once the client asks it to stop.
+
+    Deliberately a ``BaseException``: the job body and SHAP's progress hook
+    both swallow ``Exception`` broadly, and a cancellation that gets caught
+    there would be recorded as a failure instead of a stop.
+    """
+
+
+#: Job ids the client has asked to stop. In-process by design — an analysis is
+#: an in-process background task, so nothing outside this process can be
+#: running one.
+_cancelled_jobs: set[str] = set()
+_cancelled_lock = threading.Lock()
+
+
+def _request_cancel(job_id: str) -> None:
+    with _cancelled_lock:
+        _cancelled_jobs.add(job_id)
+
+
+def _is_cancelled(job_id: str) -> bool:
+    with _cancelled_lock:
+        return job_id in _cancelled_jobs
+
+
+def _clear_cancel(job_id: str) -> None:
+    with _cancelled_lock:
+        _cancelled_jobs.discard(job_id)
+
+
+def _stop_if_cancelled(job_id: str) -> None:
+    if _is_cancelled(job_id):
+        raise _JobCancelled(job_id)
+
+
+#: Analysis jobs render through pyplot's global figure state, and until they
+#: moved to the threadpool the event loop serialized them for free. Two
+#: interleaving in different threads would corrupt each other's figures, so
+#: keep the old one-at-a-time behaviour explicitly.
+_analysis_job_lock = threading.Lock()
+
+
+def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
+    """Run one analysis off the event loop.
+
+    Every step below is synchronous CPU work — rehydration, the model refit,
+    SHAP, figure rendering — and an ``async def`` background task runs *on* the
+    event loop. That left the server unable to answer the client's progress
+    polls for the whole job: the UI sat on "Starting analysis" and then showed
+    whichever section happened to be current once the loop freed up, which was
+    always SHAP. Per-row SHAP progress was unreadable for the same reason.
+
+    Starlette runs a non-async background task in its threadpool, so making
+    this synchronous keeps the loop free and lets progress arrive as it happens.
+    """
+    with _analysis_job_lock:
+        asyncio.run(_run_analysis_job_async(job_id, request))
+
+
+async def _run_analysis_job_async(job_id: str, request: AnalysisJobRequest) -> None:
     """Compute and persist one complete analysis bundle."""
     config = analysis_store.normalize_config(request.model_dump(exclude={"optimization_id"}))
     trial = config["trial_number"]
@@ -591,6 +676,7 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
     warnings: dict[str, str] = {}
 
     async def optional(section: str, call):
+        _stop_if_cancelled(job_id)
         analysis_store.update_job(job_id, current_section=section)
         try:
             return await call
@@ -635,8 +721,10 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
         # for a run whose in-memory job was lost, and build_xai refits the
         # trial's model - on a variational model that is the slowest step of
         # the whole analysis.
+        _stop_if_cancelled(job_id)
         analysis_store.update_job(job_id, status="running", current_section="preparing")
         opt_result = _get_completed_result(request.optimization_id)
+        _stop_if_cancelled(job_id)
         analysis_store.update_job(job_id, current_section="training")
         shared_xai = build_xai(
             opt_result,
@@ -647,11 +735,17 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
             max_evals=config.get("max_evals"),
         )
         token = _job_xai.set(shared_xai)
-        analysis_store.update_job(job_id, current_section="shap")
+        analysis_store.update_job(job_id, current_section="shap", progress_done=0, progress_total=0)
         # SHAP and metrics are the required core sections. Existing endpoint
         # functions remain the compatibility implementation for now; this job
         # owns orchestration and persistence.
-        shap = await generate_shap_analysis(shap_request)
+        #
+        # SHAP explains row by row and is the longest step here; report that
+        # progress to the job so the browser sees what the server's terminal
+        # already shows.
+        with shap_progress.report_progress(_shap_progress_sink(job_id)):
+            shap = await generate_shap_analysis(shap_request)
+        analysis_store.update_job(job_id, progress_done=None, progress_total=None)
         metrics = await generate_metrics(metrics_request)
         # Publish the core sections now: the derived ones below can take a
         # while, and there is no reason to withhold finished SHAP and metrics
@@ -736,6 +830,16 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
             "analysed_model": _analysed_model(opt_result, shared_xai, trial),
         }
         analysis_store.complete_job(job_id, payload)
+    except _JobCancelled:
+        logger.info("Analysis job %s stopped at the client's request", job_id)
+        analysis_store.update_job(
+            job_id,
+            status="cancelled",
+            current_section=None,
+            progress_done=None,
+            progress_total=None,
+            completed_at=datetime.now().isoformat(),
+        )
     except Exception as exc:
         logger.exception("Analysis job %s failed", job_id)
         detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
@@ -743,6 +847,7 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
             job_id, status="failed", error=str(detail), completed_at=datetime.now().isoformat()
         )
     finally:
+        _clear_cancel(job_id)
         if token is not None:
             _job_xai.reset(token)
 
@@ -755,6 +860,34 @@ async def start_analysis_job(request: AnalysisJobRequest, background_tasks: Back
     if job.pop("created"):
         background_tasks.add_task(_run_analysis_job, job["id"], request)
     return job
+
+
+@router.get("/jobs")
+async def find_active_analysis_job(optimization_id: str):
+    """The analysis still running for this optimization, or ``null``.
+
+    Declared before ``/jobs/{job_id}`` for readability only; the paths do not
+    overlap. Lets a client that lost its job id — a browser refresh — reattach
+    to work that is still going rather than starting a duplicate run.
+    """
+    return {"job": analysis_store.find_active_job(optimization_id)}
+
+
+@router.post("/jobs/{job_id}/cancel")
+async def cancel_analysis_job(job_id: str):
+    """Ask a running analysis to stop.
+
+    Cooperative: the job checks between sections and once per explained SHAP
+    row, so a stop lands within a row rather than instantly. A job that has
+    already finished is left alone.
+    """
+    job = analysis_store.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Analysis job not found")
+    if job["status"] not in {"pending", "running"}:
+        return {"id": job_id, "status": job["status"], "cancelled": False}
+    _request_cancel(job_id)
+    return {"id": job_id, "status": "cancelling", "cancelled": True}
 
 
 @router.get("/jobs/{job_id}")

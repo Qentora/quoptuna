@@ -95,6 +95,9 @@ class AnalysisJob(SQLModel, table=True):
     # UI can render them while the derived sections are still running. The
     # durable copy is the snapshot payload written at completion.
     partial_json: Optional[str] = None
+    # Rows explained / rows to explain, for the long SHAP step. Null outside it.
+    progress_done: Optional[int] = None
+    progress_total: Optional[int] = None
     created_at: str = ""
     completed_at: Optional[str] = None
 

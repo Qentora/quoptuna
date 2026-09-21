@@ -86,6 +86,8 @@ def get_engine(url: str | None = None):
 #: that belongs in a real migration.
 _ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
     ("quoptuna_analysis_jobs", "partial_json", "VARCHAR"),
+    ("quoptuna_analysis_jobs", "progress_done", "INTEGER"),
+    ("quoptuna_analysis_jobs", "progress_total", "INTEGER"),
 )
 
 

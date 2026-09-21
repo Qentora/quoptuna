@@ -754,13 +754,16 @@ export interface AnalysisRevision extends AnalysisRevisionSummary {
 export interface AnalysisJob {
   id: string;
   snapshot_id: string;
-  status: 'pending' | 'running' | 'completed' | 'failed';
+  status: 'pending' | 'running' | 'completed' | 'failed' | 'cancelled';
   current_section?: string | null;
   /** Core sections published mid-run so the UI can render them before the
    *  job finishes. Null until SHAP and metrics complete. */
   partial?: Partial<AnalysisSnapshotPayload> | null;
   error?: string | null;
   revision?: number;
+  /** Rows explained / rows to explain, while the SHAP step is running. */
+  progress_done?: number | null;
+  progress_total?: number | null;
 }
 
 export async function startAnalysisJob(body: {
@@ -780,6 +783,23 @@ export async function startAnalysisJob(body: {
 
 export async function getAnalysisJob(id: string): Promise<AnalysisJob> {
   return request<AnalysisJob>(`/api/v1/analysis/jobs/${id}`);
+}
+
+/** Ask a running analysis to stop. Cooperative: the job notices between
+ *  sections and once per explained SHAP row. */
+export async function cancelAnalysisJob(
+  id: string
+): Promise<{ id: string; status: string; cancelled: boolean }> {
+  return request(`/api/v1/analysis/jobs/${id}/cancel`, { method: 'POST' });
+}
+
+/** The analysis still running for this optimization, or null. Lets a reloaded
+ *  page reattach to a run rather than starting a duplicate. */
+export async function findActiveAnalysisJob(optimizationId: string): Promise<AnalysisJob | null> {
+  const result = await request<{ job: AnalysisJob | null }>(
+    `/api/v1/analysis/jobs?optimization_id=${encodeURIComponent(optimizationId)}`
+  );
+  return result.job;
 }
 
 export async function getAnalysisSnapshot(id: string): Promise<AnalysisSnapshot> {

@@ -128,7 +128,14 @@ def publish_partial(job_id: str, payload: dict[str, Any]) -> None:
 
 
 def update_job(job_id: str, **fields: Any) -> None:
-    allowed = {"status", "current_section", "error", "completed_at"}
+    allowed = {
+        "status",
+        "current_section",
+        "error",
+        "completed_at",
+        "progress_done",
+        "progress_total",
+    }
     if set(fields) - allowed:
         raise ValueError("Invalid analysis job field")
     with session_scope() as session:
@@ -138,6 +145,57 @@ def update_job(job_id: str, **fields: Any) -> None:
                 setattr(job, key, value)
             session.add(job)
             session.commit()
+
+
+def abandon_orphaned_jobs() -> int:
+    """Fail analysis jobs left ``pending``/``running`` by a previous process.
+
+    An analysis is an in-process background task: nothing resumes it when the
+    server stops. The row outlives the work, though, and a client asking what
+    is still running would be told about a job that will never progress —
+    reattaching to it shows a permanently stuck "Computing SHAP".
+
+    Called once at startup, before anything can look a job up.
+    """
+    now = _now()
+    with session_scope() as session:
+        rows = session.exec(
+            select(AnalysisJob).where(col(AnalysisJob.status).in_(["pending", "running"]))
+        ).all()
+        for row in rows:
+            row.status = "failed"
+            row.error = "Interrupted: the server restarted while this analysis was running."
+            row.completed_at = now
+            row.progress_done = None
+            row.progress_total = None
+            session.add(row)
+        session.commit()
+        return len(rows)
+
+
+def find_active_job(optimization_id: str) -> dict[str, Any] | None:
+    """The analysis still pending or running for this optimization, if any.
+
+    Recovery path for a client that lost its job id — a browser refresh drops
+    it, while the work carries on server-side. Without this the UI reports no
+    analysis in flight and a second run is started over the top of the first.
+
+    Newest first, because only the latest job can still be the live one.
+    """
+    with session_scope() as session:
+        row = session.exec(
+            select(AnalysisJob)
+            .join(AnalysisSnapshot, onclause=AnalysisSnapshot.id == AnalysisJob.snapshot_id)  # type: ignore[arg-type]
+            .where(
+                AnalysisSnapshot.optimization_id == optimization_id,
+                col(AnalysisJob.status).in_(["pending", "running"]),
+            )
+            .order_by(col(AnalysisJob.created_at).desc())
+        ).first()
+        job_id = None if row is None else row.id
+    # Outside the session: get_job opens its own, and nesting two scopes on the
+    # same SQLite file invites a lock.
+    return None if job_id is None else get_job(job_id)
 
 
 def get_job(job_id: str) -> dict[str, Any] | None:

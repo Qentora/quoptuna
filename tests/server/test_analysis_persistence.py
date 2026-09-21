@@ -149,3 +149,38 @@ def test_context_and_bundle_endpoints_serve_a_completed_snapshot(isolated_store)
         names = set(archive.namelist())
         assert {"context.json", "evidence.md", "figures/shap_bar.png"} <= names
         assert archive.read("figures/shap_bar.png") == b"bundle-png"
+
+
+def test_a_running_analysis_is_findable_without_its_job_id(isolated_store):
+    """A refreshed browser loses the job id; the work keeps going without it.
+
+    Without this lookup the UI reports nothing in flight and starts a second
+    run over the top of the first.
+    """
+    config = {"trial_number": 3, "subset_size": 25}
+    started = analysis_store.create_job("run-1", config)
+
+    found = analysis_store.find_active_job("run-1")
+    assert found is not None
+    assert found["id"] == started["id"]
+    assert found["snapshot_id"] == started["snapshot_id"]
+    assert found["status"] == "pending"
+    # The config comes back too, so a reattaching client knows what is running.
+    assert found["config"]["trial_number"] == config["trial_number"]
+
+
+def test_a_finished_analysis_is_not_reported_as_active(isolated_store):
+    config = {"trial_number": 3, "subset_size": 25}
+    started = analysis_store.create_job("run-1", config)
+    analysis_store.complete_job(started["id"], {"metrics": {"f1": 0.9}, "plots": {}})
+
+    assert analysis_store.find_active_job("run-1") is None
+
+
+def test_active_lookup_is_scoped_to_its_optimization(isolated_store):
+    analysis_store.create_job("run-1", {"trial_number": 1})
+
+    assert analysis_store.find_active_job("run-2") is None
+    assert asyncio.run(analysis.find_active_analysis_job("run-2")) == {"job": None}
+    endpoint = asyncio.run(analysis.find_active_analysis_job("run-1"))
+    assert endpoint["job"]["status"] == "pending"
