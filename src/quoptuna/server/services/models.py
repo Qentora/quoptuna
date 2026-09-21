@@ -59,6 +59,31 @@ class AnalysisSnapshot(SQLModel, table=True):
     completed_at: Optional[str] = None
 
 
+class AnalysisRevision(SQLModel, table=True):
+    """One completed analysis run for a snapshot.
+
+    ``AnalysisSnapshot`` only holds the latest payload; this keeps the full
+    history so earlier analyses stay inspectable and reports remain
+    attributable to the exact revision they were built from.
+    """
+
+    __tablename__ = "quoptuna_analysis_revisions"
+    id: str = Field(primary_key=True)
+    snapshot_id: str = Field(index=True)
+    optimization_id: str = Field(index=True)
+    revision: int
+    job_id: Optional[str] = None
+    payload_json: Optional[str] = None
+    artifact_dir: Optional[str] = None
+    artifacts_pruned: bool = False
+    # Denormalised from the payload's analysed_model block so the history
+    # list can show which trial/model each revision explains without
+    # loading the full payload.
+    analysed_trial: Optional[int] = None
+    analysed_model_type: Optional[str] = None
+    created_at: str = ""
+
+
 class AnalysisJob(SQLModel, table=True):
     __tablename__ = "quoptuna_analysis_jobs"
     id: str = Field(primary_key=True)
@@ -66,6 +91,13 @@ class AnalysisJob(SQLModel, table=True):
     status: str
     current_section: Optional[str] = None
     error: Optional[str] = None
+    # Core sections (SHAP + metrics) published as soon as they finish, so the
+    # UI can render them while the derived sections are still running. The
+    # durable copy is the snapshot payload written at completion.
+    partial_json: Optional[str] = None
+    # Rows explained / rows to explain, for the long SHAP step. Null outside it.
+    progress_done: Optional[int] = None
+    progress_total: Optional[int] = None
     created_at: str = ""
     completed_at: Optional[str] = None
 

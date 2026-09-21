@@ -96,6 +96,8 @@ def run_headless_optimization(
     db_name: str = "cli_runs",
     analyze: bool = True,
     subset_size: int = 30,
+    background_size: int | None = None,
+    shap_max_evals: int | None = None,
 ) -> dict[str, Any]:
     """Run one optimization exactly as the UI would, synchronously.
 
@@ -162,11 +164,22 @@ def run_headless_optimization(
         from quoptuna.server.api.v1 import analysis as analysis_mod
 
         try:
-            xai = build_xai(opt, subset_size=subset_size)
+            xai = build_xai(
+                opt,
+                subset_size=subset_size,
+                background_size=background_size,
+                max_evals=shap_max_evals,
+            )
         except TypeError:
             # Models without predict_proba (e.g. SVC without probability=True):
             # same fallback the UI offers via its "use probabilities" toggle.
-            xai = build_xai(opt, use_proba=False, subset_size=subset_size)
+            xai = build_xai(
+                opt,
+                use_proba=False,
+                subset_size=subset_size,
+                background_size=background_size,
+                max_evals=shap_max_evals,
+            )
         spec = opt.get("task_spec")
         multiclass = bool(spec and spec.get("kind") == "multiclass")
         average = "macro" if multiclass else "binary"

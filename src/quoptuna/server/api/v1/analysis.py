@@ -2,9 +2,12 @@
 Analysis endpoints (SHAP, metrics, AI reports).
 """
 
+import asyncio
 import base64
 import io
 import logging
+import threading
+import time
 from contextvars import ContextVar
 from datetime import datetime
 from typing import Any, List, Optional, cast
@@ -16,18 +19,21 @@ import matplotlib as mpl
 mpl.use("Agg")
 
 import numpy as np
-from fastapi import APIRouter, BackgroundTasks, HTTPException
-from pydantic import BaseModel, ConfigDict
+from fastapi import APIRouter, BackgroundTasks, HTTPException, Response
+from pydantic import BaseModel, ConfigDict, Field
 
 from quoptuna.backend.utils.storage import DEFAULT_DB_NAME
+from quoptuna.backend.xai import prompts as report_prompts
+from quoptuna.backend.xai import report_context, shap_progress
 
 # Access optimization results stored by the optimize module.
 from quoptuna.server.api.v1.optimize import (
     OptimizationRequest,
     build_workflow,
     get_job,
+    serialize_study_trials,
 )
-from quoptuna.server.services import analysis_store
+from quoptuna.server.services import analysis_store, dataset_registry, research_bundle
 from quoptuna.server.services.storage import optuna_storage_url
 from quoptuna.server.services.workflow_service import (
     WorkflowExecutor,
@@ -55,6 +61,11 @@ class SHAPRequest(BaseModel):
     sample_index: int = 0
     use_proba: bool = True
     subset_size: int = 50
+    # Background rows the masker marginalises over, and per-row masked
+    # evaluations. None keeps the XAIConfig defaults (25 / 3 permutations);
+    # both trade SHAP precision for wall-clock roughly linearly.
+    background_size: Optional[int] = None
+    max_evals: Optional[int] = None
     # Which class's SHAP values to slice/plot when values are per-class
     # (multiclass). None keeps the default (positive class for binary,
     # class 0 for multiclass).
@@ -66,9 +77,47 @@ class MetricsRequest(BaseModel):
     trial_number: Optional[int] = None
     use_proba: bool = True
     subset_size: int = 50
+    background_size: Optional[int] = None
+    max_evals: Optional[int] = None
 
 
-class ReportRequest(BaseModel):
+class ReportInclusionOptions(BaseModel):
+    """Which evidence families reach the report agents.
+
+    Defaults mirror ``report_prompts.REPORT_PROMPT_SETTINGS``, which is what the
+    Settings page renders and documents, so an older client that sends none of
+    these still gets the full bundle.
+    """
+
+    # Include a fairness audit in the report when a protected attribute is
+    # available (stored with the run or given here).
+    include_fairness: bool = True
+    # Search-time fairness configuration: mode, disparity metric, threshold and
+    # per-trial disparities. Without it a constrained run reads as unconstrained.
+    include_fairness_search: bool = True
+    # Pareto front of a multi-objective run (the front *is* the result).
+    include_pareto: bool = True
+    include_shap_detail: bool = True
+    include_trial_history: bool = True
+    include_study_plots: bool = True
+    # Attach rendered figures to the request (off for text-only/cheap models).
+    attach_figures: bool = True
+    max_trial_rows: int = Field(default=40, ge=0, le=500)
+
+    def inclusions(self) -> report_context.ReportInclusions:
+        return report_context.ReportInclusions(
+            fairness=self.include_fairness,
+            fairness_search=self.include_fairness_search,
+            pareto=self.include_pareto,
+            shap_detail=self.include_shap_detail,
+            trial_history=self.include_trial_history,
+            study_plots=self.include_study_plots,
+            figures=self.attach_figures,
+            max_trial_rows=self.max_trial_rows,
+        )
+
+
+class ReportRequest(ReportInclusionOptions):
     # "model_name" collides with Pydantic's protected "model_" namespace; opt out.
     model_config = ConfigDict(protected_namespaces=())
 
@@ -80,10 +129,12 @@ class ReportRequest(BaseModel):
     api_key: str
     model_name: str = "gpt-4o"
     dataset_description: Optional[str] = None
-    # Include a fairness audit in the report when a protected attribute is
-    # available (stored with the run or given here).
     sensitive_feature: Optional[str] = None
-    include_fairness: bool = True
+    # Prompt overrides from Settings; empty falls back to the built-in prompts.
+    analyst_instructions: Optional[str] = None
+    reviewer_instructions: Optional[str] = None
+    # The reviewer pass is what catches ungrounded numbers and broken tables.
+    enable_review: bool = True
 
 
 class AnalysisJobRequest(BaseModel):
@@ -91,6 +142,8 @@ class AnalysisJobRequest(BaseModel):
     trial_number: Optional[int] = None
     use_proba: bool = True
     subset_size: int = 50
+    background_size: Optional[int] = None
+    max_evals: Optional[int] = None
     class_index: int = 0
     sample_index: int = 0
 
@@ -171,6 +224,71 @@ def _get_completed_result(optimization_id: str) -> dict:
             raise HTTPException(status_code=400, detail=detail)
         job["result"] = result  # cache for subsequent analysis calls
     return result
+
+
+def _analysed_model(opt_result: dict, xai, trial_number: int | None) -> dict:
+    """Provenance for the model a snapshot explains.
+
+    ``trial_number`` is what the request asked for; ``None`` means "the study's
+    best trial", which ``build_xai`` resolved. Resolve it again here so the
+    stored record names a concrete trial rather than "best", which would drift
+    if the study is extended later.
+    """
+    from optuna import load_study
+
+    resolved = trial_number
+    params: dict = {}
+    try:
+        study = load_study(
+            storage=optuna_storage_url(str(opt_result.get("db_name") or DEFAULT_DB_NAME)),
+            study_name=opt_result.get("study_name"),
+        )
+        if resolved is None:
+            trial = study_best_trial(study)
+        else:
+            trial = next((t for t in study.trials if t.number == resolved), None)
+        if trial is not None:
+            resolved = trial.number
+            params = dict(trial.params)
+    except Exception:  # provenance must never fail a completed analysis
+        logger.warning("Could not resolve analysed trial for provenance", exc_info=True)
+
+    budget = {
+        "max_steps": opt_result.get("max_steps"),
+        "convergence_interval": opt_result.get("convergence_interval"),
+        "dev_type": opt_result.get("dev_type"),
+    }
+    return {
+        "trial_number": resolved,
+        "requested_trial": trial_number,
+        "selected_by": "best_trial" if trial_number is None else "explicit",
+        "best_trial_number": opt_result.get("best_trial_number"),
+        "is_best_trial": resolved is not None and resolved == opt_result.get("best_trial_number"),
+        "model_type": params.get("model_type"),
+        "params": {k: v for k, v in params.items() if k != "model_type"},
+        "training_budget": {k: v for k, v in budget.items() if v is not None},
+        "retrained_at": datetime.now().isoformat(),
+    }
+
+
+def _warm_xai_caches(xai, use_proba: bool) -> None:
+    """Populate the lazy caches the parallel sections read.
+
+    ``XAI.shap_values`` / ``predictions`` / ``predictions_proba`` memoise into
+    unguarded attributes. Computing them once up front makes the later
+    concurrent readers side-effect free. Each is best-effort: a model without
+    ``predict_proba`` must not fail the whole analysis here, because the
+    sections that need it already degrade on their own.
+    """
+    for label, get in (
+        ("shap_values", lambda: xai.shap_values),
+        ("predictions", lambda: xai.predictions),
+        *((("predictions_proba", lambda: xai.predictions_proba),) if use_proba else ()),
+    ):
+        try:
+            get()
+        except Exception:
+            logger.debug("Could not pre-compute %s; sections will handle it", label)
 
 
 def _figure_to_data_url(fig) -> str:
@@ -450,7 +568,90 @@ def _shap_data_payload(
     }
 
 
-async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
+def _shap_progress_sink(job_id: str, min_interval: float = 1.0):
+    """Persist SHAP's row progress, throttled to one write per second.
+
+    A write per explained row would cost more than the explanation itself on a
+    fast model. The final row always writes, so the UI never stalls one short
+    of complete.
+    """
+    last = 0.0
+
+    def sink(done: int, total: int) -> None:
+        nonlocal last
+        now = time.monotonic()
+        if done < total and now - last < min_interval:
+            return
+        last = now
+        analysis_store.update_job(job_id, progress_done=done, progress_total=total)
+        # Called once per explained row, which makes it the finest-grained
+        # place to honour a stop request inside the longest step.
+        _stop_if_cancelled(job_id)
+
+    return sink
+
+
+class _JobCancelled(BaseException):
+    """Raised inside a running analysis once the client asks it to stop.
+
+    Deliberately a ``BaseException``: the job body and SHAP's progress hook
+    both swallow ``Exception`` broadly, and a cancellation that gets caught
+    there would be recorded as a failure instead of a stop.
+    """
+
+
+#: Job ids the client has asked to stop. In-process by design — an analysis is
+#: an in-process background task, so nothing outside this process can be
+#: running one.
+_cancelled_jobs: set[str] = set()
+_cancelled_lock = threading.Lock()
+
+
+def _request_cancel(job_id: str) -> None:
+    with _cancelled_lock:
+        _cancelled_jobs.add(job_id)
+
+
+def _is_cancelled(job_id: str) -> bool:
+    with _cancelled_lock:
+        return job_id in _cancelled_jobs
+
+
+def _clear_cancel(job_id: str) -> None:
+    with _cancelled_lock:
+        _cancelled_jobs.discard(job_id)
+
+
+def _stop_if_cancelled(job_id: str) -> None:
+    if _is_cancelled(job_id):
+        raise _JobCancelled(job_id)
+
+
+#: Analysis jobs render through pyplot's global figure state, and until they
+#: moved to the threadpool the event loop serialized them for free. Two
+#: interleaving in different threads would corrupt each other's figures, so
+#: keep the old one-at-a-time behaviour explicitly.
+_analysis_job_lock = threading.Lock()
+
+
+def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
+    """Run one analysis off the event loop.
+
+    Every step below is synchronous CPU work — rehydration, the model refit,
+    SHAP, figure rendering — and an ``async def`` background task runs *on* the
+    event loop. That left the server unable to answer the client's progress
+    polls for the whole job: the UI sat on "Starting analysis" and then showed
+    whichever section happened to be current once the loop freed up, which was
+    always SHAP. Per-row SHAP progress was unreadable for the same reason.
+
+    Starlette runs a non-async background task in its threadpool, so making
+    this synchronous keeps the loop free and lets progress arrive as it happens.
+    """
+    with _analysis_job_lock:
+        asyncio.run(_run_analysis_job_async(job_id, request))
+
+
+async def _run_analysis_job_async(job_id: str, request: AnalysisJobRequest) -> None:
     """Compute and persist one complete analysis bundle."""
     config = analysis_store.normalize_config(request.model_dump(exclude={"optimization_id"}))
     trial = config["trial_number"]
@@ -459,6 +660,8 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
         trial_number=trial,
         use_proba=config["use_proba"],
         subset_size=config["subset_size"],
+        background_size=config.get("background_size"),
+        max_evals=config.get("max_evals"),
     )
     shap_request = SHAPRequest(
         optimization_id=request.optimization_id,
@@ -466,11 +669,14 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
         sample_index=config["sample_index"],
         use_proba=config["use_proba"],
         subset_size=config["subset_size"],
+        background_size=config.get("background_size"),
+        max_evals=config.get("max_evals"),
         class_index=config["class_index"],
     )
     warnings: dict[str, str] = {}
 
     async def optional(section: str, call):
+        _stop_if_cancelled(job_id)
         analysis_store.update_job(job_id, current_section=section)
         try:
             return await call
@@ -480,49 +686,122 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
             logger.warning("Analysis section %s failed: %s", section, detail)
             return None
 
+    async def gather_optional(section: str, calls: dict[str, Any]) -> dict[str, Any]:
+        """Run independent sections concurrently, recording failures per name.
+
+        Safe only once the shared ``XAI``'s lazy caches are warm: the section
+        coroutines read ``shap_values`` / ``predictions*`` off one instance and
+        those properties are not synchronised, so racing them would recompute
+        (or interleave) the same work. ``_warm_xai_caches`` populates them
+        first, leaving these calls as pure readers.
+
+        The coroutines are async but CPU-bound, so this overlaps their awaits
+        rather than their compute; it is ordering, not true parallelism. It
+        still removes the serialised section-by-section stalls and keeps one
+        failure from cancelling its siblings.
+        """
+        analysis_store.update_job(job_id, current_section=section)
+        names = list(calls)
+        settled = await asyncio.gather(*(calls[name] for name in names), return_exceptions=True)
+        results: dict[str, Any] = {}
+        for name, outcome in zip(names, settled, strict=True):
+            if isinstance(outcome, BaseException):
+                detail = outcome.detail if isinstance(outcome, HTTPException) else str(outcome)
+                warnings[name] = str(detail)
+                logger.warning("Analysis section %s failed: %s", name, detail)
+                results[name] = None
+            else:
+                results[name] = outcome
+        return results
+
     token = None
     try:
-        analysis_store.update_job(job_id, status="running", current_section="shap")
+        # Two substantial steps run before SHAP and both used to report as
+        # "shap", which made the job look stuck. Rehydration re-runs data prep
+        # for a run whose in-memory job was lost, and build_xai refits the
+        # trial's model - on a variational model that is the slowest step of
+        # the whole analysis.
+        _stop_if_cancelled(job_id)
+        analysis_store.update_job(job_id, status="running", current_section="preparing")
         opt_result = _get_completed_result(request.optimization_id)
+        _stop_if_cancelled(job_id)
+        analysis_store.update_job(job_id, current_section="training")
         shared_xai = build_xai(
             opt_result,
             trial_number=trial,
             use_proba=config["use_proba"],
             subset_size=config["subset_size"],
+            background_size=config.get("background_size"),
+            max_evals=config.get("max_evals"),
         )
         token = _job_xai.set(shared_xai)
+        analysis_store.update_job(job_id, current_section="shap", progress_done=0, progress_total=0)
         # SHAP and metrics are the required core sections. Existing endpoint
         # functions remain the compatibility implementation for now; this job
         # owns orchestration and persistence.
-        shap = await generate_shap_analysis(shap_request)
+        #
+        # SHAP explains row by row and is the longest step here; report that
+        # progress to the job so the browser sees what the server's terminal
+        # already shows.
+        with shap_progress.report_progress(_shap_progress_sink(job_id)):
+            shap = await generate_shap_analysis(shap_request)
+        analysis_store.update_job(job_id, progress_done=None, progress_total=None)
         metrics = await generate_metrics(metrics_request)
-        curves = await optional("curves", generate_curves(metrics_request))
-        curves_data = await optional("curves_data", generate_curves_data(metrics_request))
-        confusion_data = await optional(
-            "confusion_matrix_data", generate_confusion_matrix_data(metrics_request)
+        # Publish the core sections now: the derived ones below can take a
+        # while, and there is no reason to withhold finished SHAP and metrics
+        # until they land.
+        analysis_store.publish_partial(
+            job_id,
+            {
+                "feature_importance": shap.get("feature_importance"),
+                "plots": dict(shap.get("plots") or {}),
+                "metrics": metrics.get("metrics"),
+                "confusion_matrix_plot": metrics.get("confusion_matrix_plot"),
+                "task_type": metrics.get("task_type"),
+                "class_labels": metrics.get("class_labels"),
+            },
         )
-        importance_data = await optional(
-            "feature_importance_data", generate_feature_importance_data(metrics_request)
+
+        # Everything below only reads the shared XAI. Warm its lazy caches so
+        # the concurrent sections cannot race on first computation.
+        _warm_xai_caches(shared_xai, config["use_proba"])
+
+        derived = await gather_optional(
+            "derived",
+            {
+                "curves": generate_curves(metrics_request),
+                "curves_data": generate_curves_data(metrics_request),
+                "confusion_matrix_data": generate_confusion_matrix_data(metrics_request),
+                "feature_importance_data": generate_feature_importance_data(metrics_request),
+                "shap_data": generate_shap_data(shap_request),
+            },
         )
-        shap_data = await optional("shap_data", generate_shap_data(shap_request))
-        study = await optional(
-            "study_plots",
-            generate_study_plots(StudyPlotsRequest(optimization_id=request.optimization_id)),
-        )
-        fairness = None
+        curves = derived["curves"]
+        curves_data = derived["curves_data"]
+        confusion_data = derived["confusion_matrix_data"]
+        importance_data = derived["feature_importance_data"]
+        shap_data = derived["shap_data"]
+
+        # Study plots read the Optuna study, not the XAI, and fairness needs
+        # its own refit, so they stay off the shared-instance group above.
         job = get_job(request.optimization_id)
         sensitive = (job.get("request") or {}).get("sensitive_feature")
-        if sensitive:
-            fairness = await optional(
-                "fairness",
-                generate_fairness(
-                    FairnessRequest(
-                        optimization_id=request.optimization_id,
-                        trial_number=trial,
-                        sensitive_feature=sensitive,
-                    )
-                ),
+        tail: dict[str, Any] = {
+            "study_plots": generate_study_plots(
+                StudyPlotsRequest(optimization_id=request.optimization_id)
             )
+        }
+        if sensitive:
+            tail["fairness"] = generate_fairness(
+                FairnessRequest(
+                    optimization_id=request.optimization_id,
+                    trial_number=trial,
+                    sensitive_feature=sensitive,
+                )
+            )
+        tail_results = await gather_optional("study_plots", tail)
+        study = tail_results["study_plots"]
+        fairness = tail_results.get("fairness")
 
         plots = dict(shap.get("plots") or {})
         if curves and curves.get("roc_curve_plot"):
@@ -545,8 +824,22 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
             "task_type": metrics.get("task_type"),
             "class_labels": metrics.get("class_labels"),
             "warnings": warnings,
+            # Which model this snapshot actually explains. Recorded at
+            # analysis time so a stored snapshot (and any report built from
+            # it) stays attributable after the study or request changes.
+            "analysed_model": _analysed_model(opt_result, shared_xai, trial),
         }
         analysis_store.complete_job(job_id, payload)
+    except _JobCancelled:
+        logger.info("Analysis job %s stopped at the client's request", job_id)
+        analysis_store.update_job(
+            job_id,
+            status="cancelled",
+            current_section=None,
+            progress_done=None,
+            progress_total=None,
+            completed_at=datetime.now().isoformat(),
+        )
     except Exception as exc:
         logger.exception("Analysis job %s failed", job_id)
         detail = exc.detail if isinstance(exc, HTTPException) else str(exc)
@@ -554,6 +847,7 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
             job_id, status="failed", error=str(detail), completed_at=datetime.now().isoformat()
         )
     finally:
+        _clear_cancel(job_id)
         if token is not None:
             _job_xai.reset(token)
 
@@ -566,6 +860,34 @@ async def start_analysis_job(request: AnalysisJobRequest, background_tasks: Back
     if job.pop("created"):
         background_tasks.add_task(_run_analysis_job, job["id"], request)
     return job
+
+
+@router.get("/jobs")
+async def find_active_analysis_job(optimization_id: str):
+    """The analysis still running for this optimization, or ``null``.
+
+    Declared before ``/jobs/{job_id}`` for readability only; the paths do not
+    overlap. Lets a client that lost its job id — a browser refresh — reattach
+    to work that is still going rather than starting a duplicate run.
+    """
+    return {"job": analysis_store.find_active_job(optimization_id)}
+
+
+@router.post("/jobs/{job_id}/cancel")
+async def cancel_analysis_job(job_id: str):
+    """Ask a running analysis to stop.
+
+    Cooperative: the job checks between sections and once per explained SHAP
+    row, so a stop lands within a row rather than instantly. A job that has
+    already finished is left alone.
+    """
+    job = analysis_store.get_job(job_id)
+    if not job:
+        raise HTTPException(status_code=404, detail="Analysis job not found")
+    if job["status"] not in {"pending", "running"}:
+        return {"id": job_id, "status": job["status"], "cancelled": False}
+    _request_cancel(job_id)
+    return {"id": job_id, "status": "cancelling", "cancelled": True}
 
 
 @router.get("/jobs/{job_id}")
@@ -589,6 +911,22 @@ async def get_analysis_snapshot(snapshot_id: str):
     if not snapshot or snapshot["revision"] < 1:
         raise HTTPException(status_code=404, detail="Completed analysis snapshot not found")
     return snapshot
+
+
+@router.get("/snapshots/{snapshot_id}/revisions")
+async def list_analysis_revisions(snapshot_id: str):
+    """Analysis history for a snapshot, newest first."""
+    if analysis_store.get_snapshot(snapshot_id, hydrate=False) is None:
+        raise HTTPException(status_code=404, detail="Analysis snapshot not found")
+    return {"revisions": analysis_store.list_revisions(snapshot_id)}
+
+
+@router.get("/snapshots/{snapshot_id}/revisions/{revision}")
+async def get_analysis_revision(snapshot_id: str, revision: int):
+    found = analysis_store.get_revision(snapshot_id, revision)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Analysis revision not found")
+    return found
 
 
 @router.get("/snapshots/{snapshot_id}/artifacts/{filename}")
@@ -661,6 +999,8 @@ async def generate_shap_data(request: SHAPRequest):
             trial_number=request.trial_number,
             use_proba=request.use_proba,
             subset_size=request.subset_size,
+            background_size=request.background_size,
+            max_evals=request.max_evals,
         )
         class_index = _plot_class_index(xai, request.class_index)
         payload = _shap_data_payload(xai.shap_values, class_index)
@@ -690,6 +1030,8 @@ async def generate_shap_analysis(request: SHAPRequest):
             trial_number=request.trial_number,
             use_proba=request.use_proba,
             subset_size=request.subset_size,
+            background_size=request.background_size,
+            max_evals=request.max_evals,
         )
 
         # Per-class SHAP values (ndim > 2) must be sliced to one class for plotting.
@@ -730,6 +1072,8 @@ async def generate_metrics(request: MetricsRequest):
             trial_number=request.trial_number,
             use_proba=request.use_proba,
             subset_size=request.subset_size,
+            background_size=request.background_size,
+            max_evals=request.max_evals,
         )
 
         from sklearn.metrics import average_precision_score, roc_auc_score
@@ -843,6 +1187,8 @@ async def generate_curves(request: MetricsRequest):
             trial_number=request.trial_number,
             use_proba=request.use_proba,
             subset_size=request.subset_size,
+            background_size=request.background_size,
+            max_evals=request.max_evals,
         )
     except HTTPException:
         raise
@@ -980,6 +1326,8 @@ async def generate_curves_data(request: MetricsRequest):
             trial_number=request.trial_number,
             use_proba=request.use_proba,
             subset_size=request.subset_size,
+            background_size=request.background_size,
+            max_evals=request.max_evals,
         )
     except HTTPException:
         raise
@@ -1037,6 +1385,8 @@ async def generate_confusion_matrix_data(request: MetricsRequest):
             trial_number=request.trial_number,
             use_proba=request.use_proba,
             subset_size=request.subset_size,
+            background_size=request.background_size,
+            max_evals=request.max_evals,
         )
         cm = xai.get_confusion_matrix()
         try:
@@ -1071,6 +1421,8 @@ async def generate_feature_importance_data(request: MetricsRequest):
             trial_number=request.trial_number,
             use_proba=request.use_proba,
             subset_size=request.subset_size,
+            background_size=request.background_size,
+            max_evals=request.max_evals,
         )
         importance = _feature_importance_from_xai(xai)
         return {
@@ -1280,19 +1632,200 @@ async def generate_fairness(request: FairnessRequest):
         raise HTTPException(status_code=500, detail=f"Failed to compute fairness: {e!s}")
 
 
+def _run_view(optimization_id: str) -> Optional[dict]:
+    """The optimization job as a plain dict, or ``None`` when it is unknown.
+
+    The report path must degrade rather than fail: a snapshot can outlive the
+    run record it came from (a wiped hot cache plus a pruned store), and a
+    report grounded in the snapshot alone is still worth producing.
+    """
+    try:
+        job = get_job(optimization_id)
+    except HTTPException:
+        return None
+    result = job.get("result") or {}
+    return {**job, "best_trial_number": result.get("best_trial_number")}
+
+
+def _run_trials(run: Optional[dict]) -> list[dict]:
+    """Trial history for a run, read back from the Optuna study when needed."""
+    if not run:
+        return []
+    trials = run.get("trials")
+    if trials:
+        return list(trials)
+    request_data = run.get("request") or {}
+    study_name = request_data.get("study_name")
+    if not study_name:
+        return []
+    try:
+        return serialize_study_trials(
+            str(request_data.get("database_name") or DEFAULT_DB_NAME), study_name
+        )
+    except Exception as exc:
+        logger.warning("Could not serialize trials for the report context: %s", exc)
+        return []
+
+
+def _run_pareto(run: Optional[dict]) -> list[dict]:
+    """Pareto front of a multi-objective run, recomputed if not cached.
+
+    ``pareto_trials`` is only set on the job by the background task that ran the
+    search, so it is absent for any run resumed after a restart even though the
+    study on disk still holds the front.
+    """
+    if not run:
+        return []
+    cached = run.get("pareto_trials")
+    if cached:
+        return list(cached)
+    request_data = run.get("request") or {}
+    study_name = request_data.get("study_name")
+    if not study_name:
+        return []
+    try:
+        from optuna import load_study
+
+        study = load_study(
+            storage=optuna_storage_url(str(request_data.get("database_name") or DEFAULT_DB_NAME)),
+            study_name=study_name,
+            sampler=None,
+        )
+        if len(study.directions) <= 1:
+            return []
+        return [
+            {"trial": trial.number, "values": list(trial.values), "params": trial.params}
+            for trial in study.best_trials
+        ]
+    except Exception as exc:
+        logger.warning("Could not load the Pareto front for the report context: %s", exc)
+        return []
+
+
+def _report_context(
+    snapshot: dict,
+    *,
+    options: ReportInclusionOptions,
+    dataset_description: Optional[str] = None,
+    prompt_names: Optional[dict[str, str]] = None,
+) -> tuple[dict, Optional[dict], list[dict], list[dict]]:
+    """Build the evidence bundle for a snapshot, plus the raw run data it used."""
+    optimization_id = snapshot["optimization_id"]
+    run = _run_view(optimization_id)
+    trials = _run_trials(run)
+    pareto = _run_pareto(run)
+    dataset_id = ((run or {}).get("request") or {}).get("dataset_id")
+    dataset = dataset_registry.get(dataset_id) if dataset_id else None
+    context = report_context.build_context(
+        optimization_id=optimization_id,
+        snapshot=snapshot,
+        run=run,
+        dataset=dict(dataset) if dataset else None,
+        trials=trials,
+        pareto_trials=pareto,
+        dataset_description=dataset_description,
+        inclusions=options.inclusions(),
+        prompts=prompt_names or {},
+    )
+    return context, run, trials, pareto
+
+
+def _completed_snapshot(snapshot_id: str, optimization_id: Optional[str] = None) -> dict:
+    snapshot = analysis_store.get_snapshot(snapshot_id)
+    if not snapshot or snapshot.get("revision", 0) < 1 or not snapshot.get("payload"):
+        raise HTTPException(status_code=404, detail="Completed analysis snapshot not found")
+    if optimization_id and snapshot["optimization_id"] != optimization_id:
+        raise HTTPException(status_code=409, detail="A completed analysis snapshot is required")
+    return snapshot
+
+
+@router.get("/report-prompts")
+async def get_report_prompts():
+    """Default agent prompts and the documented settings the UI exposes."""
+    return {
+        "prompts": report_prompts.default_prompts(),
+        "settings": report_prompts.REPORT_PROMPT_SETTINGS,
+        "markdown_contract": report_prompts.MARKDOWN_CONTRACT,
+        "report_skeleton": report_prompts.REPORT_SKELETON,
+    }
+
+
+@router.get("/snapshots/{snapshot_id}/context")
+async def get_report_context(snapshot_id: str, include_evidence_markdown: bool = True):
+    """The structured evidence bundle the report agents are given.
+
+    Served without any base64: figures are described by the manifest and
+    downloaded through the bundle endpoint.
+    """
+    snapshot = _completed_snapshot(snapshot_id)
+    context, _, _, _ = _report_context(snapshot, options=ReportInclusionOptions())
+    body: dict[str, Any] = {"snapshot_id": snapshot_id, "context": context}
+    if include_evidence_markdown:
+        body["evidence_markdown"] = report_context.render_markdown(context)
+    return body
+
+
+@router.get("/snapshots/{snapshot_id}/bundle")
+async def download_research_bundle(snapshot_id: str):
+    """One-click research dump: context, evidence, figures, tables and reports.
+
+    Built with the *default* inclusions rather than the caller's report settings:
+    the dump is the archive of what the run produced, so it must stay complete
+    even when a report deliberately left some of it out.
+    """
+    snapshot = _completed_snapshot(snapshot_id)
+    context, run, trials, pareto = _report_context(snapshot, options=ReportInclusionOptions())
+    reports = [
+        report
+        for report in analysis_store.list_reports(snapshot_id)
+        if report.get("snapshot_revision") == snapshot["revision"]
+    ]
+    try:
+        archive = research_bundle.build_zip(
+            context=context,
+            payload=snapshot.get("payload") or {},
+            reports=reports,
+            evidence_markdown=report_context.render_markdown(context),
+            prompts={
+                f"{name}.default": text for name, text in report_prompts.default_prompts().items()
+            },
+            run=run,
+            trials=trials,
+            pareto_trials=pareto,
+        )
+    except Exception as exc:
+        logger.exception("Failed to build the research bundle for snapshot %s", snapshot_id)
+        raise HTTPException(status_code=500, detail=f"Failed to build the bundle: {exc!s}")
+    filename = research_bundle.bundle_filename(context)
+    return Response(
+        content=archive,
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.post("/report")
 async def generate_ai_report(request: ReportRequest):
     """Generate and persist a report strictly from a completed snapshot."""
     if not request.api_key:
         raise HTTPException(status_code=400, detail="An LLM api_key is required")
 
-    snapshot = analysis_store.get_snapshot(request.analysis_snapshot_id)
-    if not snapshot or snapshot["optimization_id"] != request.optimization_id:
-        raise HTTPException(status_code=409, detail="A completed analysis snapshot is required")
-    if snapshot["revision"] != request.analysis_revision:
+    snapshot = _completed_snapshot(request.analysis_snapshot_id, request.optimization_id)
+    if snapshot["revision"] < request.analysis_revision:
+        # The client claims a revision the server never produced.
         raise HTTPException(
             status_code=409,
             detail="The analysis snapshot changed; reload it before generating the report",
+        )
+    if snapshot["revision"] != request.analysis_revision:
+        # A newer analysis completed after the client loaded the page. Report
+        # against the latest rather than a stale revision; the report records
+        # the revision it used so the output stays attributable.
+        logger.info(
+            "Report for %s requested revision %s; using latest revision %s",
+            request.analysis_snapshot_id,
+            request.analysis_revision,
+            snapshot["revision"],
         )
     payload = snapshot.get("payload") or {}
     if not payload.get("metrics"):
@@ -1305,42 +1838,34 @@ async def generate_ai_report(request: ReportRequest):
     try:
         from quoptuna.backend.xai import report_agent
 
-        evidence: dict[str, Any] = {
-            "metrics": payload["metrics"],
-            "feature_importance": payload.get("feature_importance"),
-            "confusion_matrix": payload.get("confusion_data"),
-            "curves": payload.get("curves_data"),
-            "task_type": payload.get("task_type"),
-            "class_labels": payload.get("class_labels"),
-        }
-        if request.include_fairness and payload.get("fairness"):
-            fairness = payload["fairness"]
-            evidence["fairness_metrics"] = fairness.get("metrics")
-            evidence["fairness_mitigation"] = fairness.get("mitigation")
+        context, _, _, _ = _report_context(
+            snapshot,
+            options=request,
+            dataset_description=request.dataset_description,
+            prompt_names={
+                "analyst": "custom" if (request.analyst_instructions or "").strip() else "default",
+                "reviewer": "custom"
+                if (request.reviewer_instructions or "").strip()
+                else "default",
+            },
+        )
+        images = (
+            research_bundle.image_map(payload, context.get("figures") or [])
+            if request.attach_figures
+            else {}
+        )
 
-        images = dict(payload.get("plots") or {})
-        if payload.get("confusion_matrix_plot"):
-            images["confusion_matrix"] = payload["confusion_matrix_plot"]
-        fairness = payload.get("fairness") or {}
-        if request.include_fairness:
-            images.update(
-                {f"fairness_{name}": value for name, value in (fairness.get("plots") or {}).items()}
-            )
-            mitigation = fairness.get("mitigation") or {}
-            if mitigation.get("comparison_plot"):
-                images["fairness_mitigation_comparison"] = mitigation["comparison_plot"]
-
-        markdown = await report_agent.generate_report(
-            report=evidence,
+        result = await report_agent.generate_report(
+            context=context,
             images=images,
             api_key=request.api_key,
             model_name=request.model_name,
             provider=request.llm_provider,
+            analyst_instructions=request.analyst_instructions,
+            reviewer_instructions=request.reviewer_instructions,
+            enable_review=request.enable_review,
         )
-
-        if request.dataset_description:
-            markdown = f"> Dataset: {request.dataset_description}\n\n{markdown}"
-
+        markdown = result["markdown"]
         analysis_store.complete_report(report_id, markdown)
 
         return {
@@ -1348,6 +1873,26 @@ async def generate_ai_report(request: ReportRequest):
             "report_id": report_id,
             "status": "completed",
             "report_markdown": markdown,
+            # The revision the report was actually grounded in, which is not
+            # always the one requested: a newer analysis completing mid-session
+            # is used instead (see above). The UI labels the report with this.
+            "analysis_revision": snapshot["revision"],
+            # Diagnostics the UI surfaces: which figures the report actually
+            # references, what was dropped as invented, and residual markdown
+            # issues the normalizer could not repair.
+            "referenced_figures": result.get("referenced_figures") or [],
+            "dropped_figures": result.get("dropped_figures") or [],
+            "markdown_issues": result.get("lint") or [],
+            "reviewed": result.get("reviewed", False),
+            "context_summary": {
+                "figures": len(context.get("figures") or []),
+                "trials_included": len((context.get("optimization") or {}).get("trials") or []),
+                "trials_recorded": (context.get("optimization") or {}).get("n_trials_recorded"),
+                "fairness_audit_included": (context.get("fairness") or {}).get("audit_included"),
+                "fairness_mode": ((context.get("fairness") or {}).get("search") or {}).get("mode"),
+                "pareto_points": (context.get("pareto_front") or {}).get("n_points") or 0,
+                "omissions": len(context.get("omissions") or []),
+            },
         }
     except HTTPException as exc:
         analysis_store.fail_report(report_id, str(exc.detail))

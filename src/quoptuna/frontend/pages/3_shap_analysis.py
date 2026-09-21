@@ -156,6 +156,27 @@ def run_shap_analysis():
     else:
         subset_size = None
 
+    with st.expander("Speed / precision", expanded=False):
+        background_size = st.slider(
+            "Background Size:",
+            min_value=5,
+            max_value=100,
+            value=25,
+            help=(
+                "Rows SHAP marginalises over. Model calls scale linearly with "
+                "this, so lowering it is the cheapest speedup."
+            ),
+        )
+        permutations = st.slider(
+            "Permutations per row:",
+            min_value=1,
+            max_value=10,
+            value=3,
+            help=(
+                "Masked evaluations per explained row, as multiples of "
+                "2 * n_features + 1. Lower is faster and noisier."
+            ),
+        )
     # Run SHAP analysis
     if st.button("🔬 Run SHAP Analysis", type="primary"):
         try:
@@ -165,6 +186,8 @@ def run_shap_analysis():
                     use_proba=use_proba,
                     onsubset=onsubset,
                     subset_size=subset_size if onsubset else None,
+                    background_size=background_size,
+                    eval_permutations=permutations,
                 )
 
                 # Create XAI instance

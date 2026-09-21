@@ -38,6 +38,11 @@ class Settings(BaseSettings):
     OPTUNA_DB_SCHEMA: str = "optuna"
     ARTIFACT_STORAGE: str = "local"
     ARTIFACT_ROOT: str = "db/analysis"
+    # How many completed analysis revisions to keep on disk per snapshot.
+    # Older revisions stay in the history table (metadata + payload) but
+    # their figure artifacts are pruned. 1 restores the previous
+    # keep-latest-only behaviour; 0 disables pruning entirely.
+    ANALYSIS_HISTORY_LIMIT: int = 5
     S3_ENDPOINT_URL: str = ""
     S3_BUCKET: str = ""
     S3_REGION: str = ""

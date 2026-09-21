@@ -11,6 +11,7 @@ import pandas as pd
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
+from quoptuna.datasets import BUNDLED_DATASETS, bundled_catalog, bundled_dataset_path
 from quoptuna.server.core.config import settings
 from quoptuna.server.services import dataset_registry
 from quoptuna.server.services.analysis_store import get_artifact_store
@@ -66,6 +67,9 @@ POPULAR_UCI_DATASETS = [
         "num_instances": 690,
         "num_features": 14,
     },
+    # Datasets committed to the repo are appended so the picker still works
+    # when the UCI archive is unreachable.
+    *bundled_catalog(),
 ]
 
 MAX_UNIQUE_FOR_TARGET = 20
@@ -135,18 +139,28 @@ async def list_uci_datasets():
 
 @router.post("/uci/{dataset_id}/load")
 async def load_uci_dataset(dataset_id: int):
-    """Fetch a UCI dataset, persist it as CSV and register it for reuse."""
+    """Load a UCI dataset, persist it as CSV and register it for reuse.
+
+    Datasets bundled with the package are read from disk; everything else is
+    fetched from the UCI archive.
+    """
+    bundled_path = bundled_dataset_path(dataset_id)
+
     try:
-        from ucimlrepo import fetch_ucirepo
-
-        dataset = fetch_ucirepo(id=dataset_id)
-
-        if dataset.data.targets is not None:
-            df = pd.concat([dataset.data.features, dataset.data.targets], axis=1)
+        if bundled_path is not None:
+            df = pd.read_csv(bundled_path)
+            dataset_name = BUNDLED_DATASETS[dataset_id]["name"]
         else:
-            df = dataset.data.features
+            from ucimlrepo import fetch_ucirepo
 
-        dataset_name = dataset.metadata.get("name", f"UCI Dataset {dataset_id}")
+            dataset = fetch_ucirepo(id=dataset_id)
+
+            if dataset.data.targets is not None:
+                df = pd.concat([dataset.data.features, dataset.data.targets], axis=1)
+            else:
+                df = dataset.data.features
+
+            dataset_name = dataset.metadata.get("name", f"UCI Dataset {dataset_id}")
 
         registry_id = str(dataset_id)
         file_path = UPLOAD_DIR / f"uci_{dataset_id}.csv"

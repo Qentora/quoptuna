@@ -19,6 +19,7 @@ from quoptuna.server.services.models import (
     AnalysisArtifact,
     AnalysisJob,
     AnalysisReport,
+    AnalysisRevision,
     AnalysisSnapshot,
 )
 
@@ -29,11 +30,20 @@ def _now() -> str:
     return datetime.now().isoformat()
 
 
+def _opt_int(value: Any) -> int | None:
+    return None if value is None else int(value)
+
+
 def normalize_config(config: dict[str, Any]) -> dict[str, Any]:
     return {
         "trial_number": config.get("trial_number"),
         "use_proba": bool(config.get("use_proba", True)),
         "subset_size": int(config.get("subset_size", 50)),
+        # SHAP cost knobs. Part of the config key on purpose: a snapshot taken
+        # at a coarser background/eval budget must not be served for a request
+        # asking for a finer one.
+        "background_size": _opt_int(config.get("background_size")),
+        "max_evals": _opt_int(config.get("max_evals")),
         "class_index": int(config.get("class_index", 0)),
         "sample_index": int(config.get("sample_index", 0)),
     }
@@ -102,8 +112,30 @@ def create_revision_job(snapshot_id: str) -> dict[str, Any]:
         return {"id": job.id, "snapshot_id": snapshot_id, "status": "running"}
 
 
+def publish_partial(job_id: str, payload: dict[str, Any]) -> None:
+    """Expose finished core sections while the job is still running.
+
+    Figures stay inline as data URLs here; only the final snapshot extracts
+    them to artifact files. This is a transient preview, discarded once the
+    snapshot is written.
+    """
+    with session_scope() as session:
+        job = session.get(AnalysisJob, job_id)
+        if job:
+            job.partial_json = json.dumps(payload)
+            session.add(job)
+            session.commit()
+
+
 def update_job(job_id: str, **fields: Any) -> None:
-    allowed = {"status", "current_section", "error", "completed_at"}
+    allowed = {
+        "status",
+        "current_section",
+        "error",
+        "completed_at",
+        "progress_done",
+        "progress_total",
+    }
     if set(fields) - allowed:
         raise ValueError("Invalid analysis job field")
     with session_scope() as session:
@@ -115,6 +147,57 @@ def update_job(job_id: str, **fields: Any) -> None:
             session.commit()
 
 
+def abandon_orphaned_jobs() -> int:
+    """Fail analysis jobs left ``pending``/``running`` by a previous process.
+
+    An analysis is an in-process background task: nothing resumes it when the
+    server stops. The row outlives the work, though, and a client asking what
+    is still running would be told about a job that will never progress —
+    reattaching to it shows a permanently stuck "Computing SHAP".
+
+    Called once at startup, before anything can look a job up.
+    """
+    now = _now()
+    with session_scope() as session:
+        rows = session.exec(
+            select(AnalysisJob).where(col(AnalysisJob.status).in_(["pending", "running"]))
+        ).all()
+        for row in rows:
+            row.status = "failed"
+            row.error = "Interrupted: the server restarted while this analysis was running."
+            row.completed_at = now
+            row.progress_done = None
+            row.progress_total = None
+            session.add(row)
+        session.commit()
+        return len(rows)
+
+
+def find_active_job(optimization_id: str) -> dict[str, Any] | None:
+    """The analysis still pending or running for this optimization, if any.
+
+    Recovery path for a client that lost its job id — a browser refresh drops
+    it, while the work carries on server-side. Without this the UI reports no
+    analysis in flight and a second run is started over the top of the first.
+
+    Newest first, because only the latest job can still be the live one.
+    """
+    with session_scope() as session:
+        row = session.exec(
+            select(AnalysisJob)
+            .join(AnalysisSnapshot, onclause=AnalysisSnapshot.id == AnalysisJob.snapshot_id)  # type: ignore[arg-type]
+            .where(
+                AnalysisSnapshot.optimization_id == optimization_id,
+                col(AnalysisJob.status).in_(["pending", "running"]),
+            )
+            .order_by(col(AnalysisJob.created_at).desc())
+        ).first()
+        job_id = None if row is None else row.id
+    # Outside the session: get_job opens its own, and nesting two scopes on the
+    # same SQLite file invites a lock.
+    return None if job_id is None else get_job(job_id)
+
+
 def get_job(job_id: str) -> dict[str, Any] | None:
     with session_scope() as session:
         job = session.get(AnalysisJob, job_id)
@@ -124,6 +207,7 @@ def get_job(job_id: str) -> dict[str, Any] | None:
         if snapshot is None:
             return None
         result = job.model_dump()
+        result["partial"] = json.loads(result.pop("partial_json") or "null")
         result.update(
             {
                 "optimization_id": snapshot.optimization_id,
@@ -274,16 +358,98 @@ def complete_job(job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
             analysis_job.status = "completed"
             analysis_job.current_section = "complete"
             analysis_job.completed_at = _now()
+            analysed = (stored_payload or {}).get("analysed_model") or {}
+            session.add(
+                AnalysisRevision(
+                    id=str(uuid.uuid4()),
+                    snapshot_id=job["snapshot_id"],
+                    optimization_id=job["optimization_id"],
+                    revision=revision,
+                    job_id=job_id,
+                    payload_json=json.dumps(stored_payload),
+                    artifact_dir=str(final_dir),
+                    analysed_trial=_opt_int(analysed.get("trial_number")),
+                    analysed_model_type=analysed.get("model_type"),
+                    created_at=_now(),
+                )
+            )
             session.add(snapshot)
             session.add(analysis_job)
             session.commit()
-        for old in final_dir.parent.iterdir():
-            if old != final_dir and old.is_dir():
-                shutil.rmtree(old, ignore_errors=True)
+        _prune_history(job["snapshot_id"], final_dir)
     except Exception:
         shutil.rmtree(temp_dir, ignore_errors=True)
         raise
     return {"snapshot_id": job["snapshot_id"], "revision": revision}
+
+
+def _prune_history(snapshot_id: str, keep_dir: Path) -> None:
+    """Drop artifact directories beyond ``ANALYSIS_HISTORY_LIMIT``.
+
+    History rows are kept regardless; only the on-disk figures are removed,
+    and the row is flagged so the UI can show the revision as metadata-only.
+    The current revision's directory is never pruned.
+    """
+    limit = int(settings.ANALYSIS_HISTORY_LIMIT)
+    if limit <= 0:
+        return
+    with session_scope() as session:
+        rows = session.exec(
+            select(AnalysisRevision)
+            .where(AnalysisRevision.snapshot_id == snapshot_id)
+            .order_by(col(AnalysisRevision.revision).desc())
+        ).all()
+        for row in rows[limit:]:
+            if row.artifacts_pruned or not row.artifact_dir:
+                continue
+            directory = Path(row.artifact_dir)
+            if directory != keep_dir and directory.exists():
+                shutil.rmtree(directory, ignore_errors=True)
+            row.artifacts_pruned = True
+            session.add(row)
+        session.commit()
+
+
+def list_revisions(snapshot_id: str) -> list[dict[str, Any]]:
+    """Completed analysis revisions for a snapshot, newest first."""
+    with session_scope() as session:
+        return [
+            {
+                "id": r.id,
+                "snapshot_id": r.snapshot_id,
+                "optimization_id": r.optimization_id,
+                "revision": r.revision,
+                "analysed_trial": r.analysed_trial,
+                "analysed_model_type": r.analysed_model_type,
+                "artifacts_pruned": r.artifacts_pruned,
+                "created_at": r.created_at,
+            }
+            for r in session.exec(
+                select(AnalysisRevision)
+                .where(AnalysisRevision.snapshot_id == snapshot_id)
+                .order_by(col(AnalysisRevision.revision).desc())
+            ).all()
+        ]
+
+
+def get_revision(snapshot_id: str, revision: int, hydrate: bool = True) -> dict[str, Any] | None:
+    with session_scope() as session:
+        row = session.exec(
+            select(AnalysisRevision).where(
+                AnalysisRevision.snapshot_id == snapshot_id,
+                AnalysisRevision.revision == revision,
+            )
+        ).first()
+        if row is None:
+            return None
+        result = row.model_dump()
+        raw = json.loads(result.pop("payload_json") or "null")
+        result["payload"] = (
+            _hydrate(raw, Path(row.artifact_dir))
+            if hydrate and raw is not None and row.artifact_dir and not row.artifacts_pruned
+            else raw
+        )
+        return result
 
 
 def _hydrate(value: Any, directory: Path) -> Any:
@@ -420,6 +586,10 @@ def delete_for_run(optimization_id: str) -> None:
                 select(AnalysisArtifact).where(AnalysisArtifact.snapshot_id == snapshot_id)
             ).all():
                 session.delete(artifact_row)
+            for revision_row in session.exec(
+                select(AnalysisRevision).where(AnalysisRevision.snapshot_id == snapshot_id)
+            ).all():
+                session.delete(revision_row)
             snapshot_row = session.get(AnalysisSnapshot, snapshot_id)
             if snapshot_row is not None:
                 session.delete(snapshot_row)
