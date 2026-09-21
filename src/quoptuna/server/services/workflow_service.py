@@ -38,6 +38,24 @@ def study_best_trial(study):
     return study.best_trial
 
 
+def _training_budget(opt_result: Dict[str, Any]) -> Dict[str, Any]:
+    """Search-time knobs that are not part of ``trial.params``.
+
+    ``Optimizer.objective`` passes ``max_steps`` / ``convergence_interval`` /
+    ``dev_type`` to ``create_model`` alongside the sampled hyperparameters, but
+    Optuna only records what it sampled. Retraining a trial without them
+    rebuilds the JAX-trained models at their class-default training budget
+    rather than the one the search actually used, so replay them here. Omit
+    ``None`` so ``create_model`` keeps its own defaults.
+    """
+    budget = {
+        "max_steps": opt_result.get("max_steps"),
+        "convergence_interval": opt_result.get("convergence_interval"),
+        "dev_type": opt_result.get("dev_type"),
+    }
+    return {key: value for key, value in budget.items() if value is not None}
+
+
 def build_xai(
     opt_result: Dict[str, Any],
     trial_number: int | None = None,
@@ -72,7 +90,12 @@ def build_xai(
     task_spec = opt_result.get("task_spec")
     n_classes = int(task_spec["n_classes"]) if task_spec else 2
     params = {k: v for k, v in trial.params.items() if k != "model_type"}
-    model = create_model(trial.params["model_type"], n_classes=n_classes, **params)
+    model = create_model(
+        trial.params["model_type"],
+        n_classes=n_classes,
+        **_training_budget(opt_result),
+        **params,
+    )
 
     x_train_df = opt_result["x_train"]
     y_train_df = opt_result["y_train"]
@@ -659,6 +682,11 @@ class WorkflowExecutor:
             "x_columns": opt_config.get("x_columns"),
             "y_column": opt_config.get("y_column"),
             "task_spec": task_spec,
+            # Retraining a trial for analysis/deployment needs the same
+            # training budget the search used; these are not in trial.params.
+            "max_steps": opt_config.get("max_steps"),
+            "convergence_interval": opt_config.get("convergence_interval"),
+            "dev_type": opt_config.get("dev_type", "default.qubit"),
         }
 
     def _execute_shap_analysis(self, config: Dict, inputs: Dict) -> Dict:
@@ -697,7 +725,12 @@ class WorkflowExecutor:
         task_spec = opt_result.get("task_spec")
         n_classes = int(task_spec["n_classes"]) if task_spec else 2
         params = {k: v for k, v in best_trial.params.items() if k != "model_type"}
-        model = create_model(best_trial.params["model_type"], n_classes=n_classes, **params)
+        model = create_model(
+            best_trial.params["model_type"],
+            n_classes=n_classes,
+            **_training_budget(opt_result),
+            **params,
+        )
 
         # Convert to numpy for model fitting (as shown in notebooks)
         x_train_np = x_train_df.values if hasattr(x_train_df, "values") else x_train_df

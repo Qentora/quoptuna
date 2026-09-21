@@ -662,9 +662,20 @@ def build_context(  # noqa: C901, PLR0912, PLR0913, PLR0915
     }
     if best_trial["trial"] is None and ranked:
         best_trial["trial"] = ranked[0]["trial"]
-    analysed_trial = (snapshot.get("config") or {}).get("trial_number")
+    # The snapshot's analysed_model block is authoritative: it records the
+    # trial the analysis actually retrained, with "best" already resolved to a
+    # concrete number. Fall back to the request config for older snapshots
+    # written before that block existed.
+    analysed_model = (payload or {}).get("analysed_model") or {}
+    analysed_trial = analysed_model.get("trial_number")
+    if analysed_trial is None:
+        analysed_trial = (snapshot.get("config") or {}).get("trial_number")
     best_trial["analysed_trial"] = analysed_trial
     best_trial["analysed_is_best"] = analysed_trial is None or analysed_trial == best_trial["trial"]
+    best_trial["analysed_model_type"] = analysed_model.get("model_type")
+    best_trial["analysed_selected_by"] = analysed_model.get("selected_by")
+    best_trial["analysed_training_budget"] = analysed_model.get("training_budget") or {}
+    best_trial["analysis_revision"] = snapshot.get("revision")
 
     # ---- pareto front ---------------------------------------------------
     pareto: dict[str, Any] = {"present": False, "included": False}
@@ -1126,11 +1137,32 @@ def render_markdown(context: dict) -> str:  # noqa: C901, PLR0912, PLR0915
                 ("best_objective_f1", best.get("objective")),
                 ("analysed_trial", best.get("analysed_trial")),
                 ("analysed_trial_is_best", best.get("analysed_is_best")),
+                ("analysed_model_type", best.get("analysed_model_type")),
+                ("analysed_trial_selected_by", best.get("analysed_selected_by")),
+                ("analysis_revision", best.get("analysis_revision")),
                 ("trials_recorded", optimization.get("n_trials_recorded")),
                 ("trial_states", optimization.get("state_counts")),
             ]
         )
     )
+    analysed_type = best.get("analysed_model_type")
+    if analysed_type:
+        scope = (
+            "which is also the best trial of the search"
+            if best.get("analysed_is_best")
+            else f"which is NOT the best trial (best is #{best.get('trial')})"
+        )
+        budget = best.get("analysed_training_budget") or {}
+        budget_note = (
+            f" It was retrained with {', '.join(f'{k}={v}' for k, v in sorted(budget.items()))}."
+            if budget
+            else ""
+        )
+        parts.append(
+            f"All SHAP values, metrics, curves and fairness figures in this report "
+            f"describe a **{analysed_type}** model from trial "
+            f"**#{best.get('analysed_trial')}**, {scope}.{budget_note}"
+        )
     if best.get("params"):
         parts.append(
             _section(

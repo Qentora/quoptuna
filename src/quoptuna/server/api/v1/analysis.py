@@ -223,6 +223,51 @@ def _get_completed_result(optimization_id: str) -> dict:
     return result
 
 
+def _analysed_model(opt_result: dict, xai, trial_number: int | None) -> dict:
+    """Provenance for the model a snapshot explains.
+
+    ``trial_number`` is what the request asked for; ``None`` means "the study's
+    best trial", which ``build_xai`` resolved. Resolve it again here so the
+    stored record names a concrete trial rather than "best", which would drift
+    if the study is extended later.
+    """
+    from optuna import load_study
+
+    resolved = trial_number
+    params: dict = {}
+    try:
+        study = load_study(
+            storage=optuna_storage_url(str(opt_result.get("db_name") or DEFAULT_DB_NAME)),
+            study_name=opt_result.get("study_name"),
+        )
+        if resolved is None:
+            trial = study_best_trial(study)
+        else:
+            trial = next((t for t in study.trials if t.number == resolved), None)
+        if trial is not None:
+            resolved = trial.number
+            params = dict(trial.params)
+    except Exception:  # provenance must never fail a completed analysis
+        logger.warning("Could not resolve analysed trial for provenance", exc_info=True)
+
+    budget = {
+        "max_steps": opt_result.get("max_steps"),
+        "convergence_interval": opt_result.get("convergence_interval"),
+        "dev_type": opt_result.get("dev_type"),
+    }
+    return {
+        "trial_number": resolved,
+        "requested_trial": trial_number,
+        "selected_by": "best_trial" if trial_number is None else "explicit",
+        "best_trial_number": opt_result.get("best_trial_number"),
+        "is_best_trial": resolved is not None and resolved == opt_result.get("best_trial_number"),
+        "model_type": params.get("model_type"),
+        "params": {k: v for k, v in params.items() if k != "model_type"},
+        "training_budget": {k: v for k, v in budget.items() if v is not None},
+        "retrained_at": datetime.now().isoformat(),
+    }
+
+
 def _figure_to_data_url(fig) -> str:
     import matplotlib.pyplot as plt
 
@@ -601,6 +646,10 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
             "task_type": metrics.get("task_type"),
             "class_labels": metrics.get("class_labels"),
             "warnings": warnings,
+            # Which model this snapshot actually explains. Recorded at
+            # analysis time so a stored snapshot (and any report built from
+            # it) stays attributable after the study or request changes.
+            "analysed_model": _analysed_model(opt_result, shared_xai, trial),
         }
         analysis_store.complete_job(job_id, payload)
     except Exception as exc:
@@ -645,6 +694,22 @@ async def get_analysis_snapshot(snapshot_id: str):
     if not snapshot or snapshot["revision"] < 1:
         raise HTTPException(status_code=404, detail="Completed analysis snapshot not found")
     return snapshot
+
+
+@router.get("/snapshots/{snapshot_id}/revisions")
+async def list_analysis_revisions(snapshot_id: str):
+    """Analysis history for a snapshot, newest first."""
+    if analysis_store.get_snapshot(snapshot_id, hydrate=False) is None:
+        raise HTTPException(status_code=404, detail="Analysis snapshot not found")
+    return {"revisions": analysis_store.list_revisions(snapshot_id)}
+
+
+@router.get("/snapshots/{snapshot_id}/revisions/{revision}")
+async def get_analysis_revision(snapshot_id: str, revision: int):
+    found = analysis_store.get_revision(snapshot_id, revision)
+    if found is None:
+        raise HTTPException(status_code=404, detail="Analysis revision not found")
+    return found
 
 
 @router.get("/snapshots/{snapshot_id}/artifacts/{filename}")
@@ -1529,10 +1594,21 @@ async def generate_ai_report(request: ReportRequest):
         raise HTTPException(status_code=400, detail="An LLM api_key is required")
 
     snapshot = _completed_snapshot(request.analysis_snapshot_id, request.optimization_id)
-    if snapshot["revision"] != request.analysis_revision:
+    if snapshot["revision"] < request.analysis_revision:
+        # The client claims a revision the server never produced.
         raise HTTPException(
             status_code=409,
             detail="The analysis snapshot changed; reload it before generating the report",
+        )
+    if snapshot["revision"] != request.analysis_revision:
+        # A newer analysis completed after the client loaded the page. Report
+        # against the latest rather than a stale revision; the report records
+        # the revision it used so the output stays attributable.
+        logger.info(
+            "Report for %s requested revision %s; using latest revision %s",
+            request.analysis_snapshot_id,
+            request.analysis_revision,
+            snapshot["revision"],
         )
     payload = snapshot.get("payload") or {}
     if not payload.get("metrics"):

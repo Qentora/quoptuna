@@ -14,6 +14,7 @@ from quoptuna.server.services.models import (
     AnalysisArtifact,
     AnalysisJob,
     AnalysisReport,
+    AnalysisRevision,
     AnalysisSnapshot,
     Dataset,
     Run,
@@ -26,6 +27,7 @@ APPLICATION_MODELS = (
     AnalysisJob,
     AnalysisReport,
     AnalysisArtifact,
+    AnalysisRevision,
 )
 
 

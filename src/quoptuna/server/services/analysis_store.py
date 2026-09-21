@@ -19,6 +19,7 @@ from quoptuna.server.services.models import (
     AnalysisArtifact,
     AnalysisJob,
     AnalysisReport,
+    AnalysisRevision,
     AnalysisSnapshot,
 )
 
@@ -283,16 +284,98 @@ def complete_job(job_id: str, payload: dict[str, Any]) -> dict[str, Any]:
             analysis_job.status = "completed"
             analysis_job.current_section = "complete"
             analysis_job.completed_at = _now()
+            analysed = (stored_payload or {}).get("analysed_model") or {}
+            session.add(
+                AnalysisRevision(
+                    id=str(uuid.uuid4()),
+                    snapshot_id=job["snapshot_id"],
+                    optimization_id=job["optimization_id"],
+                    revision=revision,
+                    job_id=job_id,
+                    payload_json=json.dumps(stored_payload),
+                    artifact_dir=str(final_dir),
+                    analysed_trial=_opt_int(analysed.get("trial_number")),
+                    analysed_model_type=analysed.get("model_type"),
+                    created_at=_now(),
+                )
+            )
             session.add(snapshot)
             session.add(analysis_job)
             session.commit()
-        for old in final_dir.parent.iterdir():
-            if old != final_dir and old.is_dir():
-                shutil.rmtree(old, ignore_errors=True)
+        _prune_history(job["snapshot_id"], final_dir)
     except Exception:
         shutil.rmtree(temp_dir, ignore_errors=True)
         raise
     return {"snapshot_id": job["snapshot_id"], "revision": revision}
+
+
+def _prune_history(snapshot_id: str, keep_dir: Path) -> None:
+    """Drop artifact directories beyond ``ANALYSIS_HISTORY_LIMIT``.
+
+    History rows are kept regardless; only the on-disk figures are removed,
+    and the row is flagged so the UI can show the revision as metadata-only.
+    The current revision's directory is never pruned.
+    """
+    limit = int(settings.ANALYSIS_HISTORY_LIMIT)
+    if limit <= 0:
+        return
+    with session_scope() as session:
+        rows = session.exec(
+            select(AnalysisRevision)
+            .where(AnalysisRevision.snapshot_id == snapshot_id)
+            .order_by(col(AnalysisRevision.revision).desc())
+        ).all()
+        for row in rows[limit:]:
+            if row.artifacts_pruned or not row.artifact_dir:
+                continue
+            directory = Path(row.artifact_dir)
+            if directory != keep_dir and directory.exists():
+                shutil.rmtree(directory, ignore_errors=True)
+            row.artifacts_pruned = True
+            session.add(row)
+        session.commit()
+
+
+def list_revisions(snapshot_id: str) -> list[dict[str, Any]]:
+    """Completed analysis revisions for a snapshot, newest first."""
+    with session_scope() as session:
+        return [
+            {
+                "id": r.id,
+                "snapshot_id": r.snapshot_id,
+                "optimization_id": r.optimization_id,
+                "revision": r.revision,
+                "analysed_trial": r.analysed_trial,
+                "analysed_model_type": r.analysed_model_type,
+                "artifacts_pruned": r.artifacts_pruned,
+                "created_at": r.created_at,
+            }
+            for r in session.exec(
+                select(AnalysisRevision)
+                .where(AnalysisRevision.snapshot_id == snapshot_id)
+                .order_by(col(AnalysisRevision.revision).desc())
+            ).all()
+        ]
+
+
+def get_revision(snapshot_id: str, revision: int, hydrate: bool = True) -> dict[str, Any] | None:
+    with session_scope() as session:
+        row = session.exec(
+            select(AnalysisRevision).where(
+                AnalysisRevision.snapshot_id == snapshot_id,
+                AnalysisRevision.revision == revision,
+            )
+        ).first()
+        if row is None:
+            return None
+        result = row.model_dump()
+        raw = json.loads(result.pop("payload_json") or "null")
+        result["payload"] = (
+            _hydrate(raw, Path(row.artifact_dir))
+            if hydrate and raw is not None and row.artifact_dir and not row.artifacts_pruned
+            else raw
+        )
+        return result
 
 
 def _hydrate(value: Any, directory: Path) -> Any:
@@ -429,6 +512,10 @@ def delete_for_run(optimization_id: str) -> None:
                 select(AnalysisArtifact).where(AnalysisArtifact.snapshot_id == snapshot_id)
             ).all():
                 session.delete(artifact_row)
+            for revision_row in session.exec(
+                select(AnalysisRevision).where(AnalysisRevision.snapshot_id == snapshot_id)
+            ).all():
+                session.delete(revision_row)
             snapshot_row = session.get(AnalysisSnapshot, snapshot_id)
             if snapshot_row is not None:
                 session.delete(snapshot_row)

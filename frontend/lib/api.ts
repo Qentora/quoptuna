@@ -701,6 +701,21 @@ export interface AnalysisSnapshotPayload {
   importance_data: FeatureImportanceData | null;
   shap_data: ShapData | null;
   warnings: Record<string, string>;
+  /** Which trained model this analysis explains. Absent on snapshots
+   *  written before provenance was recorded. */
+  analysed_model?: AnalysedModel | null;
+}
+
+export interface AnalysedModel {
+  trial_number: number | null;
+  requested_trial: number | null;
+  selected_by: 'best_trial' | 'explicit';
+  best_trial_number: number | null;
+  is_best_trial: boolean;
+  model_type: string | null;
+  params: Record<string, any>;
+  training_budget: Record<string, number | string>;
+  retrained_at: string;
 }
 
 export interface AnalysisSnapshotSummary {
@@ -713,6 +728,24 @@ export interface AnalysisSnapshotSummary {
 
 export interface AnalysisSnapshot extends AnalysisSnapshotSummary {
   payload: AnalysisSnapshotPayload;
+}
+
+/** One completed analysis run. Older entries keep their metadata after
+ *  their figures are pruned; `artifacts_pruned` says which. */
+export interface AnalysisRevisionSummary {
+  id: string;
+  snapshot_id: string;
+  optimization_id: string;
+  revision: number;
+  analysed_trial: number | null;
+  analysed_model_type: string | null;
+  artifacts_pruned: boolean;
+  created_at: string;
+}
+
+export interface AnalysisRevision extends AnalysisRevisionSummary {
+  payload: AnalysisSnapshotPayload | null;
+  artifact_dir: string | null;
 }
 
 export interface AnalysisJob {
@@ -754,6 +787,25 @@ export async function listAnalysisSnapshots(
     `/api/v1/analysis/snapshots?optimization_id=${encodeURIComponent(optimizationId)}`
   );
   return result.snapshots;
+}
+
+/** Completed analyses for a snapshot, newest first. */
+export async function listAnalysisRevisions(
+  snapshotId: string
+): Promise<AnalysisRevisionSummary[]> {
+  const result = await request<{ revisions: AnalysisRevisionSummary[] }>(
+    `/api/v1/analysis/snapshots/${snapshotId}/revisions`
+  );
+  return result.revisions;
+}
+
+export async function getAnalysisRevision(
+  snapshotId: string,
+  revision: number
+): Promise<AnalysisRevision> {
+  return request<AnalysisRevision>(
+    `/api/v1/analysis/snapshots/${snapshotId}/revisions/${revision}`
+  );
 }
 
 export interface PersistedReport {

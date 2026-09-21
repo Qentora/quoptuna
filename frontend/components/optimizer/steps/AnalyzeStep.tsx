@@ -22,6 +22,7 @@ import { Label } from '@/components/ui/label';
 import { Metric } from '@/components/ui/metric';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
+  type AnalysedModel,
   type AnalysisSnapshot,
   type ConfusionMatrixData,
   type CurvesData,
@@ -113,6 +114,8 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
   const [shapClassIndex, setShapClassIndex] = useState(
     workflowData.analysis.config?.classIndex ?? 0
   );
+  // Which trained model the displayed results actually explain.
+  const [analysedModel, setAnalysedModel] = useState<AnalysedModel | null>(null);
 
   const applySnapshot = useCallback(
     (snapshot: AnalysisSnapshot) => {
@@ -121,6 +124,7 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
       setConfusionData(payload.confusion_data);
       setImportanceData(payload.importance_data);
       setShapData(payload.shap_data);
+      setAnalysedModel(payload.analysed_model ?? null);
       setWorkflowData((prev) => ({
         ...prev,
         report: { markdown: null },
@@ -310,7 +314,18 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
       <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="text-sm text-muted-foreground">
           Analyzing trial{' '}
-          <span className="font-medium text-brand">#{optimization.selectedTrial ?? 'best'}</span>
+          <span className="font-medium text-brand">
+            #{analysedModel?.trial_number ?? optimization.selectedTrial ?? 'best'}
+          </span>
+          {analysedModel?.model_type && (
+            <>
+              {' · '}
+              <span className="font-medium text-foreground">{analysedModel.model_type}</span>
+              {!analysedModel.is_best_trial && (
+                <span className="text-accent-amber-foreground"> (not the best trial)</span>
+              )}
+            </>
+          )}
           {optimization.bestValue !== null && (
             <>
               {' · '}best F1{' '}
