@@ -53,6 +53,7 @@ import remarkGfm from 'remark-gfm';
 import { ErrorBanner } from '../NavButtons';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
+import { RevisionBadge, formatTimestamp } from '../revisions';
 
 type Provider = 'google' | 'openai' | 'anthropic';
 
@@ -90,6 +91,7 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
   const [tab, setTab] = useState<ReportTab>('report');
   // Id of a report opened from History; null shows the current one.
   const [viewingId, setViewingId] = useState<string | null>(null);
+  const [liveReportRevision, setLiveReportRevision] = useState<number | null>(null);
   // Read once per generation so a mid-run Settings change can't half-apply.
   const [reportSettings, setReportSettings] = useState(loadReportSettings);
 
@@ -119,6 +121,10 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
   const effectiveModel = modelName === '__custom__' ? customModel.trim() : modelName;
   // The report being read: an entry opened from History, else the current one.
   const viewing = viewingId ? history.find((item) => item.id === viewingId) : undefined;
+  // Which analysis revision the live report was grounded in. Taken from the
+  // server response rather than assumed: the report endpoint falls back to the
+  // latest revision when a newer analysis landed while this page was open.
+  const reportRevision = viewing?.snapshot_revision ?? liveReportRevision;
   const shownMarkdown = viewing?.markdown ?? (hasReport ? report.markdown : null);
 
   const refreshHistory = useCallback(async (): Promise<PersistedReport[]> => {
@@ -142,6 +148,7 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
         );
         if (latest?.markdown) {
           setWorkflowData((prev) => ({ ...prev, report: { markdown: latest.markdown } }));
+          setLiveReportRevision(latest.snapshot_revision);
         }
       })
       .catch(() => undefined);
@@ -198,6 +205,7 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
           ? result.report_markdown
           : JSON.stringify(result.report_markdown);
       setWorkflowData((prev) => ({ ...prev, report: { markdown } }));
+      setLiveReportRevision(result.analysis_revision ?? analysis.snapshotRevision);
       setDiagnostics(result);
       // Pull the new row in so the superseded report stays reachable.
       void refreshHistory();
@@ -349,6 +357,24 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
                       >
                         Back to latest
                       </Button>
+                    </div>
+                  )}
+                  {/* The live report carries its provenance too, so the analysis it
+                      was written from is never guessed from the screen's contents. */}
+                  {!viewing && shownMarkdown && !isGenerating && reportRevision !== null && (
+                    <div className="mb-4 flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
+                      <span>Grounded in analysis</span>
+                      <RevisionBadge
+                        revision={reportRevision}
+                        current={analysis.snapshotRevision}
+                      />
+                      {analysis.snapshotRevision !== null &&
+                        reportRevision !== analysis.snapshotRevision && (
+                          <span className="text-amber-600 dark:text-amber-500">
+                            The analysis now loaded is rev {analysis.snapshotRevision} — regenerate
+                            to report against it.
+                          </span>
+                        )}
                     </div>
                   )}
                   {/* Generation takes precedence over the previous report: stale prose
@@ -668,29 +694,6 @@ function GeneratingReport({
 }
 
 /**
- * Marks which analysis revision a report was grounded in.
- *
- * This is the point of the history: two reports about the same trial can
- * legitimately disagree because they read different evidence — for example one
- * written before the fairness audit was computed and one after.
- */
-function RevisionBadge({ revision, current }: { revision: number; current: number | null }) {
-  const isCurrent = revision === current;
-  return (
-    <Badge
-      variant={isCurrent ? 'secondary' : 'outline'}
-      title={
-        isCurrent
-          ? 'Grounded in the analysis revision currently loaded'
-          : 'Grounded in an earlier analysis revision, so its evidence differed'
-      }
-    >
-      rev {revision}
-    </Badge>
-  );
-}
-
-/**
  * Every report persisted for this trial's analysis snapshot, newest first.
  *
  * An aligned table rather than a stack of expanders: the columns are what make
@@ -806,12 +809,6 @@ function ReportHistoryTable({
       </div>
     </div>
   );
-}
-
-/** ISO timestamp -> locale string, falling back to the raw value. */
-function formatTimestamp(value: string): string {
-  const parsed = new Date(value);
-  return Number.isNaN(parsed.getTime()) ? value : parsed.toLocaleString();
 }
 
 function ReportDiagnostics({ result }: { result: ReportResponse }) {

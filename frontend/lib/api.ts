@@ -579,6 +579,9 @@ export interface ReportResponse {
   report_id?: string;
   status: string;
   report_markdown: string;
+  /** Analysis revision the report was grounded in. May be newer than the one
+   *  requested when an analysis completed while the page was open. */
+  analysis_revision?: number;
   /** Figure ids the report actually references (resolve to `figures/<id>.png`). */
   referenced_figures?: string[];
   /** Figure ids the agent invented; removed before the report was saved. */

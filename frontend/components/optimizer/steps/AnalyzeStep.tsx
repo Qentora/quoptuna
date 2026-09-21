@@ -23,19 +23,23 @@ import { Metric } from '@/components/ui/metric';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import {
   type AnalysedModel,
+  type AnalysisRevisionSummary,
   type AnalysisSnapshot,
+  type AnalysisSnapshotPayload,
   type ConfusionMatrixData,
   type CurvesData,
   type FeatureImportanceData,
   type ShapData,
   getAnalysisJob,
+  getAnalysisRevision,
   getAnalysisSnapshot,
+  listAnalysisRevisions,
   listAnalysisSnapshots,
   startAnalysisJob,
   updateSnapshotFairness,
 } from '@/lib/api';
 import { cn } from '@/lib/utils';
-import { BarChart3, Download, Loader2, Scale } from 'lucide-react';
+import { BarChart3, Download, History, Loader2, Scale } from 'lucide-react';
 import { Fragment, useCallback, useEffect, useState } from 'react';
 import {
   Bar,
@@ -54,6 +58,7 @@ import { ErrorBanner } from '../NavButtons';
 import { PlotSkeleton, PlotlyFigure } from '../PlotlyFigure';
 import { StepHeader } from '../Wizard';
 import type { StepProps } from '../Wizard';
+import { AnalysisHistoryTable, RevisionBadge, formatTimestamp } from '../revisions';
 import type { FairnessMetrics, WorkflowData } from '../types';
 
 const STUDY_PLOTS: Array<{ id: string; label: string; wide?: boolean }> = [
@@ -174,10 +179,16 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
   const [analysedModel, setAnalysedModel] = useState<AnalysedModel | null>(null);
   // Which section the background job is on, for the progress label.
   const [currentSection, setCurrentSection] = useState<string | null>(null);
+  // Every completed analysis of this snapshot, newest first.
+  const [revisions, setRevisions] = useState<AnalysisRevisionSummary[]>([]);
+  // Non-null while an older revision is on screen instead of the latest.
+  const [viewingRevision, setViewingRevision] = useState<number | null>(null);
+  const [loadingRevision, setLoadingRevision] = useState<number | null>(null);
 
   const applySnapshot = useCallback(
     (snapshot: AnalysisSnapshot) => {
       const payload = snapshot.payload;
+      setViewingRevision(null);
       setCurvesData(payload.curves_data);
       setConfusionData(payload.confusion_data);
       setImportanceData(payload.importance_data);
@@ -210,6 +221,78 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
     },
     [setWorkflowData]
   );
+
+  const refreshRevisions = useCallback(async (snapshotId: string | null) => {
+    if (!snapshotId) {
+      setRevisions([]);
+      return;
+    }
+    setRevisions(await listAnalysisRevisions(snapshotId).catch(() => []));
+  }, []);
+
+  useEffect(() => {
+    void refreshRevisions(analysis.snapshotId);
+  }, [analysis.snapshotId, refreshRevisions]);
+
+  /**
+   * Put an earlier revision of this snapshot on screen.
+   *
+   * `snapshotId` and the analysis config are unchanged by definition — a
+   * snapshot is keyed by its config — so only the evidence is swapped. The
+   * report step still generates against the latest revision; the server
+   * enforces that and labels the report with the revision it used.
+   */
+  const viewRevision = useCallback(
+    async (revision: number) => {
+      const snapshotId = analysis.snapshotId;
+      if (!snapshotId) return;
+      setLoadingRevision(revision);
+      setError(null);
+      try {
+        const found = await getAnalysisRevision(snapshotId, revision);
+        const payload = found.payload as AnalysisSnapshotPayload | null;
+        if (!payload) throw new Error(`Revision ${revision} kept no payload`);
+        setCurvesData(payload.curves_data);
+        setConfusionData(payload.confusion_data);
+        setImportanceData(payload.importance_data);
+        setShapData(payload.shap_data);
+        setAnalysedModel(payload.analysed_model ?? null);
+        setWorkflowData((prev) => ({
+          ...prev,
+          analysis: {
+            ...prev.analysis,
+            status: 'completed',
+            featureImportance: payload.feature_importance,
+            plots: payload.plots ?? {},
+            studyPlots: payload.study_plots,
+            metrics: payload.metrics,
+            confusionMatrixPlot: payload.confusion_matrix_plot,
+            rocAuc: payload.roc_auc,
+            averagePrecision: payload.average_precision,
+            fairness: payload.fairness,
+          },
+        }));
+        setViewingRevision(revision);
+      } catch (err) {
+        setError(err instanceof Error ? err.message : 'Could not load that analysis revision');
+      } finally {
+        setLoadingRevision(null);
+      }
+    },
+    [analysis.snapshotId, setWorkflowData]
+  );
+
+  const backToLatest = useCallback(async () => {
+    if (!analysis.snapshotId) return;
+    setLoadingRevision(-1);
+    try {
+      applySnapshot(await getAnalysisSnapshot(analysis.snapshotId));
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Could not reload the latest analysis');
+    } finally {
+      setLoadingRevision(null);
+    }
+  }, [analysis.snapshotId, applySnapshot]);
 
   // Restore persisted data only; this effect never starts computation.
   useEffect(() => {
@@ -321,6 +404,8 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
       setCurrentSection(null);
       if (job.status === 'failed') throw new Error(job.error || 'Analysis failed');
       applySnapshot(await getAnalysisSnapshot(started.snapshot_id));
+      // A run always adds a revision; pull it in so the history shows this one.
+      void refreshRevisions(started.snapshot_id);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed');
     } finally {
@@ -345,6 +430,7 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
           snapshotRevision: result.revision,
         },
       }));
+      void refreshRevisions(analysis.snapshotId);
     } catch (err) {
       setFairnessError(err instanceof Error ? err.message : 'Fairness audit failed');
     } finally {
@@ -369,6 +455,7 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
           snapshotRevision: result.revision,
         },
       }));
+      void refreshRevisions(analysis.snapshotId);
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Mitigation failed');
     } finally {
@@ -385,6 +472,10 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
     !!curvesData?.roc || !!curvesData?.pr || !!analysis.plots.rocCurve || !!analysis.plots.prCurve;
 
   const rocAuc = analysis.rocAuc ?? (metrics.roc_auc_score as number | undefined) ?? null;
+
+  const latestRevision = revisions[0]?.revision ?? null;
+  const shownRevision = viewingRevision ?? analysis.snapshotRevision;
+  const shownRevisionRow = revisions.find((item) => item.revision === shownRevision);
 
   return (
     <div className="flex flex-col gap-4">
@@ -418,6 +509,20 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
             </>
           )}
         </p>
+        {/* Re-running at the same settings is deterministic, so identical numbers
+            prove nothing. The revision and its timestamp are what say whether the
+            results on screen came from the latest run. */}
+        {shownRevision !== null && analysis.status === 'completed' && (
+          <p className="flex flex-wrap items-center gap-2 text-muted-foreground text-sm">
+            <RevisionBadge
+              revision={shownRevision}
+              current={latestRevision ?? analysis.snapshotRevision}
+            />
+            {shownRevisionRow && (
+              <span>analysed {formatTimestamp(shownRevisionRow.created_at)}</span>
+            )}
+          </p>
+        )}
         <Button type="button" size="sm" onClick={runAnalysis} disabled={isGenerating}>
           {isGenerating ? (
             <Loader2 className="h-4 w-4 animate-spin" />
@@ -431,6 +536,31 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
       {isGenerating && <AnalysisProgress section={currentSection} />}
 
       <ErrorBanner message={error} />
+
+      {/* An older revision on screen is labelled, so it is never mistaken for
+          the current one — the same guarantee the report history gives. */}
+      {viewingRevision !== null && (
+        <div className="flex flex-wrap items-center gap-2 rounded-md border border-border bg-muted/50 px-3 py-2 text-sm">
+          <History className="h-4 w-4 shrink-0 text-muted-foreground" />
+          <span>
+            Viewing analysis <span className="font-medium">rev {viewingRevision}</span>
+            {latestRevision !== null && latestRevision !== viewingRevision && (
+              <> — the latest is rev {latestRevision}</>
+            )}
+          </span>
+          <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            className="ml-auto"
+            disabled={loadingRevision !== null}
+            onClick={() => void backToLatest()}
+          >
+            {loadingRevision === -1 && <Loader2 className="h-4 w-4 animate-spin" />}
+            Back to latest
+          </Button>
+        </div>
+      )}
 
       <details className="rounded-lg border border-border bg-card">
         <summary className="cursor-pointer px-4 py-3 text-sm font-semibold">
@@ -863,6 +993,28 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
         <div className="py-16">
           <EmptyState message="Run the analysis to see metrics and plots." />
         </div>
+      )}
+
+      {revisions.length > 0 && (
+        <Card>
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <History className="h-4 w-4" /> Analysis history
+            </CardTitle>
+            <CardDescription>
+              Every completed analysis of this trial at these settings, newest first.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <AnalysisHistoryTable
+              revisions={revisions}
+              currentRevision={latestRevision}
+              viewingRevision={shownRevision}
+              busyRevision={loadingRevision}
+              onView={(revision) => void viewRevision(revision)}
+            />
+          </CardContent>
+        </Card>
       )}
     </div>
   );

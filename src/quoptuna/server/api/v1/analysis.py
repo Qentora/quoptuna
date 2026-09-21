@@ -1740,6 +1740,10 @@ async def generate_ai_report(request: ReportRequest):
             "report_id": report_id,
             "status": "completed",
             "report_markdown": markdown,
+            # The revision the report was actually grounded in, which is not
+            # always the one requested: a newer analysis completing mid-session
+            # is used instead (see above). The UI labels the report with this.
+            "analysis_revision": snapshot["revision"],
             # Diagnostics the UI surfaces: which figures the report actually
             # references, what was dropped as invented, and residual markdown
             # issues the normalizer could not repair.

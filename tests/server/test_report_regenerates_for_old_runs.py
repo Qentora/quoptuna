@@ -164,3 +164,51 @@ def test_a_missing_fairness_audit_is_declared_rather_than_implied(existing_run, 
         "protected attribute" in note and "no audit is stored" in note
         for note in context["omissions"]
     )
+
+
+def regenerate_response(snapshot, monkeypatch, requested_revision: int | None = None) -> dict:
+    async def fake_generate_report(**kwargs):
+        return {"markdown": "# Regenerated", "lint": [], "reviewed": True}
+
+    monkeypatch.setattr(report_agent, "generate_report", fake_generate_report)
+    return asyncio.run(
+        analysis.generate_ai_report(
+            analysis.ReportRequest(
+                optimization_id="opt_old",
+                analysis_snapshot_id=snapshot["id"],
+                analysis_revision=(
+                    snapshot["revision"] if requested_revision is None else requested_revision
+                ),
+                api_key="k",
+                llm_provider="openai",
+                model_name="m",
+            )
+        )
+    )
+
+
+def test_report_states_which_analysis_revision_it_used(existing_run, monkeypatch):
+    """The UI labels the report with this; it must not have to guess."""
+    response = regenerate_response(existing_run, monkeypatch)
+    assert response["analysis_revision"] == existing_run["revision"]
+
+
+def test_a_superseded_request_is_labelled_with_the_revision_actually_used(
+    existing_run, monkeypatch
+):
+    """An analysis completing mid-session is reported against, not the stale one.
+
+    The client asks for the revision it loaded; the endpoint silently uses the
+    newer one. Labelling the response with the requested revision would
+    misattribute the report's evidence.
+    """
+    stale = existing_run["revision"]
+    job = analysis_store.create_job("opt_old", {"trial_number": None})
+    analysis_store.complete_job(
+        job["id"], {"metrics": {"f1_score": 0.91, "accuracy": 0.93}, "plots": {}, "warnings": {}}
+    )
+    current = analysis_store.get_snapshot(job["snapshot_id"])["revision"]
+    assert current > stale, "test is vacuous without a newer revision"
+
+    response = regenerate_response(existing_run, monkeypatch, requested_revision=stale)
+    assert response["analysis_revision"] == current
