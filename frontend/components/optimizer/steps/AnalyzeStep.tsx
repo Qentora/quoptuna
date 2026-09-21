@@ -73,6 +73,62 @@ function downloadDataUrl(dataUrl: string, filename: string) {
   document.body.removeChild(a);
 }
 
+/** Backend `current_section` values rendered as progress text. */
+/** The job's sections in execution order, as `current_section` reports them.
+ *  `fairness` shares the final group with `study_plots`, so it is not a
+ *  separate step here. */
+const ANALYSIS_STEPS: { id: string; label: string }[] = [
+  { id: 'preparing', label: 'Preparing data' },
+  // Refitting the chosen trial. On a variational quantum model this is the
+  // longest step of the analysis; on a kernel model it is near-instant.
+  { id: 'training', label: 'Training model' },
+  { id: 'shap', label: 'Computing SHAP' },
+  { id: 'derived', label: 'Curves & plots' },
+  { id: 'study_plots', label: 'Study plots' },
+];
+
+function AnalysisProgress({ section }: { section: string | null }) {
+  // `fairness` runs in the same group as study plots; show it as that step.
+  const normalized = section === 'fairness' ? 'study_plots' : section;
+  const activeIndex = ANALYSIS_STEPS.findIndex((step) => step.id === normalized);
+  const current = ANALYSIS_STEPS[activeIndex];
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border bg-card px-4 py-3">
+      <div className="flex items-center gap-2 text-sm">
+        <Loader2 className="h-3.5 w-3.5 animate-spin text-brand" />
+        <span className="font-medium text-foreground">
+          {current ? current.label : 'Starting analysis'}
+        </span>
+        {activeIndex >= 0 && (
+          <span className="text-xs text-muted-foreground">
+            step {activeIndex + 1} of {ANALYSIS_STEPS.length}
+          </span>
+        )}
+      </div>
+      <div className="flex gap-1" aria-hidden="true">
+        {ANALYSIS_STEPS.map((step, index) => (
+          <div
+            key={step.id}
+            className={`h-1 flex-1 rounded-full ${
+              activeIndex >= 0 && index < activeIndex
+                ? 'bg-brand'
+                : index === activeIndex
+                  ? 'animate-pulse bg-brand'
+                  : 'bg-muted'
+            }`}
+          />
+        ))}
+      </div>
+      {normalized === 'training' && (
+        <p className="text-xs text-muted-foreground">
+          Refitting the trial's model. Variational quantum models can take a while.
+        </p>
+      )}
+    </div>
+  );
+}
+
 const fmt = (v: unknown) =>
   typeof v === 'number' ? v.toFixed(4) : v === null || v === undefined ? '—' : String(v);
 
@@ -116,6 +172,8 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
   );
   // Which trained model the displayed results actually explain.
   const [analysedModel, setAnalysedModel] = useState<AnalysedModel | null>(null);
+  // Which section the background job is on, for the progress label.
+  const [currentSection, setCurrentSection] = useState<string | null>(null);
 
   const applySnapshot = useCallback(
     (snapshot: AnalysisSnapshot) => {
@@ -229,19 +287,44 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
         analysis: { ...prev.analysis, snapshotId: started.snapshot_id, status: 'pending' },
       }));
       let job = started;
+      let shownPartial = false;
+      let polls = 0;
       while (job.status === 'pending' || job.status === 'running') {
-        await new Promise((resolve) => setTimeout(resolve, 1000));
+        // Poll quickly at first: data prep and a kernel-model fit can both
+        // finish inside a second, and a flat 1s interval skips straight to
+        // SHAP without ever showing them.
+        polls += 1;
+        await new Promise((resolve) => setTimeout(resolve, polls <= 6 ? 250 : 1000));
         job = await getAnalysisJob(started.id);
+        setCurrentSection(job.current_section ?? null);
+        // Render SHAP and metrics as soon as the job publishes them rather
+        // than waiting for the derived sections to finish.
+        if (!shownPartial && job.partial) {
+          shownPartial = true;
+          const partial = job.partial;
+          setWorkflowData((prev) => ({
+            ...prev,
+            analysis: {
+              ...prev.analysis,
+              featureImportance: partial.feature_importance ?? null,
+              plots: partial.plots ?? {},
+              metrics: partial.metrics ?? null,
+              confusionMatrixPlot: partial.confusion_matrix_plot ?? null,
+            },
+          }));
+        }
         setWorkflowData((prev) => ({
           ...prev,
           analysis: { ...prev.analysis, status: job.status },
         }));
       }
+      setCurrentSection(null);
       if (job.status === 'failed') throw new Error(job.error || 'Analysis failed');
       applySnapshot(await getAnalysisSnapshot(started.snapshot_id));
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Analysis failed');
     } finally {
+      setCurrentSection(null);
       setIsGenerating(false);
     }
   };
@@ -341,9 +424,11 @@ export function AnalyzeStep({ workflowData, setWorkflowData, setFooter }: StepPr
           ) : (
             <BarChart3 className="h-4 w-4" />
           )}
-          {hasSHAP ? 'Re-run analysis' : 'Run analysis'}
+          {isGenerating ? 'Analyzing…' : hasSHAP ? 'Re-run analysis' : 'Run analysis'}
         </Button>
       </div>
+
+      {isGenerating && <AnalysisProgress section={currentSection} />}
 
       <ErrorBanner message={error} />
 

@@ -2,6 +2,7 @@
 Analysis endpoints (SHAP, metrics, AI reports).
 """
 
+import asyncio
 import base64
 import io
 import logging
@@ -266,6 +267,26 @@ def _analysed_model(opt_result: dict, xai, trial_number: int | None) -> dict:
         "training_budget": {k: v for k, v in budget.items() if v is not None},
         "retrained_at": datetime.now().isoformat(),
     }
+
+
+def _warm_xai_caches(xai, use_proba: bool) -> None:
+    """Populate the lazy caches the parallel sections read.
+
+    ``XAI.shap_values`` / ``predictions`` / ``predictions_proba`` memoise into
+    unguarded attributes. Computing them once up front makes the later
+    concurrent readers side-effect free. Each is best-effort: a model without
+    ``predict_proba`` must not fail the whole analysis here, because the
+    sections that need it already degrade on their own.
+    """
+    for label, get in (
+        ("shap_values", lambda: xai.shap_values),
+        ("predictions", lambda: xai.predictions),
+        *((("predictions_proba", lambda: xai.predictions_proba),) if use_proba else ()),
+    ):
+        try:
+            get()
+        except Exception:
+            logger.debug("Could not pre-compute %s; sections will handle it", label)
 
 
 def _figure_to_data_url(fig) -> str:
@@ -579,10 +600,44 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
             logger.warning("Analysis section %s failed: %s", section, detail)
             return None
 
+    async def gather_optional(section: str, calls: dict[str, Any]) -> dict[str, Any]:
+        """Run independent sections concurrently, recording failures per name.
+
+        Safe only once the shared ``XAI``'s lazy caches are warm: the section
+        coroutines read ``shap_values`` / ``predictions*`` off one instance and
+        those properties are not synchronised, so racing them would recompute
+        (or interleave) the same work. ``_warm_xai_caches`` populates them
+        first, leaving these calls as pure readers.
+
+        The coroutines are async but CPU-bound, so this overlaps their awaits
+        rather than their compute; it is ordering, not true parallelism. It
+        still removes the serialised section-by-section stalls and keeps one
+        failure from cancelling its siblings.
+        """
+        analysis_store.update_job(job_id, current_section=section)
+        names = list(calls)
+        settled = await asyncio.gather(*(calls[name] for name in names), return_exceptions=True)
+        results: dict[str, Any] = {}
+        for name, outcome in zip(names, settled, strict=True):
+            if isinstance(outcome, BaseException):
+                detail = outcome.detail if isinstance(outcome, HTTPException) else str(outcome)
+                warnings[name] = str(detail)
+                logger.warning("Analysis section %s failed: %s", name, detail)
+                results[name] = None
+            else:
+                results[name] = outcome
+        return results
+
     token = None
     try:
-        analysis_store.update_job(job_id, status="running", current_section="shap")
+        # Two substantial steps run before SHAP and both used to report as
+        # "shap", which made the job look stuck. Rehydration re-runs data prep
+        # for a run whose in-memory job was lost, and build_xai refits the
+        # trial's model - on a variational model that is the slowest step of
+        # the whole analysis.
+        analysis_store.update_job(job_id, status="running", current_section="preparing")
         opt_result = _get_completed_result(request.optimization_id)
+        analysis_store.update_job(job_id, current_section="training")
         shared_xai = build_xai(
             opt_result,
             trial_number=trial,
@@ -592,38 +647,67 @@ async def _run_analysis_job(job_id: str, request: AnalysisJobRequest) -> None:
             max_evals=config.get("max_evals"),
         )
         token = _job_xai.set(shared_xai)
+        analysis_store.update_job(job_id, current_section="shap")
         # SHAP and metrics are the required core sections. Existing endpoint
         # functions remain the compatibility implementation for now; this job
         # owns orchestration and persistence.
         shap = await generate_shap_analysis(shap_request)
         metrics = await generate_metrics(metrics_request)
-        curves = await optional("curves", generate_curves(metrics_request))
-        curves_data = await optional("curves_data", generate_curves_data(metrics_request))
-        confusion_data = await optional(
-            "confusion_matrix_data", generate_confusion_matrix_data(metrics_request)
+        # Publish the core sections now: the derived ones below can take a
+        # while, and there is no reason to withhold finished SHAP and metrics
+        # until they land.
+        analysis_store.publish_partial(
+            job_id,
+            {
+                "feature_importance": shap.get("feature_importance"),
+                "plots": dict(shap.get("plots") or {}),
+                "metrics": metrics.get("metrics"),
+                "confusion_matrix_plot": metrics.get("confusion_matrix_plot"),
+                "task_type": metrics.get("task_type"),
+                "class_labels": metrics.get("class_labels"),
+            },
         )
-        importance_data = await optional(
-            "feature_importance_data", generate_feature_importance_data(metrics_request)
+
+        # Everything below only reads the shared XAI. Warm its lazy caches so
+        # the concurrent sections cannot race on first computation.
+        _warm_xai_caches(shared_xai, config["use_proba"])
+
+        derived = await gather_optional(
+            "derived",
+            {
+                "curves": generate_curves(metrics_request),
+                "curves_data": generate_curves_data(metrics_request),
+                "confusion_matrix_data": generate_confusion_matrix_data(metrics_request),
+                "feature_importance_data": generate_feature_importance_data(metrics_request),
+                "shap_data": generate_shap_data(shap_request),
+            },
         )
-        shap_data = await optional("shap_data", generate_shap_data(shap_request))
-        study = await optional(
-            "study_plots",
-            generate_study_plots(StudyPlotsRequest(optimization_id=request.optimization_id)),
-        )
-        fairness = None
+        curves = derived["curves"]
+        curves_data = derived["curves_data"]
+        confusion_data = derived["confusion_matrix_data"]
+        importance_data = derived["feature_importance_data"]
+        shap_data = derived["shap_data"]
+
+        # Study plots read the Optuna study, not the XAI, and fairness needs
+        # its own refit, so they stay off the shared-instance group above.
         job = get_job(request.optimization_id)
         sensitive = (job.get("request") or {}).get("sensitive_feature")
-        if sensitive:
-            fairness = await optional(
-                "fairness",
-                generate_fairness(
-                    FairnessRequest(
-                        optimization_id=request.optimization_id,
-                        trial_number=trial,
-                        sensitive_feature=sensitive,
-                    )
-                ),
+        tail: dict[str, Any] = {
+            "study_plots": generate_study_plots(
+                StudyPlotsRequest(optimization_id=request.optimization_id)
             )
+        }
+        if sensitive:
+            tail["fairness"] = generate_fairness(
+                FairnessRequest(
+                    optimization_id=request.optimization_id,
+                    trial_number=trial,
+                    sensitive_feature=sensitive,
+                )
+            )
+        tail_results = await gather_optional("study_plots", tail)
+        study = tail_results["study_plots"]
+        fairness = tail_results.get("fairness")
 
         plots = dict(shap.get("plots") or {})
         if curves and curves.get("roc_curve_plot"):

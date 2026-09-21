@@ -80,12 +80,37 @@ def get_engine(url: str | None = None):
     return create_engine(url, **_engine_kwargs(url))
 
 
+#: Columns added to existing tables after they shipped. ``create_all`` only
+#: creates missing tables, so an established local database would otherwise
+#: keep the old shape. Each entry is additive and nullable; anything beyond
+#: that belongs in a real migration.
+_ADDED_COLUMNS: tuple[tuple[str, str, str], ...] = (
+    ("quoptuna_analysis_jobs", "partial_json", "VARCHAR"),
+)
+
+
+def _add_missing_columns(engine) -> None:
+    from sqlalchemy import inspect, text
+
+    inspector = inspect(engine)
+    existing = set(inspector.get_table_names())
+    for table, column, column_type in _ADDED_COLUMNS:
+        if table not in existing:
+            continue  # create_all already built it with the column
+        if column in {c["name"] for c in inspector.get_columns(table)}:
+            continue
+        with engine.begin() as connection:
+            connection.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {column_type}"))
+
+
 def init_db() -> None:
     """Create application tables; production schema changes use migrations."""
+    engine = get_engine()
     SQLModel.metadata.create_all(
-        get_engine(),
+        engine,
         tables=[model.__table__ for model in APPLICATION_MODELS],  # type: ignore[attr-defined, union-attr]
     )
+    _add_missing_columns(engine)
 
 
 @contextmanager

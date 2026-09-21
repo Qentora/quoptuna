@@ -111,6 +111,29 @@ def cap_training(
     return model
 
 
+@pytest.fixture(autouse=True)
+def isolate_app_database(tmp_path, monkeypatch):
+    """Point every test's application database at a temporary file.
+
+    ``_database_url()`` prefers ``run_store.APP_DB_PATH`` over
+    ``settings.DATABASE_URL``, and ``get_engine`` is ``lru_cache``d, so patching
+    the setting alone still resolves to the developer's real
+    ``db/quoptuna_app.db`` and a cached engine keeps it afterwards. Tests used
+    to write rows into that live database. Autouse so a new test cannot forget.
+    """
+    from quoptuna.server.core.config import settings  # noqa: PLC0415
+    from quoptuna.server.services import analysis_store, database, run_store  # noqa: PLC0415
+
+    db_path = tmp_path / "app.db"
+    monkeypatch.setattr(run_store, "APP_DB_PATH", str(db_path))
+    monkeypatch.setattr(settings, "DATABASE_URL", f"sqlite:///{db_path}")
+    monkeypatch.setattr(settings, "ARTIFACT_ROOT", str(tmp_path / "artifacts"))
+    monkeypatch.setattr(analysis_store, "ARTIFACT_ROOT", tmp_path / "artifacts")
+    database.get_engine.cache_clear()
+    yield
+    database.get_engine.cache_clear()
+
+
 @pytest.fixture
 def fast_optimizer_training(monkeypatch):
     """Patch the optimizer's create_model so every built model trains briefly.

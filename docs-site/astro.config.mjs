@@ -101,6 +101,7 @@ export default defineConfig({
             { slug: "explanation/architecture" },
             { slug: "explanation/optimization-engine" },
             { slug: "explanation/workflow-engine" },
+            { slug: "explanation/analysis-pipeline" },
             { slug: "explanation/features" },
           ],
         },

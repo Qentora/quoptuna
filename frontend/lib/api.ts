@@ -753,6 +753,9 @@ export interface AnalysisJob {
   snapshot_id: string;
   status: 'pending' | 'running' | 'completed' | 'failed';
   current_section?: string | null;
+  /** Core sections published mid-run so the UI can render them before the
+   *  job finishes. Null until SHAP and metrics complete. */
+  partial?: Partial<AnalysisSnapshotPayload> | null;
   error?: string | null;
   revision?: number;
 }

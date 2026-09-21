@@ -91,6 +91,10 @@ class AnalysisJob(SQLModel, table=True):
     status: str
     current_section: Optional[str] = None
     error: Optional[str] = None
+    # Core sections (SHAP + metrics) published as soon as they finish, so the
+    # UI can render them while the derived sections are still running. The
+    # durable copy is the snapshot payload written at completion.
+    partial_json: Optional[str] = None
     created_at: str = ""
     completed_at: Optional[str] = None
 

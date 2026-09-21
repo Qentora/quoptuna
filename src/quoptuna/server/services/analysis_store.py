@@ -112,6 +112,21 @@ def create_revision_job(snapshot_id: str) -> dict[str, Any]:
         return {"id": job.id, "snapshot_id": snapshot_id, "status": "running"}
 
 
+def publish_partial(job_id: str, payload: dict[str, Any]) -> None:
+    """Expose finished core sections while the job is still running.
+
+    Figures stay inline as data URLs here; only the final snapshot extracts
+    them to artifact files. This is a transient preview, discarded once the
+    snapshot is written.
+    """
+    with session_scope() as session:
+        job = session.get(AnalysisJob, job_id)
+        if job:
+            job.partial_json = json.dumps(payload)
+            session.add(job)
+            session.commit()
+
+
 def update_job(job_id: str, **fields: Any) -> None:
     allowed = {"status", "current_section", "error", "completed_at"}
     if set(fields) - allowed:
@@ -134,6 +149,7 @@ def get_job(job_id: str) -> dict[str, Any] | None:
         if snapshot is None:
             return None
         result = job.model_dump()
+        result["partial"] = json.loads(result.pop("partial_json") or "null")
         result.update(
             {
                 "optimization_id": snapshot.optimization_id,
