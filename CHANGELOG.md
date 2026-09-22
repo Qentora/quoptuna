@@ -83,6 +83,28 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   threshold chosen against one fit is not guaranteed to be meaningful against
   another, and an analysis must never report an all-one-class score for a model that
   predicts both.
+- `SVC` was constructed with scikit-learn's default `probability=False`, so it has no
+  `predict_proba`. Whenever an SVC won the search — the common case on easy datasets
+  — ROC-AUC, average precision and log loss came back `null`, the decision-threshold
+  sweep was skipped, and the UI's analysis (which requests probability mode by
+  default) failed outright with "Model does not have a predict_proba method". SVC now
+  fits Platt scaling with a pinned `random_state`, and `build_xai` degrades to label
+  mode for models that genuinely cannot produce probabilities (`LinearSVC`,
+  `Perceptron`) instead of failing the analysis.
+
+### Added
+- Refit consistency check. The search already scores every trial on the test split;
+  the analysis recomputes the same number after retraining it. Those must agree, and
+  every silent-divergence bug above moved that delta while leaving other metrics
+  plausible. Analyses now record `refit_consistency` (both values, the drift, and
+  whether it is within tolerance) in `analysed_model`, and raise a snapshot warning —
+  visible to the UI and the report agent — when the analysed model does not reproduce
+  the trial that was selected.
+- End-to-end pipeline canary (`tests/test_pipeline_canary.py`) on Banknote
+  Authentication, which is linearly separable: a correct pipeline scores ~1.0, so any
+  of the failure modes above shows up as a number below the floor. Asserts perfect
+  F1/accuracy, a non-null ROC-AUC, search/analysis agreement, and a confusion matrix
+  that uses both classes. Runs in ~5s.
 
 ## [0.1.3]
 ### Changed

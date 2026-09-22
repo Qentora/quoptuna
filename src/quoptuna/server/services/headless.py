@@ -163,23 +163,14 @@ def run_headless_optimization(
 
         from quoptuna.server.api.v1 import analysis as analysis_mod
 
-        try:
-            xai = build_xai(
-                opt,
-                subset_size=subset_size,
-                background_size=background_size,
-                max_evals=shap_max_evals,
-            )
-        except TypeError:
-            # Models without predict_proba (e.g. SVC without probability=True):
-            # same fallback the UI offers via its "use probabilities" toggle.
-            xai = build_xai(
-                opt,
-                use_proba=False,
-                subset_size=subset_size,
-                background_size=background_size,
-                max_evals=shap_max_evals,
-            )
+        # build_xai degrades to label mode by itself for models without
+        # predict_proba (LinearSVC, Perceptron).
+        xai = build_xai(
+            opt,
+            subset_size=subset_size,
+            background_size=background_size,
+            max_evals=shap_max_evals,
+        )
         spec = opt.get("task_spec")
         multiclass = bool(spec and spec.get("kind") == "multiclass")
         average = "macro" if multiclass else "binary"
@@ -222,6 +213,13 @@ def run_headless_optimization(
             "metrics": metrics,
             "confusion_matrix": {"labels": labels, "matrix": cm.tolist()},
             "curves": curves,
+            # The search scored this trial on the test split too, so the two
+            # numbers must agree. A drift outside tolerance means the analysed
+            # model is not the model that was selected — the symptom shared by
+            # every silent-divergence bug this pipeline has had.
+            "refit_consistency": analysis_mod._refit_consistency(  # noqa: SLF001
+                opt, None, metrics["f1_score"]
+            ),
         }
 
         if sensitive_feature:

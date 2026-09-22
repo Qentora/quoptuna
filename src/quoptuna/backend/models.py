@@ -161,6 +161,17 @@ MODEL_PARAM_KEYS = {name: list(keys) for name, (_cls, keys) in MODEL_CONSTRUCTOR
 # still be sampled for MLP trials.
 MODEL_PARAM_KEYS["MLPClassifier"].append("learning_rate")
 
+# Constructor arguments that are not hyperparameters: never sampled, always
+# applied. ``SVC`` ships ``probability=False``, which leaves it without a
+# ``predict_proba`` — so whenever an SVC won the search, every probability
+# metric (ROC-AUC, average precision, log loss), the proba-based SHAP mode and
+# the decision-threshold sweep silently degraded or failed. ``random_state``
+# pins the internal CV that Platt scaling uses, keeping a refit identical to
+# the trial's fit.
+MODEL_FIXED_KWARGS = {
+    "SVC": {"probability": True, "random_state": 42},
+}
+
 
 def create_model(model_type, n_classes: int = BINARY_N_CLASSES, **kwargs):
     if model_type not in MODEL_CONSTRUCTORS:
@@ -186,6 +197,8 @@ def create_model(model_type, n_classes: int = BINARY_N_CLASSES, **kwargs):
     dev_type = kwargs.get("dev_type")
     if dev_type is not None and "dev_type" in inspect.signature(model_class.__init__).parameters:
         params["dev_type"] = dev_type
+
+    params.update(MODEL_FIXED_KWARGS.get(model_type, {}))
 
     model = model_class(**params)
 

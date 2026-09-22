@@ -226,6 +226,61 @@ def _get_completed_result(optimization_id: str) -> dict:
     return result
 
 
+#: Largest |trial F1 - analysis F1| treated as reproduction noise. Models seed
+#: their init (``random_state=42``), so a faithful refit on the same frame
+#: reproduces the trial's own test metrics almost exactly; anything above this
+#: means the analysed model is not the model the search selected.
+MAX_REFIT_METRIC_DRIFT = 0.02
+
+
+def _refit_consistency(opt_result: dict, trial_number: int | None, analysis_f1) -> dict | None:
+    """Compare the analysis F1 against the F1 the trial recorded for itself.
+
+    The search already scores every trial on the test split and stores it
+    (``Quantum_f1_score`` / ``Classical_f1_score``). Analyze retrains that
+    trial and recomputes the same number, so the two are the same quantity
+    measured twice — they must agree.
+
+    Every silent-divergence bug this pipeline has had would have shown up
+    here on the first analysis: a validation split contaminated by resampled
+    duplicates, a refit on the wrong frame, a mis-shaped training target, a
+    decision threshold replayed onto an incompatible probability scale. None
+    of them raised; all of them moved this delta.
+    """
+    from optuna import load_study
+
+    if analysis_f1 is None:
+        return None
+    try:
+        study = load_study(
+            storage=optuna_storage_url(str(opt_result.get("db_name") or DEFAULT_DB_NAME)),
+            study_name=opt_result.get("study_name"),
+        )
+        if trial_number is None:
+            trial = study_best_trial(study)
+        else:
+            trial = next((t for t in study.trials if t.number == trial_number), None)
+        if trial is None:
+            return None
+        attrs = trial.user_attrs
+        # Exactly one of the two families is non-zero for a given trial.
+        recorded = attrs.get("Quantum_f1_score") or attrs.get("Classical_f1_score")
+        if recorded is None:
+            return None
+    except Exception:  # a consistency check must never fail the analysis
+        logger.warning("Could not load the trial's recorded metrics", exc_info=True)
+        return None
+
+    drift = abs(float(analysis_f1) - float(recorded))
+    return {
+        "trial_test_f1": float(recorded),
+        "analysis_test_f1": float(analysis_f1),
+        "drift": drift,
+        "within_tolerance": drift <= MAX_REFIT_METRIC_DRIFT,
+        "tolerance": MAX_REFIT_METRIC_DRIFT,
+    }
+
+
 def _analysed_model(opt_result: dict, xai, trial_number: int | None) -> dict:
     """Provenance for the model a snapshot explains.
 
@@ -814,6 +869,24 @@ async def _run_analysis_job_async(job_id: str, request: AnalysisJobRequest) -> N
             plots["rocCurve"] = curves["roc_curve_plot"]
         if curves and curves.get("pr_curve_plot"):
             plots["prCurve"] = curves["pr_curve_plot"]
+        analysed_model = _analysed_model(opt_result, shared_xai, trial)
+        # The search and the analysis measure the same quantity on the same
+        # split; a disagreement means the analysed model is not the selected
+        # one. Surfaced as a warning so it reaches the UI and the report agent
+        # instead of only a log line.
+        consistency = _refit_consistency(
+            opt_result, analysed_model.get("trial_number"), (metrics.get("metrics") or {}).get("f1_score")
+        )
+        analysed_model["refit_consistency"] = consistency
+        if consistency and not consistency["within_tolerance"]:
+            warnings["refit_consistency"] = (
+                f"The analysed model scores F1 {consistency['analysis_test_f1']:.3f} on the test "
+                f"split, but trial {analysed_model.get('trial_number')} recorded "
+                f"{consistency['trial_test_f1']:.3f} for itself during the search "
+                f"(drift {consistency['drift']:.3f}). The analysis is not describing the model "
+                "that was selected; treat these metrics as unreliable."
+            )
+            logger.warning(warnings["refit_consistency"])
         payload = {
             "feature_importance": shap.get("feature_importance"),
             "plots": plots,
@@ -833,7 +906,7 @@ async def _run_analysis_job_async(job_id: str, request: AnalysisJobRequest) -> N
             # Which model this snapshot actually explains. Recorded at
             # analysis time so a stored snapshot (and any report built from
             # it) stays attributable after the study or request changes.
-            "analysed_model": _analysed_model(opt_result, shared_xai, trial),
+            "analysed_model": analysed_model,
         }
         analysis_store.complete_job(job_id, payload)
     except _JobCancelled:

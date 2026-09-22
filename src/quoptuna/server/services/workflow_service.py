@@ -187,7 +187,22 @@ def build_xai(
         decision_threshold=decision_threshold,
         **({} if background_size is None else {"background_size": background_size}),
     )
-    return XAI(model=model, data=data_dict, config=xai_config)
+    try:
+        return XAI(model=model, data=data_dict, config=xai_config)
+    except TypeError:
+        if not use_proba:
+            raise
+        # Models with no predict_proba at all (LinearSVC, Perceptron) cannot
+        # serve the probability mode. Explaining labels instead is the same
+        # fallback the UI's "use probabilities" toggle offers, and is strictly
+        # better than failing the whole analysis: the label-based metrics,
+        # confusion matrix and SHAP values are all still valid.
+        logger.warning(
+            "%s has no predict_proba; analysing in label mode (probability metrics unavailable)",
+            trial.params["model_type"],
+        )
+        xai_config.use_proba = False
+        return XAI(model=model, data=data_dict, config=xai_config)
 
 
 class WorkflowExecutor:
