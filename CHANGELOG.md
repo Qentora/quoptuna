@@ -68,6 +68,21 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   `decision_threshold`. It now refits on the trial's own training frame and applies
   that threshold to every label-based metric (`decision_threshold` is recorded in the
   snapshot's `analysed_model`); probability-based metrics are unchanged.
+- **Analyze trained every model on a mis-shaped target.** `build_xai` (and the SHAP
+  node) passed `y_train.values` straight to `model.fit`, but the label-encoding node
+  stores `y` as a DataFrame, so the target arrived as `(n, 1)` instead of `(n,)`. The
+  fit does not raise: it collapses the model's probabilities into a narrow band
+  around 0.5 (observed range 0.474-0.512 on ILPD) and degrades its ranking (test
+  ROC-AUC 0.54 versus 0.72 for the same configuration fitted correctly). Argmax
+  predictions stayed plausible, which is why it went unnoticed — until a probability
+  threshold was applied to that band and put every row on one side, reporting F1
+  0.000 with zero predicted positives. Both refit paths now ravel the target.
+- A stored `decision_threshold` that falls outside the refit's probability range is
+  now discarded rather than applied: the analysis falls back to the model's own
+  `predict` and records `decision_threshold_discarded` in `analysed_model`. A
+  threshold chosen against one fit is not guaranteed to be meaningful against
+  another, and an analysis must never report an all-one-class score for a model that
+  predicts both.
 
 ## [0.1.3]
 ### Changed

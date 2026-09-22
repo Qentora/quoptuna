@@ -269,7 +269,10 @@ def _analysed_model(opt_result: dict, xai, trial_number: int | None) -> dict:
         "training_budget": {k: v for k, v in budget.items() if v is not None},
         # The cutoff every label-based metric below was produced at; None
         # means the model's own predict() (argmax, or 0.5 for binary proba).
+        # ``decision_threshold_discarded`` explains a None that the trial did
+        # record a threshold for.
         "decision_threshold": getattr(xai, "decision_threshold", None),
+        "decision_threshold_discarded": getattr(xai, "threshold_discarded", None),
         "retrained_at": datetime.now().isoformat(),
     }
 

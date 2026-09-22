@@ -159,7 +159,13 @@ def build_xai(
     x_train_df = opt_result["x_train"]
     y_train_df = opt_result["y_train"]
     x_train_np = x_train_df.values if hasattr(x_train_df, "values") else x_train_df
-    y_train_np = y_train_df.values if hasattr(y_train_df, "values") else y_train_df
+    # MUST be 1-D, exactly as the search fits it (_execute_optimization ravels
+    # too). The label-encoding node stores y as a DataFrame, so ``.values``
+    # alone yields (n, 1); training on that shape does not raise — it silently
+    # collapses the model's probabilities into a narrow band around 0.5, which
+    # left argmax predictions plausible while making any probability threshold
+    # meaningless (every row on one side of it).
+    y_train_np = np.asarray(y_train_df).ravel()
     model.fit(x_train_np, y_train_np)
 
     data_dict = {
@@ -838,9 +844,9 @@ class WorkflowExecutor:
             **params,
         )
 
-        # Convert to numpy for model fitting (as shown in notebooks)
+        # Convert to numpy for model fitting. y MUST be 1-D — see build_xai.
         x_train_np = x_train_df.values if hasattr(x_train_df, "values") else x_train_df
-        y_train_np = y_train_df.values if hasattr(y_train_df, "values") else y_train_df
+        y_train_np = np.asarray(y_train_df).ravel()
 
         model.fit(x_train_np, y_train_np)
 

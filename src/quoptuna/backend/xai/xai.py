@@ -2,6 +2,7 @@ from __future__ import annotations
 
 import base64
 import io
+import logging
 import pickle
 import random
 from dataclasses import dataclass
@@ -34,6 +35,8 @@ if TYPE_CHECKING:
     from sklearn.base import BaseEstimator
 
     from quoptuna.backend.typing.data_typing import DataSet
+
+logger = logging.getLogger(__name__)
 
 # Constants
 EXPECTED_SHAP_VALUES_DIM = 2
@@ -106,6 +109,9 @@ class XAI:
         self.x_test_key: str = self.config.x_test_key
         self.y_test_key: str = self.config.y_test_key
         self.decision_threshold: float | None = self.config.decision_threshold
+        #: Set when a stored threshold had to be discarded; surfaced in the
+        #: analysis payload so a silently-changed decision rule is visible.
+        self.threshold_discarded: str | None = None
 
         self._classes = self.get_classes
         data_frame = self.data.get(self.data_key)
@@ -161,6 +167,13 @@ class XAI:
         threshold, and defined for the quantum models that expose no
         ``classes_``. Column 1 of ``predict_proba`` is the positive class for
         both the {-1,+1} quantum models and sklearn's ``classes_`` ordering.
+
+        A threshold chosen against one fit is applied here to a *different*
+        fit, whose probability scale may not match. When that lands the cutoff
+        outside the model's entire probability range, every row falls on one
+        side and every label-based metric reads 0 for a model that is not
+        actually degenerate. That case falls back to ``predict`` and records
+        ``threshold_discarded`` rather than reporting the zero.
         """
         if not hasattr(self.model, "predict_proba"):
             return self.model.predict(self.x_test)
@@ -171,7 +184,18 @@ class XAI:
         if len(classes) != BINARY_CLASS_COUNT:
             return self.model.predict(self.x_test)
         proba = np.asarray(self.model.predict_proba(self.x_test))[:, 1]
-        return np.where(proba >= self.decision_threshold, classes[-1], classes[0])
+        thresholded = np.where(proba >= self.decision_threshold, classes[-1], classes[0])
+        fallback = self.model.predict(self.x_test)
+        if len(np.unique(thresholded)) == 1 and len(np.unique(np.asarray(fallback))) > 1:
+            self.threshold_discarded = (
+                f"decision_threshold={self.decision_threshold} lies outside this fit's "
+                f"probability range [{proba.min():.3f}, {proba.max():.3f}], which would "
+                "assign every row to one class; scored with the model's own predict() instead"
+            )
+            logger.warning(self.threshold_discarded)
+            self.decision_threshold = None
+            return fallback
+        return thresholded
 
     @property
     def predictions_proba(self) -> pd.DataFrame:
