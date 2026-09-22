@@ -48,6 +48,27 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Clarified that the model catalog lists registry keys, while `/api/v1/models`
   returns display names.
 
+### Fixed
+- **Train rows leaked into the validation split on resampled runs.** The train split
+  was oversampled (`RandomOverSampler` duplicates minority rows verbatim) *before*
+  `Optimizer` carved its validation split out of it, so a row and its own copy landed
+  on opposite sides of that boundary and the objective scored memorisation. On ILPD
+  (71/29 imbalance) 43% of validation rows — 84% of the positive class — were exact
+  copies of training rows, reporting F1 0.90 where the true value was 0.27, and
+  ranking trials *against* their real test performance (Spearman -0.75). The
+  validation split is now carved in the split node before any resampling, and only
+  the inner training portion is resampled; `Optimizer` consumes the split instead of
+  deriving one. Undersampled and unresampled runs were unaffected.
+- The fairness-aware search measured its disparity on the **test** split, so
+  constrained and multi-objective runs selected against the same data the post-hoc
+  audit reports. Disparity is now computed on validation, with the sensitive column
+  carried through the carve and the resampling in lockstep.
+- Analyze refit the selected trial on a different frame than the trial trained on and
+  scored it at a 0.5 cutoff while the objective had been maximised over a tuned
+  `decision_threshold`. It now refits on the trial's own training frame and applies
+  that threshold to every label-based metric (`decision_threshold` is recorded in the
+  snapshot's `analysed_model`); probability-based metrics are unchanged.
+
 ## [0.1.3]
 ### Changed
 - Migrated the documentation from MkDocs to an Astro + Starlight site in `docs-site/`,

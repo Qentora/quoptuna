@@ -267,6 +267,9 @@ def _analysed_model(opt_result: dict, xai, trial_number: int | None) -> dict:
         "model_type": params.get("model_type"),
         "params": {k: v for k, v in params.items() if k != "model_type"},
         "training_budget": {k: v for k, v in budget.items() if v is not None},
+        # The cutoff every label-based metric below was produced at; None
+        # means the model's own predict() (argmax, or 0.5 for binary proba).
+        "decision_threshold": getattr(xai, "decision_threshold", None),
         "retrained_at": datetime.now().isoformat(),
     }
 
@@ -967,7 +970,7 @@ async def update_snapshot_fairness(snapshot_id: str, request: SnapshotFairnessRe
             mitigate=request.mitigate,
             constraint=request.constraint,
             task_spec=_task_spec(opt_result),
-            resampled_sensitive_train=opt_result.get("sensitive_train"),
+            persisted_sensitive_train=opt_result.get("sensitive_train"),
         )
         payload = dict(snapshot["payload"])
         payload["fairness"] = {
@@ -1497,24 +1500,26 @@ def _resolve_sensitive_series(
     optimization_id: str,
     sensitive_feature: Optional[str],
     xai,
-    resampled_sensitive_train=None,
+    persisted_sensitive_train=None,
 ):
-    """Load the raw dataset column and align it to the train/test split.
+    """Load the raw dataset column and align it to the analysed splits.
 
     ``DataPreparation.preprocess`` resets the feature index to a RangeIndex
     before its seeded ``train_test_split``, so split indices are positional
     row numbers into the raw dataframe (post feature-selection, which only
-    selects columns).
+    selects columns). The TEST split preserves that property — nothing
+    downstream reorders or resamples it — so it always resolves positionally.
 
-    When the run used TRAIN resampling, ``xai.data["x_train"]`` is the
-    resampled frame (no longer positional into the raw file); the caller must
-    then pass ``resampled_sensitive_train`` — the sensitive series already
-    resampled in lockstep at split time (persisted on the run's result as
-    ``sensitive_train``) — instead of re-deriving it positionally.
+    The train side does not: ``xai.data["x_train"]`` is the inner training
+    frame (validation carved out, then resampled), so neither its length nor
+    its index maps onto the raw file. It is therefore taken from
+    ``persisted_sensitive_train`` — the series carried through both steps in
+    lockstep by ``WorkflowExecutor._execute_train_test_split``. It is only
+    needed for mitigation; a missing one degrades that single feature rather
+    than failing the audit.
     """
     from quoptuna.server.services.sensitive import (
         SensitiveColumnError,
-        resolve_sensitive_series,
         resolve_sensitive_test_series,
     )
 
@@ -1528,16 +1533,10 @@ def _resolve_sensitive_series(
         )
 
     try:
-        if resampled_sensitive_train is not None:
-            sens_train = resampled_sensitive_train
-            sens_test = resolve_sensitive_test_series(request.dataset_id, column, xai.x_test)
-        else:
-            sens_train, sens_test = resolve_sensitive_series(
-                request.dataset_id, column, xai.data.get("x_train"), xai.x_test
-            )
+        sens_test = resolve_sensitive_test_series(request.dataset_id, column, xai.x_test)
     except SensitiveColumnError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return column, sens_train, sens_test
+    return column, persisted_sensitive_train, sens_test
 
 
 def _compute_fairness_payload(
@@ -1548,12 +1547,12 @@ def _compute_fairness_payload(
     mitigate: bool = False,
     constraint: str = "equalized_odds",
     task_spec: Optional[dict] = None,
-    resampled_sensitive_train=None,
+    persisted_sensitive_train=None,
 ) -> dict:
     from quoptuna.backend.xai import fairness as fairness_mod
 
     column, sens_train, sens_test = _resolve_sensitive_series(
-        optimization_id, sensitive_feature, xai, resampled_sensitive_train
+        optimization_id, sensitive_feature, xai, persisted_sensitive_train
     )
 
     # Multiclass tasks are audited on the favorable-class-vs-rest outcome.
@@ -1583,6 +1582,11 @@ def _compute_fairness_payload(
         # which cannot be soundly mapped back onto an argmax over K classes.
         # The audit above remains valid; mitigation is binary-only for now.
         logger.info("Fairness mitigation skipped: unsupported for multiclass targets")
+    elif mitigate and sens_train is None:
+        # Mitigation refits on the training split, which needs its sensitive
+        # values row-aligned; runs configured without a sensitive_feature
+        # never recorded them. The audit above still stands.
+        logger.info("Fairness mitigation skipped: no sensitive values recorded for the train split")
     elif mitigate:
         mitigation = fairness_mod.mitigate_with_threshold_optimizer(
             xai.model,
@@ -1619,7 +1623,7 @@ async def generate_fairness(request: FairnessRequest):
             mitigate=request.mitigate,
             constraint=request.constraint,
             task_spec=_task_spec(opt_result),
-            resampled_sensitive_train=opt_result.get("sensitive_train"),
+            persisted_sensitive_train=opt_result.get("sensitive_train"),
         )
         return {
             "optimization_id": request.optimization_id,

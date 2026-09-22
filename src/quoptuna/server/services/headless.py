@@ -227,10 +227,12 @@ def run_headless_optimization(
         if sensitive_feature:
             try:
                 from quoptuna.backend.xai.fairness import compute_fairness
-                from quoptuna.server.services.sensitive import resolve_sensitive_series
+                from quoptuna.server.services.sensitive import resolve_sensitive_test_series
 
-                _, sens_test = resolve_sensitive_series(
-                    dataset_id, sensitive_feature, xai.data.get("x_train"), xai.x_test
+                # Test-side only: x_train is the inner, resampled training
+                # frame and no longer indexes into the raw file.
+                sens_test = resolve_sensitive_test_series(
+                    dataset_id, sensitive_feature, xai.x_test
                 )
                 # Mirror the API guard (_compute_fairness_payload): a multiclass
                 # audit is meaningless without a designated favorable class —

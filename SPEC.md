@@ -84,19 +84,27 @@ Parallelising the fit itself, or caching across different optimization runs.
 
 ---
 
-## SPEC-002 — Reattach the tuned decision threshold
+## SPEC-002 — Decide whether the threshold sweep survives
 
-**Status:** Proposed
-**Area:** `backend/tuners/optimizer.py`, `server/services/workflow_service.py`
+**Status:** Proposed (the reattachment half shipped; the sweep's value is open)
+**Area:** `backend/tuners/optimizer.py`
 **Motivation:** Analysis fidelity
 
-### Problem
+### What already shipped
 
-`_tune_decision_threshold` sweeps the binary decision cutoff on the validation
-split and records it as a `decision_threshold` trial user attr — not in
-`trial.params`. The rebuilt model therefore predicts at the default 0.5, so
-SHAP values and metrics describe a different classifier from the one whose
-score won the search.
+Option (b) below landed with the split-leakage fix (see the changelog's
+Unreleased → Fixed): `build_xai` passes the trial's `decision_threshold` into
+`XAIConfig`, `XAI.predictions` applies it, and the snapshot's `analysed_model`
+records it. Probability-based metrics (ROC-AUC, average precision, log loss)
+are unaffected by construction — only the label decision rule changed.
+
+### Problem that remains
+
+`_tune_decision_threshold` picks the best of 19 cutoffs on the validation
+split. That is a maximum over 19 noisy estimates on ~88 rows, so the sweep may
+be fitting validation noise rather than recovering minority-class signal. If it
+does not transfer, the right fix is to delete the sweep, not to keep
+propagating its output.
 
 ### Evidence
 
@@ -107,48 +115,42 @@ val_f1_unthresholded : 0.8296
 decision_threshold   : 0.7
 val_f1_score         : 0.8871   ← objective, after tuning, on validation
 f1_score_thresholded : 0.2933   ← same threshold, on test
-Quantum_f1_score     : 0.3261   ← unthresholded test (what Analyze reports)
+Quantum_f1_score     : 0.3261   ← unthresholded test
 ```
 
-Two conclusions:
+The tuned cutoff made test F1 *worse* (0.326 → 0.293). But this run predates
+the leakage fix: its validation split contained duplicated training rows, so
+the sweep was optimising memorised rows and these numbers cannot settle the
+question. **Every stored `decision_threshold` is contaminated the same way.**
+A fresh run is required.
 
-1. The threshold is overfit to the validation split — it does not transfer.
-2. Reattaching it would make Analyze report **0.293 instead of 0.326**, i.e.
-   worse. This is a fidelity fix, not an improvement, and must be framed as
-   such.
+Coverage is uneven regardless: the attr exists only for binary runs on models
+with `predict_proba` where the sweep beat the baseline. Multiclass runs (e.g.
+the `wifi_signal_*` studies) will never have it.
 
-Coverage is uneven: the attr exists only for binary runs on models with
-`predict_proba` where the sweep beat the baseline. Multiclass runs (e.g. the
-`wifi_signal_*` studies) will never have it.
+### Options
 
-### Proposed design
-
-Options, in increasing order of ambition:
-
-- **(a) Report both.** Keep Analyze unthresholded, and surface the thresholded
-  metrics alongside with the threshold stated. No behaviour change, closes the
-  information gap.
-- **(b) Reattach the threshold** so the analysed model matches the searched one,
-  and state the threshold prominently wherever metrics appear.
-- **(c) Select the threshold more robustly** (cross-validated, or nested) so it
-  generalises, then reattach.
-
-(a) is safe and immediately useful. (c) addresses the real defect — the ILPD
-numbers show the current sweep is not trustworthy on a small validation split.
+- **(a) Report both.** Surface thresholded and unthresholded metrics side by
+  side. Superseded by what shipped, which reports one classifier consistently.
+- **(b) Reattach the threshold.** *Shipped.*
+- **(c) Select the threshold robustly** (cross-validated or nested), then
+  reattach — or drop the sweep entirely if the lift does not generalise.
 
 ### Open questions
 
-1. Is a threshold tuned on one small validation split ever worth reattaching,
-   or should it be recomputed?
-2. Should the search objective itself stop using the tuned value, given it
-   inflates the reported score?
+1. On a clean validation split, does the sweep's validation lift transfer to
+   test? Measure `val_f1_unthresholded` vs `val_f1_score` against test F1
+   across trials of one post-fix run.
+2. If it does not: delete `_tune_decision_threshold`, or nest it inside the
+   folds of SPEC-006's cross-validation?
 
 ### Acceptance criteria
 
-- Whichever option ships, every reported F1 states which split and which
+- The question in (1) is answered from a post-fix run, not from the
+  contaminated studies in `db/results-trial-june15.db`.
+- Whichever way it resolves, every reported F1 states which split and which
   threshold produced it.
 - Runs with no recorded threshold behave exactly as today.
-- Existing snapshots remain readable.
 
 ---
 
@@ -161,27 +163,35 @@ numbers show the current sweep is not trustworthy on a small validation split.
 
 ### Problem
 
-The search objective is **validation** F1 (`_ensure_validation_split` carves a
-validation set out of train so selection does not tune to test). Analyze
-computes metrics on **test** (`xai.get_f1_score` over `y_test`). The UI shows
-"best F1" beside a test-split F1 card with nothing marking them as different
-splits, so a normal generalization gap reads as a bug.
+The search objective is **validation** F1; Analyze computes metrics on **test**
+(`xai.get_f1_score` over `y_test`). The UI shows "best F1" beside a test-split
+F1 card with nothing marking them as different splits, so a genuine
+generalization gap reads as a bug.
 
-On ILPD trial #57 the two differ by 0.887 vs 0.326, which looks alarming and
-prompted exactly this confusion.
+The gap that originally motivated this spec — ILPD trial #57, 0.887 vs 0.326 —
+turned out to be a leakage bug, not a labelling problem, and is fixed (see the
+changelog). Post-fix the two agree closely (ILPD: val 0.280 vs test 0.268), so
+this spec is now about presentation only, and the design below is unchanged.
+
+Two residual reasons the numbers still differ, both worth naming in the UI:
+
+- `best_value` is a maximum over trials, so it carries selection optimism even
+  when the split is clean (SPEC-006).
+- A `decision_threshold`, where one exists, is chosen on validation.
 
 ### Proposed design
 
-1. Label the Optimize header value as **validation F1** and the Analyze metric
-   card as **test F1**.
-2. Where both are visible, show the gap explicitly and note that a large gap
-   indicates overfitting to the validation split.
-3. Where a `decision_threshold` exists, state it next to the validation figure
-   — it is a large part of why the numbers diverge.
+1. Label the Optimize header value as **validation F1** (selection score) and
+   the Analyze metric card as **test F1** (the result).
+2. Where both are visible, show the gap explicitly. A large gap now means
+   selection optimism or a genuinely hard split — no longer leakage.
+3. Where a `decision_threshold` exists, state it next to both figures; after
+   the reattachment fix it applies to the test metrics too.
 
 ### Acceptance criteria
 
 - No user-facing F1 appears without its split named.
+- `best_value` is never presented as the run's result.
 - Trials with no validation split (the small-dataset fallback path) are
   labelled accurately rather than mislabelled as validation.
 
@@ -270,3 +280,124 @@ after. Optionally, a guard that fails loudly if a test resolves to a path under
 
 - Running the full suite leaves `db/quoptuna_app.db` byte-identical.
 - A test that forgets isolation fails rather than writing to the real database.
+
+---
+
+## SPEC-006 — k-fold cross-validated trial scoring
+
+**Status:** Proposed
+**Area:** `backend/tuners/optimizer.py` (`objective`, `_ensure_validation_split`,
+`_make_pruning_callback`, `_tune_decision_threshold`)
+**Motivation:** Selection quality, and honesty of `best_value`
+**Depends on:** the split-ordering fix (folds must be cut before resampling,
+for the same reason the holdout is)
+
+### Problem
+
+The objective scores each trial on a single stratified holdout — 20% of train,
+one seed (`random_state=42`). `best_value` is then the **maximum** over ~100
+such estimates. The maximum of many noisy estimates is biased upward, so
+`best_value` overstates the winning trial's true skill, and trials whose real
+skill differs by less than the measurement noise are ranked essentially at
+random.
+
+This is *not* the leakage bug fixed earlier. That one made validation
+anti-correlated with test (Spearman −0.75 on `ilpd_oversample-nofair_100`) and
+inflated the headline by 0.56; it produced false claims. This is an estimator
+efficiency problem: the reported test metrics stay unbiased because no trial is
+selected on test, but the *choice* of trial is noisier than it should be, and
+`best_value` should never be quoted as a result.
+
+### Evidence
+
+Simulated on the post-fix ILPD validation geometry (88 rows, 25 positive, 100
+trials, all trials given identical true skill so every difference is noise):
+
+```
+single-trial val F1 : mean 0.462, sd 0.084
+max over 100 trials : mean 0.657   -> selection optimism +0.196
+```
+
+A real search has genuine skill spread, so the true optimism is smaller — but
+the per-trial sd of 0.084 is the measured quantity that matters: configurations
+within ~0.1 F1 of each other are being ordered by noise.
+
+Related unmeasured quantity: on `ilpd_oversample-nofair_100` the shipped trial
+scored test F1 0.340 while the search had already trained one at 0.631. How
+much of that 0.291 a clean single holdout recovers, versus how much needs
+variance reduction, is the open question below.
+
+### Proposed design
+
+Replace the single holdout with stratified k-fold CV inside `objective`. The
+trial's reported value becomes the mean fold score (report the sd too — it is
+what tells you whether a ranking is meaningful).
+
+Mechanics that are not optional:
+
+- **Folds are cut before resampling.** Each fold's training portion is
+  resampled independently, inside the loop. Resampling first and folding after
+  reproduces exactly the leakage bug this spec builds on — duplicated rows on
+  both sides of the boundary.
+- **The threshold sweep (SPEC-002) runs per fold**, on that fold's held-out
+  part. A single threshold swept across pooled out-of-fold predictions is the
+  alternative; decide which after SPEC-002 answers whether the sweep survives
+  at all.
+- **The fairness disparity is averaged over folds** the same way, since it is
+  an objective in `multi_objective` mode.
+- **Pruning needs rethinking.** `_make_pruning_callback` reports intermediate
+  values per training step of one fit. With k fits per trial the report index
+  no longer means what ASHA assumes. Either prune on fold 1 and only then run
+  the rest (cheap, biased), or report the running fold mean (correct, but k×
+  the cost before a trial can be killed). This is the main design decision.
+- **Cost.** `k ×` training per trial. On the JAX-trained quantum models at
+  `max_steps=200` this is the dominant cost in the whole pipeline; on kernel
+  and sklearn models it is near-free. Consider `k` per model family, or CV only
+  for the cheap families, before accepting a flat `k` everywhere.
+
+Cheaper alternatives worth measuring first, since they may capture most of the
+benefit:
+
+- **Never present `best_value` as a result** (SPEC-003). Free; removes the harm
+  of the bias without touching the search at all.
+- **Re-rank the shortlist.** Re-score only the top N trials on 3 extra
+  validation seeds and pick by the mean: `3 × N` refits instead of `k × 100`,
+  aimed exactly at the trials whose ordering is contested.
+
+Independently of which ships: report test metrics with a confidence interval
+and the trial count wherever a result is published.
+
+### Open questions
+
+1. **Pruning.** Prune on the first fold before spending the rest, or report a
+   running fold mean? The first is `k×` cheaper per killed trial but prunes on
+   exactly the noisy single-fold estimate this spec exists to replace.
+2. Does shortlist re-ranking recover most of CV's benefit at a fraction of the
+   cost? Measurable by re-ranking a completed study offline — no new training
+   for the kernel and classical models.
+3. Should `k` adapt to dataset size, or to model family? The variance problem
+   is worst where the holdout is smallest, which is also where CV is cheapest;
+   the cost problem is worst on the variational quantum models.
+4. Does the fairness disparity need per-fold treatment, or is the mean enough?
+   It drives an objective in `multi_objective` mode, so it inherits the
+   identical variance problem.
+5. Does Optuna's `study.best_value` semantics still read sensibly when the
+   value is a fold mean, and does the stored `val_f1_score` attr become the
+   mean, the per-fold list, or both?
+
+### Acceptance criteria
+
+- The per-trial validation sd is measured on a real post-fix run, not simulated.
+- Folds are verifiably cut before resampling: the leakage assertion in
+  `tests/test_split_leakage.py` extends to every fold's train/validation pair.
+- Selection quality is demonstrated by the selected trial's **test** F1
+  improving against the current single-holdout baseline on at least one
+  imbalanced dataset — not by `best_value` moving.
+- The added wall-clock cost per trial is measured per model family, not
+  assumed.
+- `best_value` is documented everywhere as a selection score.
+
+### Non-goals
+
+Nested cross-validation for unbiased performance estimation. The held-out test
+split already serves that purpose.

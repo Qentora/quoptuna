@@ -183,15 +183,23 @@ class TestCreateModelMulticlass:
 
 
 class _PerfectModel:
-    def __init__(self, **kwargs):
-        self.kwargs = kwargs
+    """Returns each row's true label, for any split it is asked about.
 
-    def fit(self, _x, y):
-        self._y = np.asarray(y)
+    Keyed by row content rather than position: the objective scores a
+    validation split the model never saw at fit time, so a positional
+    ``y[: len(x)]`` would answer with the wrong rows' labels.
+    """
+
+    def __init__(self, lookup=None, **kwargs):
+        self.kwargs = kwargs
+        self._lookup = lookup or {}
+
+    def fit(self, x, y):
+        self._lookup.update({tuple(row): label for row, label in zip(np.asarray(x), np.asarray(y))})
         return self
 
     def predict(self, x):
-        return self._y[: len(x)]
+        return np.array([self._lookup[tuple(row)] for row in np.asarray(x)])
 
     def score(self, _x, _y):
         return 1.0
@@ -206,7 +214,15 @@ class TestMacroF1Objective:
         return {"train_x": x, "test_x": x, "train_y": y, "test_y": y}
 
     def test_objective_uses_macro_average(self, multiclass_data, tmp_path, monkeypatch):
-        monkeypatch.setattr(optimizer_module, "create_model", lambda *_a, **k: _PerfectModel(**k))
+        # Seed the lookup with every row so the model answers correctly on the
+        # validation and test splits too, making a perfect macro-F1 reachable.
+        lookup = {
+            tuple(row): label
+            for row, label in zip(multiclass_data["train_x"], multiclass_data["train_y"])
+        }
+        monkeypatch.setattr(
+            optimizer_module, "create_model", lambda *_a, **k: _PerfectModel(lookup=lookup, **k)
+        )
         monkeypatch.setattr(
             "quoptuna.backend.utils.storage.optuna_db_path", lambda name: tmp_path / name
         )

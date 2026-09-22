@@ -103,7 +103,7 @@ class Optimizer:
         fairness_mode: str = "off",
         fairness_metric: str = "equal_opportunity_difference",
         fairness_threshold: Optional[float] = None,  # noqa: FA100
-        sensitive_test: Optional[np.ndarray] = None,  # noqa: FA100
+        sensitive_val: Optional[np.ndarray] = None,  # noqa: FA100
         task_spec: Optional[dict] = None,  # noqa: FA100
     ):
         """Initialize the Optimizer class.
@@ -112,9 +112,12 @@ class Optimizer:
             db_name: The name of the database to be used for storing optimization results.
             dataset_name: The name of the dataset. If provided, the data will be loaded from a
                 CSV file located in the 'notebook' directory. Defaults to an empty string.
-            data: A dictionary containing training and testing data. If not provided, an empty
-                dictionary will be used. Expected keys are 'train_x', 'test_x', 'train_y', and
-                'test_y'.
+            data: A dictionary containing the splits. Expected keys are 'train_x', 'train_y',
+                'test_x', 'test_y' and — for any caller that resamples the train split —
+                'val_x'/'val_y'. Supplying the validation split is REQUIRED whenever the
+                train split has been resampled: carving one here would slice a frame that
+                already contains duplicated rows, putting copies of training rows into
+                validation. Without these keys a stratified 20% of train is carved instead.
             study_name: The name of the study for Optuna. Defaults to an empty string.
             sampler: Optuna sampler to use: "tpe" (default), "random", or "grid".
             sampler_seed: Optional seed for the sampler (reproducible searches).
@@ -151,8 +154,10 @@ class Optimizer:
                 trial is feasible when disparity <= threshold (default 0.1);
                 for ``disparate_impact`` feasible when the DI ratio >=
                 threshold (default 0.8, the four-fifths rule).
-            sensitive_test: Sensitive-attribute values aligned positionally
-                with the test split. Required when ``fairness_mode`` != "off".
+            sensitive_val: Sensitive-attribute values aligned positionally
+                with the VALIDATION split. Required when ``fairness_mode`` != "off":
+                the search's disparity objective/constraint must be measured on data
+                the final report does not also use as its held-out test set.
 
         Attributes:
             db_name: The name of the database.
@@ -177,9 +182,11 @@ class Optimizer:
         self.data = data or {}  # Use an empty dictionary if no data is provided
         self.train_x, self.train_y = self.data.get("train_x"), self.data.get("train_y")
         self.test_x, self.test_y = self.data.get("test_x"), self.data.get("test_y")
-        # Validation split (carved from train at optimize() time); used for
-        # objective scoring and pruning reports. Test stays for reporting.
-        self.val_x = self.val_y = None
+        # Validation split used for objective scoring, pruning reports and the
+        # fairness disparity. Supplied by the caller when it owns the split
+        # (the server always does, because it resamples); otherwise carved
+        # from train by _ensure_validation_split. Test stays for reporting.
+        self.val_x, self.val_y = self.data.get("val_x"), self.data.get("val_y")
         ensure_db_dir()
         self.data_path = str(optuna_db_path(self.db_name))
         self.storage_location = optuna_storage_url(self.db_name)
@@ -217,7 +224,7 @@ class Optimizer:
         )
         self.fairness_mode = fairness_mode
         self.fairness_metric = fairness_metric
-        self.sensitive_test = None if sensitive_test is None else np.asarray(sensitive_test).ravel()
+        self.sensitive_val = None if sensitive_val is None else np.asarray(sensitive_val).ravel()
         self._validate_fairness_config()
         # Normalize the threshold into disparity space once (0 = parity), so
         # both modes share `disparity <= threshold` semantics: DI's ratio
@@ -271,8 +278,17 @@ class Optimizer:
                 f"(expected one of {FAIRNESS_METRICS})"
             )
             raise ValueError(msg)
-        if self.sensitive_test is None:
-            msg = f"fairness_mode={self.fairness_mode!r} requires sensitive_test"
+        if self.sensitive_val is None:
+            msg = f"fairness_mode={self.fairness_mode!r} requires sensitive_val"
+            raise ValueError(msg)
+        n_val = None if self.val_y is None else len(np.asarray(self.val_y).ravel())
+        if n_val is not None and len(self.sensitive_val) != n_val:
+            # A misaligned sensitive column silently audits the wrong rows, so
+            # every disparity the search optimizes would be meaningless.
+            msg = (
+                "sensitive_val must align positionally with val_y "
+                f"({len(self.sensitive_val)} vs {n_val} rows)"
+            )
             raise ValueError(msg)
         if self.fairness_mode == "constrained" and self.sampler != "tpe":
             # Random/Grid samplers silently ignore constraints_func; an
@@ -406,10 +422,10 @@ class Optimizer:
             self._log_resource_attributes(trial, model)
 
             if self.fairness_mode != "off":
-                # Fairness stays on the test split: sensitive_test is
-                # positionally aligned to it, and no sensitive attribute is
-                # available for the train-derived validation split.
-                disparity = self._record_fairness(trial, y_pred)
+                # Measured on validation, like the F1 objective: a disparity
+                # optimized against the test split would make the post-hoc
+                # audit in Analyze a report on data the search already fitted.
+                disparity = self._record_fairness(trial, val_pred)
                 if self.fairness_mode == "multi_objective":
                     return val_f1, disparity
 
@@ -516,13 +532,13 @@ class Optimizer:
             logger.warning("Trial %s did not converge; scoring anyway", trial.number)
             trial.set_user_attr(key="converged", value=False)
 
-    def _record_fairness(self, trial: Trial, y_pred) -> float:
-        """Compute and record the trial's fairness disparity; return it."""
+    def _record_fairness(self, trial: Trial, val_pred) -> float:
+        """Compute and record the trial's validation disparity; return it."""
         try:
             disparity = compute_disparity(
-                self.test_y,
-                y_pred,
-                self.sensitive_test,
+                self.val_y,
+                val_pred,
+                self.sensitive_val,
                 self.fairness_metric,
                 favorable=self.favorable_label,
             )
@@ -726,12 +742,19 @@ class Optimizer:
     MIN_TRAIN_ROWS_FOR_VAL_SPLIT = 10
 
     def _ensure_validation_split(self):
-        """Carve a validation split out of TRAIN (idempotent).
+        """Guarantee a validation split exists (idempotent).
 
-        The objective and pruning reports are scored on this split so model
-        selection doesn't tune to the test set (which Analyze/reports use for
-        final metrics). On tiny datasets where a further split is not viable,
-        fall back to validating on the test split (the previous behavior).
+        A caller-supplied ``val_x``/``val_y`` is used as-is and is the only
+        correct option once the train split has been resampled: carving here
+        would slice a frame containing duplicated rows, so copies of training
+        rows would land in validation and the objective would score
+        memorisation. The server always supplies one.
+
+        Only when none was supplied (standalone ``load_and_preprocess_data``
+        and direct ``objective()`` callers, neither of which resamples) is a
+        stratified 20% carved from train here. On tiny datasets where a
+        further split is not viable, fall back to validating on the test
+        split — which tunes selection to test, so it is logged as a warning.
         """
         if self.val_x is not None:
             return

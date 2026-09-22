@@ -70,6 +70,11 @@ class XAIConfig:
     data_key: str = DATA_KEY
     x_test_key: str = "x_test"
     y_test_key: str = "y_test"
+    # Binary decision cutoff the search selected this model under (the
+    # ``decision_threshold`` trial attr). Every label-based metric must use
+    # the same rule the objective scored, or the analysis reports a different
+    # classifier than the one that won. None keeps the model's own predict().
+    decision_threshold: float | None = None
 
 
 class XAI:
@@ -100,6 +105,7 @@ class XAI:
         self.data_key: str = self.config.data_key
         self.x_test_key: str = self.config.x_test_key
         self.y_test_key: str = self.config.y_test_key
+        self.decision_threshold: float | None = self.config.decision_threshold
 
         self._classes = self.get_classes
         data_frame = self.data.get(self.data_key)
@@ -136,8 +142,36 @@ class XAI:
             if not hasattr(self.model, "predict"):
                 msg = "Model does not have a predict method"
                 raise TypeError(msg)
-            self._predictions = self.model.predict(self.x_test)
+            self._predictions = (
+                self._thresholded_predictions()
+                if self.decision_threshold is not None
+                else self.model.predict(self.x_test)
+            )
         return self._predictions
+
+    def _thresholded_predictions(self):
+        """Labels from ``predict_proba`` at the search's decision threshold.
+
+        Binary only: a cutoff has no meaning against an argmax over K classes.
+        Falls back to the model's own ``predict`` when probabilities are
+        unavailable, so a model without ``predict_proba`` still analyses.
+
+        Class labels come from the training targets, sorted — the same source
+        and order ``Optimizer._tune_decision_threshold`` used to pick the
+        threshold, and defined for the quantum models that expose no
+        ``classes_``. Column 1 of ``predict_proba`` is the positive class for
+        both the {-1,+1} quantum models and sklearn's ``classes_`` ordering.
+        """
+        if not hasattr(self.model, "predict_proba"):
+            return self.model.predict(self.x_test)
+        y_train = self.data.get("y_train")
+        if y_train is None:
+            return self.model.predict(self.x_test)
+        classes = np.sort(np.unique(np.asarray(y_train).ravel()))
+        if len(classes) != BINARY_CLASS_COUNT:
+            return self.model.predict(self.x_test)
+        proba = np.asarray(self.model.predict_proba(self.x_test))[:, 1]
+        return np.where(proba >= self.decision_threshold, classes[-1], classes[0])
 
     @property
     def predictions_proba(self) -> pd.DataFrame:
