@@ -95,3 +95,35 @@ def test_confusion_matrix_uses_both_classes(banknote_run):
 
     predicted_per_class = matrix.sum(axis=0)
     assert (predicted_per_class > 0).all(), f"predicted only one class: {matrix.tolist()}"
+
+
+def _run(db_name, study_name):
+    return run_headless_optimization(
+        csv_path=BANKNOTE_CSV,
+        target="class",
+        n_trials=2,
+        # The only shot-based model in the catalogue: its feature map samples
+        # from a simulator device, so an unseeded device makes every run —
+        # and every re-analysis — return different numbers.
+        model_types=["QuantumKitchenSinks"],
+        search_space={"max_vmap": [32], "n_qfeatures": ["full"], "n_episodes": [10]},
+        sampler="random",
+        sampler_seed=0,
+        db_name=db_name,
+        study_name=study_name,
+        subset_size=5,
+    )
+
+
+def test_identical_runs_produce_identical_scores(isolated_storage):
+    """The reported symptom: scores moved on every re-analysis.
+
+    Two independent causes, both fixed. The shared-estimator leak between
+    model instances is pinned by ``tests/test_model_isolation.py``; this
+    covers the other one — sampling from an unseeded simulator device, which
+    made even identical inputs produce different predictions.
+    """
+    first = _run("determinism_a", "banknote_det_a")["analysis"]["metrics"]
+    second = _run("determinism_b", "banknote_det_b")["analysis"]["metrics"]
+
+    assert first == second

@@ -4,7 +4,6 @@ import base64
 import io
 import logging
 import pickle
-import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -670,7 +669,9 @@ class XAI:
             else:
                 num_waterfall_plots = min(num_waterfall_plots, len(self.x_test))
 
-            indices = sorted(random.sample(range(num_waterfall_plots), num_waterfall_plots))
+            # range(n) sampled n-wide then sorted is just range(n); calling
+            # random here only made report figures depend on global RNG state.
+            indices = range(num_waterfall_plots)
             for i in indices:
                 waterfall_plot_type: PlotType = "waterfall"
                 images[f"{waterfall_plot_type}_{i}"] = self.get_plot(

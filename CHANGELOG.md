@@ -91,6 +91,24 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   fits Platt scaling with a pinned `random_state`, and `build_xai` degrades to label
   mode for models that genuinely cannot produce probabilities (`LinearSVC`,
   `Perceptron`) instead of failing the analysis.
+- **Scores changed on every re-analysis.** Two independent causes, both now fixed.
+  1. The kernel-head models (`ProjectedQuantumKernel`, `IQPKernelClassifier`,
+     `SeparableKernelClassifier`, `QuantumKitchenSinks`) took their inner sklearn
+     estimator as a *mutable default argument* (`svm=SVC(...)`). Python evaluates a
+     default once at import, so every instance of the class shared one estimator
+     object, and each `fit` refitted it in place. In the analysis job — which fits its
+     model and then lets the fairness section build another — the second fit rewrote
+     the first model's classifier head underneath the metrics being computed.
+     Measured: 27 of 40 predictions flipped in an already-fitted model purely because
+     a second instance was fitted. Each class now builds its own estimator.
+  2. `QuantumKitchenSinks`, the only shot-based model, sampled from an unseeded
+     simulator device, so the same fitted model returned different predictions on
+     every call. The device is now seeded with a `jax.random.PRNGKey` derived from
+     `random_state`, which is reused verbatim per execution, making repeated predicts
+     and independent refits bit-identical.
+- Report figure selection called `random.sample(range(n), n)` — a whole-population
+  sample, so the result was always `range(n)` but the call still consumed global RNG
+  state. Replaced with `range(n)`.
 
 ### Added
 - Refit consistency check. The search already scores every trial on the test split;
@@ -105,6 +123,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   of the failure modes above shows up as a number below the floor. Asserts perfect
   F1/accuracy, a non-null ROC-AUC, search/analysis agreement, and a confusion matrix
   that uses both classes. Runs in ~5s.
+- Determinism regression tests: `tests/test_model_isolation.py` (instances never share
+  a fitted estimator; a second fit cannot change an earlier model's predictions;
+  identical configurations refit identically) and an end-to-end check that two
+  identical runs of the shot-based model produce identical metrics.
 
 ## [0.1.3]
 ### Changed
