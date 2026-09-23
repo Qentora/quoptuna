@@ -233,7 +233,12 @@ def _get_completed_result(optimization_id: str) -> dict:
 MAX_REFIT_METRIC_DRIFT = 0.02
 
 
-def _refit_consistency(opt_result: dict, trial_number: int | None, analysis_f1) -> dict | None:
+def _refit_consistency(
+    opt_result: dict,
+    trial_number: int | None,
+    analysis_f1,
+    decision_threshold: float | None = None,
+) -> dict | None:
     """Compare the analysis F1 against the F1 the trial recorded for itself.
 
     The search already scores every trial on the test split and stores it
@@ -246,6 +251,13 @@ def _refit_consistency(opt_result: dict, trial_number: int | None, analysis_f1) 
     duplicates, a refit on the wrong frame, a mis-shaped training target, a
     decision threshold replayed onto an incompatible probability scale. None
     of them raised; all of them moved this delta.
+
+    The comparison must use the same decision rule on both sides. The trial's
+    headline attrs are unthresholded, so when the analysis applied a tuned
+    ``decision_threshold`` the trial's ``f1_score_thresholded`` — recorded at
+    that same cutoff — is the like-for-like number. Comparing against the
+    unthresholded one instead reports the threshold's effect as drift, which
+    is a property of the classifier, not a divergence.
     """
     from optuna import load_study
 
@@ -263,8 +275,13 @@ def _refit_consistency(opt_result: dict, trial_number: int | None, analysis_f1) 
         if trial is None:
             return None
         attrs = trial.user_attrs
-        # Exactly one of the two families is non-zero for a given trial.
-        recorded = attrs.get("Quantum_f1_score") or attrs.get("Classical_f1_score")
+        if decision_threshold is not None and attrs.get("f1_score_thresholded") is not None:
+            recorded = attrs["f1_score_thresholded"]
+            rule = f"threshold={decision_threshold}"
+        else:
+            # Exactly one of the two families is non-zero for a given trial.
+            recorded = attrs.get("Quantum_f1_score") or attrs.get("Classical_f1_score")
+            rule = "argmax"
         if recorded is None:
             return None
     except Exception:  # a consistency check must never fail the analysis
@@ -275,6 +292,7 @@ def _refit_consistency(opt_result: dict, trial_number: int | None, analysis_f1) 
     return {
         "trial_test_f1": float(recorded),
         "analysis_test_f1": float(analysis_f1),
+        "decision_rule": rule,
         "drift": drift,
         "within_tolerance": drift <= MAX_REFIT_METRIC_DRIFT,
         "tolerance": MAX_REFIT_METRIC_DRIFT,
@@ -875,7 +893,10 @@ async def _run_analysis_job_async(job_id: str, request: AnalysisJobRequest) -> N
         # one. Surfaced as a warning so it reaches the UI and the report agent
         # instead of only a log line.
         consistency = _refit_consistency(
-            opt_result, analysed_model.get("trial_number"), (metrics.get("metrics") or {}).get("f1_score")
+            opt_result,
+            analysed_model.get("trial_number"),
+            (metrics.get("metrics") or {}).get("f1_score"),
+            decision_threshold=analysed_model.get("decision_threshold"),
         )
         analysed_model["refit_consistency"] = consistency
         if consistency and not consistency["within_tolerance"]:

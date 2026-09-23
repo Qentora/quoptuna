@@ -263,4 +263,4 @@ where = ["src"]
 # Bundle the statically-exported frontend (generated into src/quoptuna/web at
 # build time) into the wheel so `uvx quoptuna` can serve the UI without Node.
 [tool.setuptools.package-data]
-quoptuna = ["web/**/*", "datasets/*.csv"]
+quoptuna = ["web/**/*", "datasets/*.csv", "datasets/*.csv.gz"]

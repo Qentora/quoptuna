@@ -96,8 +96,10 @@ db/CrystalData.db
 *.pkl
 experiments/basic_dataset_test/data/dummy file
 
-# ...but datasets bundled with the package are committed on purpose.
+# ...but datasets bundled with the package are committed on purpose
+# (they are gzipped; *.csv.gz is not matched by the *.csv rule above).
 !src/quoptuna/datasets/*.csv
+!src/quoptuna/datasets/*.csv.gz
 
 # ---------------------------------------------------------------------------
 # Next.js / Node (frontend)

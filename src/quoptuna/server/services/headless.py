@@ -218,7 +218,10 @@ def run_headless_optimization(
             # model is not the model that was selected — the symptom shared by
             # every silent-divergence bug this pipeline has had.
             "refit_consistency": analysis_mod._refit_consistency(  # noqa: SLF001
-                opt, None, metrics["f1_score"]
+                opt,
+                None,
+                metrics["f1_score"],
+                decision_threshold=getattr(xai, "decision_threshold", None),
             ),
         }
 

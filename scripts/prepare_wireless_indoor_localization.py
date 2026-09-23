@@ -17,12 +17,13 @@ from pathlib import Path
 
 import pandas as pd
 
+# Gzipped: pandas infers the codec from the suffix, so readers are unchanged.
 OUTPUT = (
     Path(__file__).resolve().parents[1]
     / "src"
     / "quoptuna"
     / "datasets"
-    / "wireless_indoor_localization.csv"
+    / "wireless_indoor_localization.csv.gz"
 )
 
 # 8 attribute names: wifi from 1 to 7 and room
