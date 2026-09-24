@@ -6,6 +6,14 @@ services:
     network_mode: host
     env_file:
       - /opt/quoptuna/runtime.env
+    # Bind-mounted onto the instance's encrypted gp3 root volume. Without
+    # this, the SQLite databases and uploaded datasets live in the container's
+    # writable layer, which `docker compose up` discards on every deploy
+    # (the rollout logs "Container quoptuna Recreate"). The deploy creates
+    # these directories with the image's uid before starting the stack.
+    volumes:
+      - /opt/quoptuna/data/db:/app/db
+      - /opt/quoptuna/data/uploads:/app/uploads
     healthcheck:
       test:
         - CMD

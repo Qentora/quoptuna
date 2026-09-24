@@ -194,8 +194,6 @@ class QuantumMetricLearner(BaseEstimator, ClassifierMixin):
             y (np.ndarray): Labels of shape (n_samples,)
         """
 
-        self.initialize(X.shape[1], classes=np.unique(y))
-
         self.scaler = MinMaxScaler(feature_range=(-np.pi / 2, np.pi / 2))
         self.scaler.fit(X)
         X = self.transform(X)
@@ -205,8 +203,18 @@ class QuantumMetricLearner(BaseEstimator, ClassifierMixin):
         B = jnp.array(X[y == 1])
 
         if self.batch_size > min(len(A), len(B)):
-            warnings.warn("batch size too large, setting to " + str(min(len(A), len(B))))
             self.batch_size = min(len(A), len(B))
+            self.max_vmap = max(
+                divisor
+                for divisor in range(min(self.max_vmap, self.batch_size), 0, -1)
+                if self.batch_size % divisor == 0
+            )
+            warnings.warn(
+                f"batch size too large, setting to {self.batch_size}; "
+                f"max_vmap adjusted to {self.max_vmap}"
+            )
+
+        self.initialize(X.shape[1], classes=np.unique(y))
 
         # Store the comparison examples BEFORE training, not just after: predict
         # needs them, and mid-training callbacks (e.g. Optuna pruning reports)

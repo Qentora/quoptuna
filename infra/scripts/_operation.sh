@@ -57,6 +57,7 @@ build_and_push() {
 
 deploy_image() {
   local image_uri="$1"
+  local restore_uri="${2:-}"
   local instance_id bucket secret_name repository command
   instance_id="$(instance_output instance_id)"
   bucket="$(foundation_output artifact_bucket)"
@@ -67,7 +68,6 @@ deploy_image() {
   aws s3 cp "$RUNTIME_DIR/Caddyfile" \
     "s3://$bucket/deployment/$ENVIRONMENT/Caddyfile" >/dev/null
   wait_for_ssm "$instance_id"
-  run_ssm "$instance_id" "cloud-init status --wait"
   command="set -euo pipefail
 mkdir -p /opt/quoptuna
 aws s3 cp s3://$bucket/deployment/$ENVIRONMENT/docker-compose.yml /opt/quoptuna/docker-compose.yml
@@ -79,6 +79,20 @@ printf 'IMAGE_URI=%s\\nDOMAIN_NAME=%s\\n' '$image_uri' '$DOMAIN_NAME' > /opt/quo
 aws ecr get-login-password --region '$AWS_REGION' | docker login --username AWS --password-stdin '${repository%%/*}'
 cd /opt/quoptuna
 docker compose --env-file compose.env -f docker-compose.yml pull --quiet
+if [[ -n '$restore_uri' ]]; then
+  rm -rf /opt/quoptuna/data
+  aws s3 cp '$restore_uri' /tmp/quoptuna-data.tar.gz
+  tar -xzf /tmp/quoptuna-data.tar.gz -C /opt/quoptuna
+  rm -f /tmp/quoptuna-data.tar.gz
+fi
+# The bind-mounted data directories must exist and be writable by the
+# non-root user the image runs as, or the app cannot open its databases.
+# The uid is read from the image rather than hard-coded, because it is
+# assigned by useradd --system at build time.
+app_uid=\$(docker run --rm --entrypoint id '$image_uri' -u)
+app_gid=\$(docker run --rm --entrypoint id '$image_uri' -g)
+mkdir -p /opt/quoptuna/data/db /opt/quoptuna/data/uploads
+chown -R \"\$app_uid:\$app_gid\" /opt/quoptuna/data
 docker compose --env-file compose.env -f docker-compose.yml up -d --remove-orphans
 docker image prune -f"
   run_ssm "$instance_id" "$command"
@@ -115,16 +129,20 @@ deploy_application() {
 }
 
 update_infrastructure() {
-  local image_uri
+  local image_uri existing_instance backup_uri restore_uri
   check_tools
   require_command git
   bootstrap_state
   terraform_init "$APPLICATION_DIR" application
+  existing_instance=""
+  backup_uri=""
   if terraform -chdir="$APPLICATION_DIR" state show aws_instance.app >/dev/null 2>&1; then
-    local existing_instance
     existing_instance="$(instance_output instance_id)"
     require_running_instance "$existing_instance"
     assert_no_active_work "$existing_instance"
+    if [[ "$PLAN_ONLY" != true ]]; then
+      backup_uri="$(backup_instance_data "$existing_instance")"
+    fi
   fi
   apply_foundation
   [[ "$PLAN_ONLY" == true ]] && { apply_application; return; }
@@ -132,7 +150,12 @@ update_infrastructure() {
   build_and_push
   image_uri="$BUILT_IMAGE_URI"
   apply_application
-  deploy_image "$image_uri"
+  restore_uri=""
+  if [[ -n "$existing_instance" ]] &&
+    [[ "$(instance_output instance_id)" != "$existing_instance" ]]; then
+    restore_uri="$backup_uri"
+  fi
+  deploy_image "$image_uri" "$restore_uri"
 }
 
 pause_infrastructure() {
@@ -147,7 +170,7 @@ pause_infrastructure() {
   delete_dns_record
   aws ec2 stop-instances --instance-ids "$instance_id" >/dev/null
   aws ec2 wait instance-stopped --instance-ids "$instance_id"
-  log "Paused $ENVIRONMENT; persistent Supabase and S3 data were preserved"
+  log "Paused $ENVIRONMENT; instance and S3 data were preserved"
 }
 
 resume_infrastructure() {
@@ -231,6 +254,28 @@ empty_versioned_bucket() (
   done
 )
 
+backup_instance_data() {
+  # The instance stores SQLite databases and uploaded datasets on its root
+  # volume, which has delete_on_termination=true. Stopping the instance keeps
+  # them; destroying it does not, so copy them to the artifact bucket first.
+  local instance_id="$1"
+  local bucket stamp backup_uri
+  bucket="$(foundation_output artifact_bucket)"
+  stamp="$(date -u +%Y%m%d%H%M%S)"
+  backup_uri="s3://$bucket/backups/$ENVIRONMENT/$stamp/quoptuna-data.tar.gz"
+  log "Backing up instance data to ${backup_uri%/*}/" >&2
+  run_ssm "$instance_id" "set -euo pipefail
+if [ -d /opt/quoptuna/data ]; then
+  tar -czf /tmp/quoptuna-data.tar.gz -C /opt/quoptuna data
+  aws s3 cp /tmp/quoptuna-data.tar.gz '$backup_uri'
+  rm -f /tmp/quoptuna-data.tar.gz
+else
+  echo 'No /opt/quoptuna/data to back up' >&2
+  exit 1
+fi" >/dev/null || die "Backup failed; refusing to replace an instance with persistent data"
+  printf '%s\n' "$backup_uri"
+}
+
 destroy_infrastructure() (
   local instance_id temp_dir var_file bucket
   local tf_args=(
@@ -248,6 +293,7 @@ destroy_infrastructure() (
     read -r confirmation
     [[ "$confirmation" == "$ENVIRONMENT" ]] || die "Confirmation did not match"
   fi
+  backup_instance_data "$instance_id"
   delete_dns_record
   temp_dir="$(mktemp -d)"
   trap 'rm -rf "$temp_dir"' EXIT
@@ -255,7 +301,7 @@ destroy_infrastructure() (
   application_var_file "$var_file"
   terraform -chdir="$APPLICATION_DIR" destroy -auto-approve -var-file="$var_file"
   [[ "$DELETE_DATA" != true ]] && {
-    log "Compute deleted; Supabase, S3, ECR, secret, and state were preserved"
+    log "Compute deleted; data backed up to S3. S3, ECR, secret, and state were preserved"
     return
   }
   printf 'Type DELETE-%s to delete persistent AWS data: ' "$ENVIRONMENT" >&2
