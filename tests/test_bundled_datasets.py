@@ -13,7 +13,24 @@ from quoptuna.datasets import BUNDLED_DATASETS, bundled_catalog, bundled_dataset
 from quoptuna.server.api.v1.data import POPULAR_UCI_DATASETS
 
 # id -> the target column a user is expected to select.
-EXPECTED_TARGETS = {422: "room", 9020: "tenure", 9021: "tenure"}
+EXPECTED_TARGETS = {
+    15: "target",
+    30: "target",
+    53: "target",
+    161: "target",
+    236: "target",
+    257: "target",
+    267: "target",
+    357: "target",
+    422: "room",
+    523: "target",
+    545: "target",
+    850: "target",
+    9020: "tenure",
+    9021: "tenure",
+    9022: "target",
+    9023: "target",
+}
 MAX_CLASSES = 20
 MIN_CLASSES = 2
 

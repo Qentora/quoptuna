@@ -67,10 +67,14 @@ POPULAR_UCI_DATASETS = [
         "num_instances": 690,
         "num_features": 14,
     },
-    # Datasets committed to the repo are appended so the picker still works
-    # when the UCI archive is unreachable.
-    *bundled_catalog(),
 ]
+
+# Keep the original picker entries verbatim, then append every additional
+# bundled artifact without duplicating an existing UCI id such as Banknote.
+_POPULAR_IDS = {entry["id"] for entry in POPULAR_UCI_DATASETS}
+POPULAR_UCI_DATASETS.extend(
+    entry for entry in bundled_catalog() if entry["id"] not in _POPULAR_IDS
+)
 
 MAX_UNIQUE_FOR_TARGET = 20
 
