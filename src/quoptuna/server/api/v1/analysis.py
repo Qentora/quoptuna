@@ -226,6 +226,79 @@ def _get_completed_result(optimization_id: str) -> dict:
     return result
 
 
+#: Largest |trial F1 - analysis F1| treated as reproduction noise. Models seed
+#: their init (``random_state=42``), so a faithful refit on the same frame
+#: reproduces the trial's own test metrics almost exactly; anything above this
+#: means the analysed model is not the model the search selected.
+MAX_REFIT_METRIC_DRIFT = 0.02
+
+
+def _refit_consistency(
+    opt_result: dict,
+    trial_number: int | None,
+    analysis_f1,
+    decision_threshold: float | None = None,
+) -> dict | None:
+    """Compare the analysis F1 against the F1 the trial recorded for itself.
+
+    The search already scores every trial on the test split and stores it
+    (``Quantum_f1_score`` / ``Classical_f1_score``). Analyze retrains that
+    trial and recomputes the same number, so the two are the same quantity
+    measured twice — they must agree.
+
+    Every silent-divergence bug this pipeline has had would have shown up
+    here on the first analysis: a validation split contaminated by resampled
+    duplicates, a refit on the wrong frame, a mis-shaped training target, a
+    decision threshold replayed onto an incompatible probability scale. None
+    of them raised; all of them moved this delta.
+
+    The comparison must use the same decision rule on both sides. The trial's
+    headline attrs are unthresholded, so when the analysis applied a tuned
+    ``decision_threshold`` the trial's ``f1_score_thresholded`` — recorded at
+    that same cutoff — is the like-for-like number. Comparing against the
+    unthresholded one instead reports the threshold's effect as drift, which
+    is a property of the classifier, not a divergence.
+    """
+    from optuna import load_study
+
+    if analysis_f1 is None:
+        return None
+    try:
+        study = load_study(
+            storage=optuna_storage_url(str(opt_result.get("db_name") or DEFAULT_DB_NAME)),
+            study_name=opt_result.get("study_name"),
+        )
+        if trial_number is None:
+            trial = study_best_trial(study)
+        else:
+            trial = next((t for t in study.trials if t.number == trial_number), None)
+        if trial is None:
+            return None
+        attrs = trial.user_attrs
+        if decision_threshold is not None and attrs.get("f1_score_thresholded") is not None:
+            recorded = attrs["f1_score_thresholded"]
+            rule = f"threshold={decision_threshold}"
+        else:
+            # Exactly one of the two families is non-zero for a given trial.
+            recorded = attrs.get("Quantum_f1_score") or attrs.get("Classical_f1_score")
+            rule = "argmax"
+        if recorded is None:
+            return None
+    except Exception:  # a consistency check must never fail the analysis
+        logger.warning("Could not load the trial's recorded metrics", exc_info=True)
+        return None
+
+    drift = abs(float(analysis_f1) - float(recorded))
+    return {
+        "trial_test_f1": float(recorded),
+        "analysis_test_f1": float(analysis_f1),
+        "decision_rule": rule,
+        "drift": drift,
+        "within_tolerance": drift <= MAX_REFIT_METRIC_DRIFT,
+        "tolerance": MAX_REFIT_METRIC_DRIFT,
+    }
+
+
 def _analysed_model(opt_result: dict, xai, trial_number: int | None) -> dict:
     """Provenance for the model a snapshot explains.
 
@@ -267,6 +340,12 @@ def _analysed_model(opt_result: dict, xai, trial_number: int | None) -> dict:
         "model_type": params.get("model_type"),
         "params": {k: v for k, v in params.items() if k != "model_type"},
         "training_budget": {k: v for k, v in budget.items() if v is not None},
+        # The cutoff every label-based metric below was produced at; None
+        # means the model's own predict() (argmax, or 0.5 for binary proba).
+        # ``decision_threshold_discarded`` explains a None that the trial did
+        # record a threshold for.
+        "decision_threshold": getattr(xai, "decision_threshold", None),
+        "decision_threshold_discarded": getattr(xai, "threshold_discarded", None),
         "retrained_at": datetime.now().isoformat(),
     }
 
@@ -808,6 +887,27 @@ async def _run_analysis_job_async(job_id: str, request: AnalysisJobRequest) -> N
             plots["rocCurve"] = curves["roc_curve_plot"]
         if curves and curves.get("pr_curve_plot"):
             plots["prCurve"] = curves["pr_curve_plot"]
+        analysed_model = _analysed_model(opt_result, shared_xai, trial)
+        # The search and the analysis measure the same quantity on the same
+        # split; a disagreement means the analysed model is not the selected
+        # one. Surfaced as a warning so it reaches the UI and the report agent
+        # instead of only a log line.
+        consistency = _refit_consistency(
+            opt_result,
+            analysed_model.get("trial_number"),
+            (metrics.get("metrics") or {}).get("f1_score"),
+            decision_threshold=analysed_model.get("decision_threshold"),
+        )
+        analysed_model["refit_consistency"] = consistency
+        if consistency and not consistency["within_tolerance"]:
+            warnings["refit_consistency"] = (
+                f"The analysed model scores F1 {consistency['analysis_test_f1']:.3f} on the test "
+                f"split, but trial {analysed_model.get('trial_number')} recorded "
+                f"{consistency['trial_test_f1']:.3f} for itself during the search "
+                f"(drift {consistency['drift']:.3f}). The analysis is not describing the model "
+                "that was selected; treat these metrics as unreliable."
+            )
+            logger.warning(warnings["refit_consistency"])
         payload = {
             "feature_importance": shap.get("feature_importance"),
             "plots": plots,
@@ -827,7 +927,7 @@ async def _run_analysis_job_async(job_id: str, request: AnalysisJobRequest) -> N
             # Which model this snapshot actually explains. Recorded at
             # analysis time so a stored snapshot (and any report built from
             # it) stays attributable after the study or request changes.
-            "analysed_model": _analysed_model(opt_result, shared_xai, trial),
+            "analysed_model": analysed_model,
         }
         analysis_store.complete_job(job_id, payload)
     except _JobCancelled:
@@ -967,7 +1067,7 @@ async def update_snapshot_fairness(snapshot_id: str, request: SnapshotFairnessRe
             mitigate=request.mitigate,
             constraint=request.constraint,
             task_spec=_task_spec(opt_result),
-            resampled_sensitive_train=opt_result.get("sensitive_train"),
+            persisted_sensitive_train=opt_result.get("sensitive_train"),
         )
         payload = dict(snapshot["payload"])
         payload["fairness"] = {
@@ -1497,24 +1597,26 @@ def _resolve_sensitive_series(
     optimization_id: str,
     sensitive_feature: Optional[str],
     xai,
-    resampled_sensitive_train=None,
+    persisted_sensitive_train=None,
 ):
-    """Load the raw dataset column and align it to the train/test split.
+    """Load the raw dataset column and align it to the analysed splits.
 
     ``DataPreparation.preprocess`` resets the feature index to a RangeIndex
     before its seeded ``train_test_split``, so split indices are positional
     row numbers into the raw dataframe (post feature-selection, which only
-    selects columns).
+    selects columns). The TEST split preserves that property — nothing
+    downstream reorders or resamples it — so it always resolves positionally.
 
-    When the run used TRAIN resampling, ``xai.data["x_train"]`` is the
-    resampled frame (no longer positional into the raw file); the caller must
-    then pass ``resampled_sensitive_train`` — the sensitive series already
-    resampled in lockstep at split time (persisted on the run's result as
-    ``sensitive_train``) — instead of re-deriving it positionally.
+    The train side does not: ``xai.data["x_train"]`` is the inner training
+    frame (validation carved out, then resampled), so neither its length nor
+    its index maps onto the raw file. It is therefore taken from
+    ``persisted_sensitive_train`` — the series carried through both steps in
+    lockstep by ``WorkflowExecutor._execute_train_test_split``. It is only
+    needed for mitigation; a missing one degrades that single feature rather
+    than failing the audit.
     """
     from quoptuna.server.services.sensitive import (
         SensitiveColumnError,
-        resolve_sensitive_series,
         resolve_sensitive_test_series,
     )
 
@@ -1528,16 +1630,10 @@ def _resolve_sensitive_series(
         )
 
     try:
-        if resampled_sensitive_train is not None:
-            sens_train = resampled_sensitive_train
-            sens_test = resolve_sensitive_test_series(request.dataset_id, column, xai.x_test)
-        else:
-            sens_train, sens_test = resolve_sensitive_series(
-                request.dataset_id, column, xai.data.get("x_train"), xai.x_test
-            )
+        sens_test = resolve_sensitive_test_series(request.dataset_id, column, xai.x_test)
     except SensitiveColumnError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
-    return column, sens_train, sens_test
+    return column, persisted_sensitive_train, sens_test
 
 
 def _compute_fairness_payload(
@@ -1548,12 +1644,12 @@ def _compute_fairness_payload(
     mitigate: bool = False,
     constraint: str = "equalized_odds",
     task_spec: Optional[dict] = None,
-    resampled_sensitive_train=None,
+    persisted_sensitive_train=None,
 ) -> dict:
     from quoptuna.backend.xai import fairness as fairness_mod
 
     column, sens_train, sens_test = _resolve_sensitive_series(
-        optimization_id, sensitive_feature, xai, resampled_sensitive_train
+        optimization_id, sensitive_feature, xai, persisted_sensitive_train
     )
 
     # Multiclass tasks are audited on the favorable-class-vs-rest outcome.
@@ -1583,6 +1679,11 @@ def _compute_fairness_payload(
         # which cannot be soundly mapped back onto an argmax over K classes.
         # The audit above remains valid; mitigation is binary-only for now.
         logger.info("Fairness mitigation skipped: unsupported for multiclass targets")
+    elif mitigate and sens_train is None:
+        # Mitigation refits on the training split, which needs its sensitive
+        # values row-aligned; runs configured without a sensitive_feature
+        # never recorded them. The audit above still stands.
+        logger.info("Fairness mitigation skipped: no sensitive values recorded for the train split")
     elif mitigate:
         mitigation = fairness_mod.mitigate_with_threshold_optimizer(
             xai.model,
@@ -1619,7 +1720,7 @@ async def generate_fairness(request: FairnessRequest):
             mitigate=request.mitigate,
             constraint=request.constraint,
             task_spec=_task_spec(opt_result),
-            resampled_sensitive_train=opt_result.get("sensitive_train"),
+            persisted_sensitive_train=opt_result.get("sensitive_train"),
         )
         return {
             "optimization_id": request.optimization_id,

@@ -50,11 +50,15 @@ def tiny_data():
         "test_x": features,
         "train_y": labels,
         "test_y": labels,
+        # Supplied explicitly: the disparity is scored on validation, and the
+        # sensitive_val fixture is aligned to these 20 rows.
+        "val_x": features,
+        "val_y": labels,
     }
 
 
 @pytest.fixture
-def sensitive_test():
+def sensitive_val():
     # First half group "a" (all predicted +1), second half "b" (all -1):
     # maximal demographic-parity disparity.
     return np.array(["a"] * 10 + ["b"] * 10)
@@ -120,51 +124,63 @@ def test_compute_fairness_includes_di_and_eod():
 # --- Optimizer validation ----------------------------------------------------
 
 
-def test_fairness_mode_requires_sensitive_test():
-    with pytest.raises(ValueError, match="requires sensitive_test"):
+def test_fairness_mode_requires_sensitive_val():
+    with pytest.raises(ValueError, match="requires sensitive_val"):
         Optimizer(db_name="unit", fairness_mode="constrained")
 
 
-def test_constrained_requires_tpe(sensitive_test):
+def test_sensitive_val_must_align_with_validation_split(tiny_data, sensitive_val):
+    # A misaligned column audits the wrong rows, so every disparity the search
+    # optimizes would be meaningless — reject it instead.
+    with pytest.raises(ValueError, match="must align positionally"):
+        Optimizer(
+            db_name="unit",
+            data=tiny_data,
+            fairness_mode="constrained",
+            sensitive_val=sensitive_val[:5],
+        )
+
+
+def test_constrained_requires_tpe(sensitive_val):
     with pytest.raises(ValueError, match="requires sampler='tpe'"):
         Optimizer(
             db_name="unit",
             fairness_mode="constrained",
             sampler="random",
-            sensitive_test=sensitive_test,
+            sensitive_val=sensitive_val,
         )
 
 
-def test_multi_objective_coerces_pruner_to_none(sensitive_test):
+def test_multi_objective_coerces_pruner_to_none(sensitive_val):
     # Pruning is unsupported on multi-objective studies; the (default) pruner
     # is coerced to 'none' instead of rejecting the config.
     opt = Optimizer(
         db_name="unit",
         fairness_mode="multi_objective",
         pruner="asha",
-        sensitive_test=sensitive_test,
+        sensitive_val=sensitive_val,
     )
     assert opt.pruner == "none"
 
 
-def test_unknown_fairness_metric_rejected(sensitive_test):
+def test_unknown_fairness_metric_rejected(sensitive_val):
     with pytest.raises(ValueError, match="Unknown fairness_metric"):
         Optimizer(
             db_name="unit",
             fairness_mode="constrained",
             fairness_metric="accuracy",
-            sensitive_test=sensitive_test,
+            sensitive_val=sensitive_val,
         )
 
 
-def test_threshold_defaults_are_metric_specific(sensitive_test):
-    diff = Optimizer(db_name="u1", fairness_mode="constrained", sensitive_test=sensitive_test)
+def test_threshold_defaults_are_metric_specific(sensitive_val):
+    diff = Optimizer(db_name="u1", fairness_mode="constrained", sensitive_val=sensitive_val)
     assert diff._disparity_threshold == pytest.approx(0.1)
     di = Optimizer(
         db_name="u2",
         fairness_mode="constrained",
         fairness_metric="disparate_impact",
-        sensitive_test=sensitive_test,
+        sensitive_val=sensitive_val,
     )
     # DI ratio threshold 0.8 -> disparity-space threshold 0.2.
     assert di._disparity_threshold == pytest.approx(1 - DI_THRESHOLD_DEFAULT)
@@ -173,7 +189,7 @@ def test_threshold_defaults_are_metric_specific(sensitive_test):
 # --- constrained mode --------------------------------------------------------
 
 
-def test_constrained_study_records_constraint_attrs(tiny_data, sensitive_test, fake_create_model):
+def test_constrained_study_records_constraint_attrs(tiny_data, sensitive_val, fake_create_model):
     opt = Optimizer(
         db_name="unit_constrained",
         study_name="constrained_study",
@@ -183,7 +199,7 @@ def test_constrained_study_records_constraint_attrs(tiny_data, sensitive_test, f
         fairness_mode="constrained",
         fairness_metric="demographic_parity_difference",
         fairness_threshold=0.1,
-        sensitive_test=sensitive_test,
+        sensitive_val=sensitive_val,
     )
     sampler = opt._build_sampler()
     assert sampler._constraints_func is not None
@@ -199,7 +215,7 @@ def test_constrained_study_records_constraint_attrs(tiny_data, sensitive_test, f
         assert t.user_attrs["fairness_metric"] == "demographic_parity_difference"
 
 
-def test_constraints_func_defaults_to_worst_for_missing_attr(sensitive_test):
+def test_constraints_func_defaults_to_worst_for_missing_attr(sensitive_val):
     class _Frozen:
         def __init__(self):
             self.user_attrs = {}
@@ -210,7 +226,7 @@ def test_constraints_func_defaults_to_worst_for_missing_attr(sensitive_test):
 # --- multi-objective mode ----------------------------------------------------
 
 
-def test_multi_objective_study(tiny_data, sensitive_test, fake_create_model):
+def test_multi_objective_study(tiny_data, sensitive_val, fake_create_model):
     opt = Optimizer(
         db_name="unit_mo",
         study_name="mo_study",
@@ -218,7 +234,7 @@ def test_multi_objective_study(tiny_data, sensitive_test, fake_create_model):
         model_types=["SVC"],
         search_space=TINY_SEARCH_SPACE,
         fairness_mode="multi_objective",
-        sensitive_test=sensitive_test,
+        sensitive_val=sensitive_val,
     )
     study, best_trials = opt.optimize(n_trials=N_TRIALS)
     assert len(study.directions) == N_OBJECTIVES
@@ -230,7 +246,7 @@ def test_multi_objective_study(tiny_data, sensitive_test, fake_create_model):
         assert t.values[1] == t.user_attrs["fairness_disparity"]
 
 
-def test_failed_disparity_scores_worst(tiny_data, sensitive_test, fake_create_model, monkeypatch):
+def test_failed_disparity_scores_worst(tiny_data, sensitive_val, fake_create_model, monkeypatch):
     def _boom(*_args, **_kwargs):
         msg = "degenerate group"
         raise ValueError(msg)
@@ -243,7 +259,7 @@ def test_failed_disparity_scores_worst(tiny_data, sensitive_test, fake_create_mo
         model_types=["SVC"],
         search_space=TINY_SEARCH_SPACE,
         fairness_mode="multi_objective",
-        sensitive_test=sensitive_test,
+        sensitive_val=sensitive_val,
     )
     study, _ = opt.optimize(n_trials=1)
     (trial,) = study.trials

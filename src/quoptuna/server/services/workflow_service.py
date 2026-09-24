@@ -9,16 +9,15 @@ import logging
 from pathlib import Path
 from typing import Any, Dict, List
 
+import numpy as np
 import pandas as pd
 from ucimlrepo import fetch_ucirepo
 
 from quoptuna import XAI, DataPreparation, Optimizer, XAIConfig
+from quoptuna.backend.utils.data_utils.data import stratified_train_test_split
 from quoptuna.backend.utils.data_utils.resampling import resample_train_split
 from quoptuna.backend.utils.storage import DEFAULT_DB_NAME
-from quoptuna.server.services.sensitive import (
-    resolve_sensitive_series,
-    resolve_sensitive_test_series,
-)
+from quoptuna.server.services.sensitive import resolve_sensitive_series
 
 logger = logging.getLogger(__name__)
 
@@ -56,6 +55,61 @@ def _training_budget(opt_result: Dict[str, Any]) -> Dict[str, Any]:
     return {key: value for key, value in budget.items() if value is not None}
 
 
+#: Fraction of the train split held out for objective scoring, pruning reports
+#: and the search-time fairness disparity. Matches the fallback carve in
+#: ``Optimizer._ensure_validation_split`` so both paths behave identically.
+VALIDATION_FRACTION = 0.2
+#: Below this, a three-way split leaves too few validation rows to score; the
+#: run keeps the two-way split and Optimizer falls back to validating on test.
+MIN_TRAIN_ROWS_FOR_VAL_SPLIT = 10
+
+
+def _carve_validation_split(x_train, y_train, sensitive_train=None):
+    """Split train into (fit, validation), carrying the sensitive column along.
+
+    Called BEFORE any resampling so no duplicated row can span the boundary.
+    Returns ``(x_fit, x_val, y_fit, y_val, sensitive_fit, sensitive_val)``;
+    ``x_val``/``y_val`` are ``None`` when the train split is too small to
+    divide, which leaves the previous two-way behaviour intact.
+    """
+    y_arr = np.asarray(y_train).ravel()
+    if len(y_arr) < MIN_TRAIN_ROWS_FOR_VAL_SPLIT:
+        logger.warning(
+            "Train split has %d rows — too few to hold out a validation set; "
+            "the objective will be scored on the test split.",
+            len(y_arr),
+        )
+        return x_train, None, y_train, None, sensitive_train, None
+
+    # Index positionally so the sensitive series follows the exact same rows
+    # regardless of how the frames are indexed.
+    positions = np.arange(len(y_arr))
+    try:
+        fit_pos, val_pos = stratified_train_test_split(
+            positions, y_arr, test_size=VALIDATION_FRACTION, random_state=42
+        )[:2]
+    except ValueError:
+        logger.warning(
+            "Validation carve failed (a class is too rare to stratify); "
+            "the objective will be scored on the test split."
+        )
+        return x_train, None, y_train, None, sensitive_train, None
+
+    def _take(obj, pos):
+        if obj is None:
+            return None
+        return obj.iloc[pos] if hasattr(obj, "iloc") else np.asarray(obj)[pos]
+
+    return (
+        _take(x_train, fit_pos),
+        _take(x_train, val_pos),
+        _take(y_train, fit_pos),
+        _take(y_train, val_pos),
+        _take(sensitive_train, fit_pos),
+        _take(sensitive_train, val_pos),
+    )
+
+
 def build_xai(
     opt_result: Dict[str, Any],
     trial_number: int | None = None,
@@ -68,6 +122,11 @@ def build_xai(
 
     Shared by the SHAP / metrics / report analysis endpoints. When
     ``trial_number`` is ``None`` the study's best trial is used.
+
+    The refit uses ``opt_result["x_train"]`` — the same inner, resampled
+    training frame the trial fitted on — and the trial's recorded
+    ``decision_threshold``, so the analysed classifier is the one the search
+    scored rather than a differently-trained model read at a 0.5 cutoff.
     """
     from optuna import load_study
 
@@ -100,7 +159,13 @@ def build_xai(
     x_train_df = opt_result["x_train"]
     y_train_df = opt_result["y_train"]
     x_train_np = x_train_df.values if hasattr(x_train_df, "values") else x_train_df
-    y_train_np = y_train_df.values if hasattr(y_train_df, "values") else y_train_df
+    # MUST be 1-D, exactly as the search fits it (_execute_optimization ravels
+    # too). The label-encoding node stores y as a DataFrame, so ``.values``
+    # alone yields (n, 1); training on that shape does not raise — it silently
+    # collapses the model's probabilities into a narrow band around 0.5, which
+    # left argmax predictions plausible while making any probability threshold
+    # meaningless (every row on one side of it).
+    y_train_np = np.asarray(y_train_df).ravel()
     model.fit(x_train_np, y_train_np)
 
     data_dict = {
@@ -110,14 +175,34 @@ def build_xai(
         "y_test": opt_result["y_test"],
     }
 
+    # Absent for multiclass tasks, models without predict_proba, and trials
+    # whose sweep found nothing better than the default cutoff.
+    decision_threshold = trial.user_attrs.get("decision_threshold")
+
     xai_config = XAIConfig(
         use_proba=use_proba,
         onsubset=True,
         subset_size=subset_size,
         max_evals=max_evals,
+        decision_threshold=decision_threshold,
         **({} if background_size is None else {"background_size": background_size}),
     )
-    return XAI(model=model, data=data_dict, config=xai_config)
+    try:
+        return XAI(model=model, data=data_dict, config=xai_config)
+    except TypeError:
+        if not use_proba:
+            raise
+        # Models with no predict_proba at all (LinearSVC, Perceptron) cannot
+        # serve the probability mode. Explaining labels instead is the same
+        # fallback the UI's "use probabilities" toggle offers, and is strictly
+        # better than failing the whole analysis: the label-based metrics,
+        # confusion matrix and SHAP values are all still valid.
+        logger.warning(
+            "%s has no predict_proba; analysing in label mode (probability metrics unavailable)",
+            trial.params["model_type"],
+        )
+        xai_config.use_proba = False
+        return XAI(model=model, data=data_dict, config=xai_config)
 
 
 class WorkflowExecutor:
@@ -363,34 +448,52 @@ class WorkflowExecutor:
         # quantum included, since it happens before Optimizer ever sees the
         # data rather than via a per-model class_weight constructor arg.
         #
-        # A sensitive column, if configured, must be resampled in lockstep
-        # (resolved from the raw file HERE, while x_train.index is still
-        # positional into it — resampling below invalidates that positional
-        # index) so the fairness audit stays row-aligned to the resampled
-        # training data that downstream nodes actually persist/train on.
+        # ORDER IS LOAD-BEARING. The validation split is carved HERE, before
+        # resampling, and only the inner training portion is resampled.
+        # Oversampling duplicates minority rows verbatim; carving validation
+        # out of an already-oversampled frame (which is what Optimizer used to
+        # do) puts exact copies of training rows into validation, so the
+        # objective scores memorisation instead of generalisation. On ILPD
+        # that leaked 84% of the positive-class validation rows and inflated
+        # the reported F1 from ~0.28 to 0.90.
+        #
+        # A sensitive column, if configured, is resolved from the raw file
+        # FIRST (while x_train.index is still positional into it — both the
+        # carve and the resampling invalidate that) and then carried through
+        # both steps in lockstep, so the fairness audit stays row-aligned to
+        # whichever split it is measured on.
         resampling = config.get("resampling", "none")
-        sensitive_train = None
         sensitive_column = config.get("sensitive_feature")
-        if resampling != "none" and sensitive_column:
-            sens_train_raw, _ = resolve_sensitive_series(
+        sensitive_full_train = None
+        if sensitive_column:
+            sensitive_full_train, _ = resolve_sensitive_series(
                 config.get("dataset_id", ""), sensitive_column, data_prep.x_train, data_prep.x_test
             )
-            sensitive_train = sens_train_raw
 
-        x_train, y_train, sensitive_train = resample_train_split(
-            data_prep.x_train,
-            data_prep.y_train,
+        x_fit, x_val, y_fit, y_val, sensitive_fit, sensitive_val = _carve_validation_split(
+            data_prep.x_train, data_prep.y_train, sensitive_full_train
+        )
+
+        x_fit, y_fit, sensitive_fit = resample_train_split(
+            x_fit,
+            y_fit,
             strategy=resampling,
-            sensitive_train=sensitive_train,
+            sensitive_train=sensitive_fit,
         )
 
         return {
             "type": "split_data",
-            "x_train": x_train,
+            # x_train/y_train are the frame models are FITTED on: inner train,
+            # resampled. Analyze refits on exactly this, so its metrics are
+            # comparable to the trial's.
+            "x_train": x_fit,
             "x_test": data_prep.x_test,
-            "y_train": y_train,
+            "y_train": y_fit,
             "y_test": data_prep.y_test,
-            "sensitive_train": sensitive_train,
+            "x_val": x_val,
+            "y_val": y_val,
+            "sensitive_train": sensitive_fit,
+            "sensitive_val": sensitive_val,
             "x_columns": data["x_columns"],
             "y_column": data["y_column"],
             "task_spec": task_spec.to_dict(),
@@ -565,28 +668,40 @@ class WorkflowExecutor:
 
         opt_config = list(inputs.values())[0]
 
-        # Store original DataFrames for later SHAP analysis
+        # Store original DataFrames for later SHAP analysis. x_train here is
+        # the inner (post-carve, resampled) train frame produced by the split
+        # node — the exact data trials fit on, so Analyze reproduces them.
         x_train_df = opt_config["x_train"]
         x_test_df = opt_config["x_test"]
         y_train_df = opt_config["y_train"]
         y_test_df = opt_config["y_test"]
+        x_val_df = opt_config.get("x_val")
+        y_val_df = opt_config.get("y_val")
 
-        # Convert to numpy arrays for Optimizer (as shown in notebooks)
+        def _as_array(frame):
+            if frame is None:
+                return None
+            return frame.values if hasattr(frame, "values") else frame
+
+        def _as_labels(frame):
+            if frame is None:
+                return None
+            return frame.values.ravel() if hasattr(frame, "values") else np.asarray(frame).ravel()
+
+        # Convert to numpy arrays for Optimizer (as shown in notebooks). The
+        # validation split is passed in rather than carved by Optimizer: it
+        # must be taken before resampling, which already happened upstream.
         data_dict = {
-            "train_x": x_train_df.values if hasattr(x_train_df, "values") else x_train_df,
-            "train_y": y_train_df.values.ravel()
-            if hasattr(y_train_df, "values")
-            else y_train_df.ravel(),
-            "test_x": x_test_df.values if hasattr(x_test_df, "values") else x_test_df,
-            "test_y": y_test_df.values.ravel()
-            if hasattr(y_test_df, "values")
-            else y_test_df.ravel(),
+            "train_x": _as_array(x_train_df),
+            "train_y": _as_labels(y_train_df),
+            "test_x": _as_array(x_test_df),
+            "test_y": _as_labels(y_test_df),
+            "val_x": _as_array(x_val_df),
+            "val_y": _as_labels(y_val_df),
         }
 
         task_spec = opt_config.get("task_spec")
 
-        # Fairness-aware search needs the raw sensitive column aligned to the
-        # test split (same positional alignment the post-hoc audit uses).
         fairness_mode = opt_config.get("fairness_mode", "off")
         if (
             fairness_mode != "off"
@@ -597,15 +712,20 @@ class WorkflowExecutor:
             raise WorkflowExecutionError(
                 "Fairness-aware search on a multiclass target requires favorable_class"
             )
-        sensitive_test = None
+        # The search's disparity is measured on validation, so it needs the
+        # sensitive column for those rows — carved in lockstep at split time.
+        sensitive_val = None
         if fairness_mode != "off":
             column = opt_config.get("sensitive_feature")
             if not column:
                 raise WorkflowExecutionError("Fairness-aware search requires a sensitive_feature")
-            sens_test = resolve_sensitive_test_series(
-                opt_config.get("dataset_id", ""), column, x_test_df
-            )
-            sensitive_test = sens_test.to_numpy()
+            sens_val = opt_config.get("sensitive_val")
+            if sens_val is None:
+                raise WorkflowExecutionError(
+                    "Fairness-aware search requires a validation split with the sensitive "
+                    "column aligned to it; the dataset is too small to hold one out."
+                )
+            sensitive_val = np.asarray(sens_val).ravel()
 
         # Create optimizer (optional reduced search space, e.g. for tests)
         optimizer = Optimizer(
@@ -627,7 +747,7 @@ class WorkflowExecutor:
             fairness_mode=fairness_mode,
             fairness_metric=opt_config.get("fairness_metric", "equal_opportunity_difference"),
             fairness_threshold=opt_config.get("fairness_threshold"),
-            sensitive_test=sensitive_test,
+            sensitive_val=sensitive_val,
             task_spec=task_spec,
         )
 
@@ -674,11 +794,18 @@ class WorkflowExecutor:
             "db_name": opt_config.get("db_name"),
             "n_trials": n_trials,
             "model_name": model_name,
-            # Store DataFrames for SHAP analysis
+            # Store DataFrames for SHAP analysis. x_train/y_train are the
+            # fitted frame (inner train, resampled) so build_xai reproduces
+            # the trial's model; x_val/y_val let Analyze re-check the
+            # objective it was selected on.
             "x_train": x_train_df,
             "x_test": x_test_df,
             "y_train": y_train_df,
             "y_test": y_test_df,
+            "x_val": x_val_df,
+            "y_val": y_val_df,
+            "sensitive_train": opt_config.get("sensitive_train"),
+            "sensitive_val": opt_config.get("sensitive_val"),
             "x_columns": opt_config.get("x_columns"),
             "y_column": opt_config.get("y_column"),
             "task_spec": task_spec,
@@ -732,9 +859,9 @@ class WorkflowExecutor:
             **params,
         )
 
-        # Convert to numpy for model fitting (as shown in notebooks)
+        # Convert to numpy for model fitting. y MUST be 1-D — see build_xai.
         x_train_np = x_train_df.values if hasattr(x_train_df, "values") else x_train_df
-        y_train_np = y_train_df.values if hasattr(y_train_df, "values") else y_train_df
+        y_train_np = np.asarray(y_train_df).ravel()
 
         model.fit(x_train_np, y_train_np)
 

@@ -48,6 +48,86 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Clarified that the model catalog lists registry keys, while `/api/v1/models`
   returns display names.
 
+### Fixed
+- **Train rows leaked into the validation split on resampled runs.** The train split
+  was oversampled (`RandomOverSampler` duplicates minority rows verbatim) *before*
+  `Optimizer` carved its validation split out of it, so a row and its own copy landed
+  on opposite sides of that boundary and the objective scored memorisation. On ILPD
+  (71/29 imbalance) 43% of validation rows — 84% of the positive class — were exact
+  copies of training rows, reporting F1 0.90 where the true value was 0.27, and
+  ranking trials *against* their real test performance (Spearman -0.75). The
+  validation split is now carved in the split node before any resampling, and only
+  the inner training portion is resampled; `Optimizer` consumes the split instead of
+  deriving one. Undersampled and unresampled runs were unaffected.
+- The fairness-aware search measured its disparity on the **test** split, so
+  constrained and multi-objective runs selected against the same data the post-hoc
+  audit reports. Disparity is now computed on validation, with the sensitive column
+  carried through the carve and the resampling in lockstep.
+- Analyze refit the selected trial on a different frame than the trial trained on and
+  scored it at a 0.5 cutoff while the objective had been maximised over a tuned
+  `decision_threshold`. It now refits on the trial's own training frame and applies
+  that threshold to every label-based metric (`decision_threshold` is recorded in the
+  snapshot's `analysed_model`); probability-based metrics are unchanged.
+- **Analyze trained every model on a mis-shaped target.** `build_xai` (and the SHAP
+  node) passed `y_train.values` straight to `model.fit`, but the label-encoding node
+  stores `y` as a DataFrame, so the target arrived as `(n, 1)` instead of `(n,)`. The
+  fit does not raise: it collapses the model's probabilities into a narrow band
+  around 0.5 (observed range 0.474-0.512 on ILPD) and degrades its ranking (test
+  ROC-AUC 0.54 versus 0.72 for the same configuration fitted correctly). Argmax
+  predictions stayed plausible, which is why it went unnoticed — until a probability
+  threshold was applied to that band and put every row on one side, reporting F1
+  0.000 with zero predicted positives. Both refit paths now ravel the target.
+- A stored `decision_threshold` that falls outside the refit's probability range is
+  now discarded rather than applied: the analysis falls back to the model's own
+  `predict` and records `decision_threshold_discarded` in `analysed_model`. A
+  threshold chosen against one fit is not guaranteed to be meaningful against
+  another, and an analysis must never report an all-one-class score for a model that
+  predicts both.
+- `SVC` was constructed with scikit-learn's default `probability=False`, so it has no
+  `predict_proba`. Whenever an SVC won the search — the common case on easy datasets
+  — ROC-AUC, average precision and log loss came back `null`, the decision-threshold
+  sweep was skipped, and the UI's analysis (which requests probability mode by
+  default) failed outright with "Model does not have a predict_proba method". SVC now
+  fits Platt scaling with a pinned `random_state`, and `build_xai` degrades to label
+  mode for models that genuinely cannot produce probabilities (`LinearSVC`,
+  `Perceptron`) instead of failing the analysis.
+- **Scores changed on every re-analysis.** Two independent causes, both now fixed.
+  1. The kernel-head models (`ProjectedQuantumKernel`, `IQPKernelClassifier`,
+     `SeparableKernelClassifier`, `QuantumKitchenSinks`) took their inner sklearn
+     estimator as a *mutable default argument* (`svm=SVC(...)`). Python evaluates a
+     default once at import, so every instance of the class shared one estimator
+     object, and each `fit` refitted it in place. In the analysis job — which fits its
+     model and then lets the fairness section build another — the second fit rewrote
+     the first model's classifier head underneath the metrics being computed.
+     Measured: 27 of 40 predictions flipped in an already-fitted model purely because
+     a second instance was fitted. Each class now builds its own estimator.
+  2. `QuantumKitchenSinks`, the only shot-based model, sampled from an unseeded
+     simulator device, so the same fitted model returned different predictions on
+     every call. The device is now seeded with a `jax.random.PRNGKey` derived from
+     `random_state`, which is reused verbatim per execution, making repeated predicts
+     and independent refits bit-identical.
+- Report figure selection called `random.sample(range(n), n)` — a whole-population
+  sample, so the result was always `range(n)` but the call still consumed global RNG
+  state. Replaced with `range(n)`.
+
+### Added
+- Refit consistency check. The search already scores every trial on the test split;
+  the analysis recomputes the same number after retraining it. Those must agree, and
+  every silent-divergence bug above moved that delta while leaving other metrics
+  plausible. Analyses now record `refit_consistency` (both values, the drift, and
+  whether it is within tolerance) in `analysed_model`, and raise a snapshot warning —
+  visible to the UI and the report agent — when the analysed model does not reproduce
+  the trial that was selected.
+- End-to-end pipeline canary (`tests/test_pipeline_canary.py`) on Banknote
+  Authentication, which is linearly separable: a correct pipeline scores ~1.0, so any
+  of the failure modes above shows up as a number below the floor. Asserts perfect
+  F1/accuracy, a non-null ROC-AUC, search/analysis agreement, and a confusion matrix
+  that uses both classes. Runs in ~5s.
+- Determinism regression tests: `tests/test_model_isolation.py` (instances never share
+  a fitted estimator; a second fit cannot change an earlier model's predictions;
+  identical configurations refit identically) and an end-to-end check that two
+  identical runs of the shot-based model produce identical metrics.
+
 ## [0.1.3]
 ### Changed
 - Migrated the documentation from MkDocs to an Astro + Starlight site in `docs-site/`,

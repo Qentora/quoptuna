@@ -34,7 +34,7 @@ from quoptuna.backend.base.pennylane_models.qml_benchmarks import (  # noqa: E40
 class ProjectedQuantumKernel(BaseEstimator, ClassifierMixin):
     def __init__(
         self,
-        svm=SVC(kernel="precomputed", probability=True),
+        svm=None,
         gamma_factor=1.0,
         C=1.0,
         embedding="Hamiltonian",
@@ -74,7 +74,10 @@ class ProjectedQuantumKernel(BaseEstimator, ClassifierMixin):
         which fits a classifier.
 
         Args:
-            svm (sklearn.svm.SVC): scikit-learn SVC class object.
+            svm (sklearn.svm.SVC): scikit-learn SVC class object. ``None`` (the
+                default) builds a fresh one per instance. A shared default
+                would be mutated and refitted by every other instance in the
+                process, silently changing this model's predictions.
             gamma_factor (float): the factor that multiplies the default scaling parameter in the kernel.
             C (float): regularization parameter when fitting the kernel model.
             embedding (str): The choice of embedding circuit used to construct the kernel.
@@ -92,7 +95,7 @@ class ProjectedQuantumKernel(BaseEstimator, ClassifierMixin):
         """
         # attributes that do not depend on data
         self.gamma_factor = gamma_factor
-        self.svm = svm
+        self.svm = SVC(kernel="precomputed", probability=True) if svm is None else svm
         self.C = C
         self.embedding = embedding
         self.t = t

@@ -246,7 +246,7 @@ class SeparableKernelClassifier(BaseEstimator, ClassifierMixin):
     def __init__(
         self,
         encoding_layers=1,
-        svm=SVC(kernel="precomputed", probability=True),
+        svm=None,
         C=1.0,
         jit=True,
         random_state=42,
@@ -267,7 +267,9 @@ class SeparableKernelClassifier(BaseEstimator, ClassifierMixin):
 
         Args:
             encoding_layers (int): number of layers in the data encoding circuit.
-            svm (sklearn.svm.SVC): scikit-learn SVC class object used to fit the model from the kernel matrix.
+            svm (sklearn.svm.SVC): scikit-learn SVC class object used to fit the model from the
+                kernel matrix. ``None`` (the default) builds a fresh one per instance; a shared
+                default object would be refitted by every other instance in the process.
             C (float): regularization parameter for the SVC. Lower values imply stronger regularization.
             jit (bool): Whether to use just in time compilation.
             random_state (int): Seed used for pseudorandom number generation.
@@ -285,7 +287,7 @@ class SeparableKernelClassifier(BaseEstimator, ClassifierMixin):
         self.dev_type = dev_type
         self.qnode_kwargs = qnode_kwargs
         self.jit = jit
-        self.svm = svm
+        self.svm = SVC(kernel="precomputed", probability=True) if svm is None else svm
         self.C = C
         self.scaling = scaling
         self.random_state = random_state

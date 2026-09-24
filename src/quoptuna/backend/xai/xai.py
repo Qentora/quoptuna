@@ -2,8 +2,8 @@ from __future__ import annotations
 
 import base64
 import io
+import logging
 import pickle
-import random
 from dataclasses import dataclass
 from pathlib import Path
 from typing import TYPE_CHECKING, Literal
@@ -34,6 +34,8 @@ if TYPE_CHECKING:
     from sklearn.base import BaseEstimator
 
     from quoptuna.backend.typing.data_typing import DataSet
+
+logger = logging.getLogger(__name__)
 
 # Constants
 EXPECTED_SHAP_VALUES_DIM = 2
@@ -70,6 +72,11 @@ class XAIConfig:
     data_key: str = DATA_KEY
     x_test_key: str = "x_test"
     y_test_key: str = "y_test"
+    # Binary decision cutoff the search selected this model under (the
+    # ``decision_threshold`` trial attr). Every label-based metric must use
+    # the same rule the objective scored, or the analysis reports a different
+    # classifier than the one that won. None keeps the model's own predict().
+    decision_threshold: float | None = None
 
 
 class XAI:
@@ -100,6 +107,10 @@ class XAI:
         self.data_key: str = self.config.data_key
         self.x_test_key: str = self.config.x_test_key
         self.y_test_key: str = self.config.y_test_key
+        self.decision_threshold: float | None = self.config.decision_threshold
+        #: Set when a stored threshold had to be discarded; surfaced in the
+        #: analysis payload so a silently-changed decision rule is visible.
+        self.threshold_discarded: str | None = None
 
         self._classes = self.get_classes
         data_frame = self.data.get(self.data_key)
@@ -136,8 +147,54 @@ class XAI:
             if not hasattr(self.model, "predict"):
                 msg = "Model does not have a predict method"
                 raise TypeError(msg)
-            self._predictions = self.model.predict(self.x_test)
+            self._predictions = (
+                self._thresholded_predictions()
+                if self.decision_threshold is not None
+                else self.model.predict(self.x_test)
+            )
         return self._predictions
+
+    def _thresholded_predictions(self):
+        """Labels from ``predict_proba`` at the search's decision threshold.
+
+        Binary only: a cutoff has no meaning against an argmax over K classes.
+        Falls back to the model's own ``predict`` when probabilities are
+        unavailable, so a model without ``predict_proba`` still analyses.
+
+        Class labels come from the training targets, sorted — the same source
+        and order ``Optimizer._tune_decision_threshold`` used to pick the
+        threshold, and defined for the quantum models that expose no
+        ``classes_``. Column 1 of ``predict_proba`` is the positive class for
+        both the {-1,+1} quantum models and sklearn's ``classes_`` ordering.
+
+        A threshold chosen against one fit is applied here to a *different*
+        fit, whose probability scale may not match. When that lands the cutoff
+        outside the model's entire probability range, every row falls on one
+        side and every label-based metric reads 0 for a model that is not
+        actually degenerate. That case falls back to ``predict`` and records
+        ``threshold_discarded`` rather than reporting the zero.
+        """
+        if not hasattr(self.model, "predict_proba"):
+            return self.model.predict(self.x_test)
+        y_train = self.data.get("y_train")
+        if y_train is None:
+            return self.model.predict(self.x_test)
+        classes = np.sort(np.unique(np.asarray(y_train).ravel()))
+        if len(classes) != BINARY_CLASS_COUNT:
+            return self.model.predict(self.x_test)
+        proba = np.asarray(self.model.predict_proba(self.x_test))[:, 1]
+        thresholded = np.where(proba >= self.decision_threshold, classes[-1], classes[0])
+        fallback = self.model.predict(self.x_test)
+        if len(np.unique(thresholded)) == 1 and len(np.unique(np.asarray(fallback))) > 1:
+            self.threshold_discarded = (
+                f"decision_threshold={self.decision_threshold} lies outside this fit's "
+                f"probability range [{proba.min():.3f}, {proba.max():.3f}], which would "
+                "assign every row to one class; scored with the model's own predict() instead"
+            )
+            logger.warning(self.threshold_discarded)
+            self.decision_threshold = None
+            return fallback
+        return thresholded
 
     @property
     def predictions_proba(self) -> pd.DataFrame:
@@ -612,7 +669,9 @@ class XAI:
             else:
                 num_waterfall_plots = min(num_waterfall_plots, len(self.x_test))
 
-            indices = sorted(random.sample(range(num_waterfall_plots), num_waterfall_plots))
+            # range(n) sampled n-wide then sorted is just range(n); calling
+            # random here only made report figures depend on global RNG state.
+            indices = range(num_waterfall_plots)
             for i in indices:
                 waterfall_plot_type: PlotType = "waterfall"
                 images[f"{waterfall_plot_type}_{i}"] = self.get_plot(

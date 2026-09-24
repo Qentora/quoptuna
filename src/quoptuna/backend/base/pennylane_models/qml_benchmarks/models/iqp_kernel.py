@@ -34,7 +34,7 @@ from quoptuna.backend.base.pennylane_models.qml_benchmarks import (  # noqa: E40
 class IQPKernelClassifier(BaseEstimator, ClassifierMixin):
     def __init__(
         self,
-        svm=SVC(kernel="precomputed", probability=True),
+        svm=None,
         repeats=2,
         C=1.0,
         jit=False,
@@ -61,7 +61,9 @@ class IQPKernelClassifier(BaseEstimator, ClassifierMixin):
         samples, and is therefore only appropriate for relatively small datasets.
 
         Args:
-            svm (sklearn.svm.SVC): scikit-learn SVM class object used to fit the model from the kernel matrix
+            svm (sklearn.svm.SVC): scikit-learn SVM class object used to fit the model from the
+                kernel matrix. ``None`` (the default) builds a fresh one per instance; a shared
+                default object would be refitted by every other instance in the process.
             repeats (int): number of times the IQP structure is repeated in the embedding circuit.
             C (float): regularization parameter for SVC. Lower values imply stronger regularization.
             jit (bool): Whether to use just in time compilation.
@@ -77,7 +79,7 @@ class IQPKernelClassifier(BaseEstimator, ClassifierMixin):
         self.C = C
         self.jit = jit
         self.max_vmap = max_vmap
-        self.svm = svm
+        self.svm = SVC(kernel="precomputed", probability=True) if svm is None else svm
         self.dev_type = dev_type
         self.qnode_kwargs = qnode_kwargs
         self.scaling = scaling

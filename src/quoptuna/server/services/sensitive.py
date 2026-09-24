@@ -6,14 +6,15 @@ into the raw dataframe (post feature-selection, which only selects columns).
 Both the post-hoc fairness audit and the fairness-aware search rely on this
 positional alignment, so it lives here as the single implementation.
 
-When TRAIN resampling is used (see ``data_utils.resampling``), the resampled
-train frame's index is no longer positional into the raw file — duplicated or
-dropped rows break that mapping. The train side is then resolved once, at
-resampling time, from the raw file (while the index is still positional) and
-resampled in lockstep with x_train/y_train; see
-``WorkflowExecutor._execute_train_test_split``. Everything downstream of that
-either receives the already-resampled series or, for the TEST split (never
-resampled), can resolve positionally as before via ``resolve_sensitive_test_series``.
+The TRAIN side loses that alignment before any model sees it:
+``WorkflowExecutor._execute_train_test_split`` carves a validation split out of
+train and then resamples the remainder (see ``data_utils.resampling``), so its
+rows are reordered, duplicated or dropped relative to the raw file. The
+sensitive column is therefore resolved ONCE, up front, while ``x_train.index``
+is still positional, and carried through the carve and the resampling in
+lockstep. Downstream consumers receive that already-aligned series; only the
+TEST split — which nothing reorders — still resolves positionally, via
+``resolve_sensitive_test_series``.
 """
 
 from __future__ import annotations

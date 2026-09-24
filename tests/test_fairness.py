@@ -101,8 +101,13 @@ def test_explicit_label_mapping_survives_split_and_encoding():
         {"label_mapping": {"neg": "no", "pos": "yes"}}, {"in": split}
     )
 
+    # Train, validation and test together account for every row exactly once.
     y_all = np.concatenate(
-        [np.ravel(encoded["y_train"].values), np.ravel(encoded["y_test"].values)]
+        [
+            np.ravel(np.asarray(encoded["y_train"])),
+            np.ravel(np.asarray(split["y_val"])),
+            np.ravel(np.asarray(encoded["y_test"])),
+        ]
     )
     assert set(np.unique(y_all).tolist()) == {-1, 1}
     # "yes" must map to +1: positives match the f1 > 0 rows (order-insensitive check).

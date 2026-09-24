@@ -37,10 +37,7 @@ from quoptuna.backend.base.pennylane_models.qml_benchmarks.model_utils import (
 class QuantumKitchenSinks(BaseEstimator, ClassifierMixin):
     def __init__(
         self,
-        # max_iter raised from sklearn's default 100: unregularized lbfgs on
-        # separable quantum features routinely needs more iterations and
-        # otherwise emits ConvergenceWarning on every fit.
-        linear_model=LogisticRegression(penalty=None, solver="lbfgs", tol=10e-4, max_iter=1000),
+        linear_model=None,
         n_episodes=100,
         n_qfeatures="full",
         var=1.0,
@@ -78,7 +75,10 @@ class QuantumKitchenSinks(BaseEstimator, ClassifierMixin):
             of CNOT gates on nearest neighbour and next-nearest neighbour qubits.
 
         Args:
-            linear_model (sklearn Estimator): linear model to use with the transformed features
+            linear_model (sklearn Estimator): linear model to use with the transformed features.
+                ``None`` (the default) builds a fresh one per instance; a shared default object
+                would be refitted by every other instance in the process, silently changing this
+                model's predictions.
             n_episodes (int): Number of features fed into the linear model after data transformation.
             n_qfeatures (str, int): Determines the number of features fed into the quantum circuit to transform the
                 data. This is the number of qubits used by the model. If 'full', the number of qubits is equal
@@ -94,7 +94,14 @@ class QuantumKitchenSinks(BaseEstimator, ClassifierMixin):
         """
 
         # attributes that do not depend on data
-        self.linear_model = linear_model
+        # max_iter raised from sklearn's default 100: unregularized lbfgs on
+        # separable quantum features routinely needs more iterations and
+        # otherwise emits ConvergenceWarning on every fit.
+        self.linear_model = (
+            LogisticRegression(penalty=None, solver="lbfgs", tol=10e-4, max_iter=1000)
+            if linear_model is None
+            else linear_model
+        )
         self.n_episodes = n_episodes
         self.n_qfeatures = n_qfeatures
         self.var = var
@@ -130,10 +137,18 @@ class QuantumKitchenSinks(BaseEstimator, ClassifierMixin):
 
         pattern = [[i, i + 2] for i in range(self.n_qubits_ - 2)]
 
+        # Seeded explicitly: this is the only shot-based model here, and an
+        # unseeded device draws its shots from global entropy. That made the
+        # feature map non-stationary — the SAME fitted model returned
+        # different predictions on every call, so each re-analysis of a run
+        # produced different scores. A jax PRNGKey (rather than an int seed)
+        # is reused verbatim for every execution, so repeated predicts and
+        # independent refits of the same configuration agree exactly.
         dev = qml.device(
             self.dev_type,
             wires=self.n_qubits_,
             shots=1,
+            seed=jax.random.PRNGKey(self.random_state),
         )
 
         @qml.qnode(dev, **self.qnode_kwargs)
