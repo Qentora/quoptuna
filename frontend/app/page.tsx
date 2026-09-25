@@ -125,7 +125,7 @@ export default function HomePage() {
         <SectionHeader className="mb-3" title="Get Started" />
         <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
           <Link href="/optimizer" className="group">
-            <Card className="h-full border-transparent bg-linear-to-br from-brand to-brand/70 text-brand-foreground transition-shadow hover:shadow-glow-brand">
+            <Card className="h-full border-transparent bg-linear-to-br from-brand to-brand/90 text-brand-foreground transition-shadow hover:shadow-glow-brand">
               <CardContent className="p-5">
                 <Zap className="mb-2 h-7 w-7" />
                 <h3 className="mb-1 text-base font-semibold">Open the Optimizer</h3>

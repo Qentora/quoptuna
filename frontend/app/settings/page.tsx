@@ -166,7 +166,7 @@ function ToggleField({
         <Switch id={id} checked={checked} onCheckedChange={onChange} />
       </div>
       <FieldDescription>{description}</FieldDescription>
-      <FieldDescription className="text-muted-foreground/80">
+      <FieldDescription>
         <span className="font-medium text-foreground/70">When to use: </span>
         {when}
       </FieldDescription>
@@ -519,7 +519,7 @@ export default function SettingsPage() {
                 placeholder={String(DEFAULT_MAX_TRIAL_ROWS)}
               />
               <FieldDescription>{docFor('maxTrialRows').description}</FieldDescription>
-              <FieldDescription className="text-muted-foreground/80">
+              <FieldDescription>
                 <span className="font-medium text-foreground/70">When to use: </span>
                 {docFor('maxTrialRows').when}
               </FieldDescription>
@@ -570,7 +570,7 @@ export default function SettingsPage() {
                     }
                   />
                   <FieldDescription>{doc.description}</FieldDescription>
-                  <FieldDescription className="text-muted-foreground/80">
+                  <FieldDescription>
                     <span className="font-medium text-foreground/70">When to use: </span>
                     {doc.when}
                   </FieldDescription>

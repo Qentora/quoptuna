@@ -124,7 +124,7 @@
   --secondary: oklch(0.97 0 0);
   --secondary-foreground: oklch(0.205 0 0);
   --muted: oklch(0.97 0 0);
-  --muted-foreground: oklch(0.556 0 0);
+  --muted-foreground: oklch(0.5 0 0);
   --accent: oklch(0.97 0 0);
   --accent-foreground: oklch(0.205 0 0);
   --destructive: oklch(0.577 0.245 27.325);
@@ -151,17 +151,17 @@
 
   /* Accent families (background / foreground pairs) */
   --accent-emerald: hsl(149 80% 90%);
-  --accent-emerald-foreground: hsl(161 94% 30%);
+  --accent-emerald-foreground: hsl(161 94% 24%);
   --accent-amber: hsl(48 96% 89%);
-  --accent-amber-foreground: hsl(26 90% 37%);
+  --accent-amber-foreground: hsl(26 90% 36%);
   --accent-red: hsl(0 93% 94%);
-  --accent-red-foreground: hsl(0 72% 51%);
+  --accent-red-foreground: hsl(0 72% 45%);
   --accent-indigo: hsl(226 100% 94%);
   --accent-indigo-foreground: hsl(243 75% 59%);
   --accent-purple: hsl(269 100% 95%);
-  --accent-purple-foreground: hsl(271 81% 56%);
+  --accent-purple-foreground: hsl(271 81% 54%);
   --accent-orange: hsl(34 100% 92%);
-  --accent-orange-foreground: hsl(21 90% 48%);
+  --accent-orange-foreground: hsl(21 90% 37%);
 
   /* Charts: 1 = quantum (purple), 2 = classical (orange), then supporting hues */
   --chart-1: var(--accent-purple-foreground);
