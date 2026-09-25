@@ -40,10 +40,7 @@ def target_balance_profile(target: pd.Series) -> TargetBalanceProfile | None:
 
     total = int(counts.sum())
     minority_fraction = int(counts.min()) / total
-    classes = [
-        {"label": str(value), "count": int(count)}
-        for value, count in counts.items()
-    ]
+    classes = [{"label": str(value), "count": int(count)} for value, count in counts.items()]
     if n_classes > BINARY_N_CLASSES:
         label: Literal["balanced", "moderate_imbalance", "imbalanced", "multiclass"] = "multiclass"
         kind: Literal["binary", "multiclass"] = "multiclass"

@@ -45,27 +45,49 @@ def stratified_sample(frame: pd.DataFrame, target: str) -> pd.DataFrame:
 def prepare_ntia() -> pd.DataFrame:
     """Build adult wearable-use classification data from NTIA CPS Nov 2023."""
     columns = [
-        "prtage", "prpertyp", "pewearab", "hefaminc", "peeduca", "pesex", "ptdtrace",
-        "pehspnon", "prdisflg", "gtmetsta",
+        "prtage",
+        "prpertyp",
+        "pewearab",
+        "hefaminc",
+        "peeduca",
+        "pesex",
+        "ptdtrace",
+        "pehspnon",
+        "prdisflg",
+        "gtmetsta",
     ]
     archive = download_zip(NTIA_URL)
     frame = pd.read_csv(archive.open("nov23-cps.csv"), usecols=columns, low_memory=False)
     # NTIA's public Stata script defines this universe as persons aged 15+ who
     # are not group-quarter residents. Codes 1/2 answer yes/no for wearables.
     frame = frame[
-        (frame["prtage"] >= 15)
-        & (frame["prpertyp"] != 3)
-        & frame["pewearab"].isin([1, 2])
+        (frame["prtage"] >= 15) & (frame["prpertyp"] != 3) & frame["pewearab"].isin([1, 2])
     ].copy()
     frame["target"] = frame.pop("pewearab").map({1: "uses_wearable", 2: "does_not_use_wearable"})
-    frame["age_group"] = pd.cut(frame.pop("prtage"), [14, 24, 44, 64, float("inf")], labels=["15_24", "25_44", "45_64", "65_plus"])
-    frame["income_bracket"] = pd.cut(frame.pop("hefaminc"), [0, 7, 11, 13, 14, 16], labels=["under_25k", "25k_49k", "50k_74k", "75k_99k", "100k_plus"])
-    frame["education"] = pd.cut(frame.pop("peeduca"), [0, 38, 39, 42, float("inf")], labels=["no_diploma", "high_school", "some_college", "college_plus"])
+    frame["age_group"] = pd.cut(
+        frame.pop("prtage"),
+        [14, 24, 44, 64, float("inf")],
+        labels=["15_24", "25_44", "45_64", "65_plus"],
+    )
+    frame["income_bracket"] = pd.cut(
+        frame.pop("hefaminc"),
+        [0, 7, 11, 13, 14, 16],
+        labels=["under_25k", "25k_49k", "50k_74k", "75k_99k", "100k_plus"],
+    )
+    frame["education"] = pd.cut(
+        frame.pop("peeduca"),
+        [0, 38, 39, 42, float("inf")],
+        labels=["no_diploma", "high_school", "some_college", "college_plus"],
+    )
     frame["sex"] = frame.pop("pesex").map({1: "male", 2: "female"})
     frame["race"] = frame.pop("ptdtrace").astype("string")
     frame.loc[frame.pop("pehspnon") == 1, "race"] = "hispanic"
-    frame["disability"] = frame.pop("prdisflg").map({1: "disabled", 2: "not_disabled"}).fillna("unknown")
-    frame["metro"] = frame.pop("gtmetsta").map({1: "metropolitan", 2: "non_metropolitan", 3: "unknown"})
+    frame["disability"] = (
+        frame.pop("prdisflg").map({1: "disabled", 2: "not_disabled"}).fillna("unknown")
+    )
+    frame["metro"] = frame.pop("gtmetsta").map(
+        {1: "metropolitan", 2: "non_metropolitan", 3: "unknown"}
+    )
     frame = frame.drop(columns="prpertyp")
     return stratified_sample(frame.dropna(), "target")
 
@@ -104,11 +126,16 @@ def prepare_acs() -> pd.DataFrame:
 
 def main() -> None:
     DATASETS_DIR.mkdir(parents=True, exist_ok=True)
-    for name, prepare in (("ntia_2023_wearable_use", prepare_ntia), ("acs_2023_internet_access", prepare_acs)):
+    for name, prepare in (
+        ("ntia_2023_wearable_use", prepare_ntia),
+        ("acs_2023_internet_access", prepare_acs),
+    ):
         frame = prepare()
         output = DATASETS_DIR / f"{name}.csv.gz"
         frame.to_csv(output, index=False)
-        print(f"{name}: {len(frame)} rows, {len(frame.columns) - 1} features, {frame['target'].value_counts().to_dict()}")
+        print(
+            f"{name}: {len(frame)} rows, {len(frame.columns) - 1} features, {frame['target'].value_counts().to_dict()}"
+        )
 
 
 if __name__ == "__main__":

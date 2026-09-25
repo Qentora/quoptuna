@@ -21,7 +21,9 @@ DATASETS_DIR = Path(__file__).resolve().parents[1] / "src" / "quoptuna" / "datas
 SAMPLE_ROWS = 2_000
 RANDOM_STATE = 0
 COMPAS_URL = "https://raw.githubusercontent.com/propublica/compas-analysis/master/compas-scores-two-years.csv"
-ACS_CALIFORNIA_PERSON_URL = "https://www2.census.gov/programs-surveys/acs/data/pums/2023/1-Year/csv_pca.zip"
+ACS_CALIFORNIA_PERSON_URL = (
+    "https://www2.census.gov/programs-surveys/acs/data/pums/2023/1-Year/csv_pca.zip"
+)
 
 
 def stratified_sample(frame: pd.DataFrame, target: str) -> pd.DataFrame:
@@ -29,8 +31,10 @@ def stratified_sample(frame: pd.DataFrame, target: str) -> pd.DataFrame:
     shares = frame[target].value_counts(normalize=True)
     counts = {label: int(SAMPLE_ROWS * share) for label, share in shares.items()}
     remainder = SAMPLE_ROWS - sum(counts.values())
+
     def fractional(label: str) -> float:
         return SAMPLE_ROWS * shares[label] - counts[label]
+
     for label in sorted(counts, key=fractional, reverse=True)[:remainder]:
         counts[label] += 1
     samples = [
@@ -88,8 +92,18 @@ def acs_person_frame() -> pd.DataFrame:
         if name.lower().startswith("psam_p") and name.lower().endswith(".csv")
     )
     columns = [
-        "AGEP", "COW", "SCHL", "MAR", "OCCP", "POBP", "RELSHIPP", "WKHP",
-        "SEX", "RAC1P", "ESR", "JWMNP",
+        "AGEP",
+        "COW",
+        "SCHL",
+        "MAR",
+        "OCCP",
+        "POBP",
+        "RELSHIPP",
+        "WKHP",
+        "SEX",
+        "RAC1P",
+        "ESR",
+        "JWMNP",
     ]
     return pd.read_csv(archive.open(member), usecols=columns, low_memory=False)
 
@@ -97,9 +111,7 @@ def acs_person_frame() -> pd.DataFrame:
 def prepare_acs_employment(frame: pd.DataFrame) -> pd.DataFrame:
     """Build the Folktables-style employment task from ACS PUMS."""
     selected = frame[frame["AGEP"].between(16, 90)].copy()
-    selected["target"] = selected.pop("ESR").eq(1).map(
-        {True: "employed", False: "not_employed"}
-    )
+    selected["target"] = selected.pop("ESR").eq(1).map({True: "employed", False: "not_employed"})
     selected = selected.drop(columns="JWMNP")
     return stratified_sample(selected.dropna(), "target")
 
@@ -107,8 +119,8 @@ def prepare_acs_employment(frame: pd.DataFrame) -> pd.DataFrame:
 def prepare_acs_travel_time(frame: pd.DataFrame) -> pd.DataFrame:
     """Build the Folktables-style commute-over-20-minutes task without leakage."""
     selected = frame[(frame["AGEP"] >= 16) & frame["JWMNP"].notna()].copy()
-    selected["target"] = selected.pop("JWMNP").gt(20).map(
-        {True: "over_20_minutes", False: "20_minutes_or_less"}
+    selected["target"] = (
+        selected.pop("JWMNP").gt(20).map({True: "over_20_minutes", False: "20_minutes_or_less"})
     )
     selected = selected.drop(columns="ESR")
     return stratified_sample(selected.dropna(), "target")

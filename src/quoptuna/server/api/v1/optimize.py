@@ -587,7 +587,6 @@ async def get_optimization_trials(optimization_id: str):
         }
 
 
-
 @router.delete("/{optimization_id}")
 async def cancel_optimization(optimization_id: str):
     """Cancel a running optimization, or delete a finished run's record.

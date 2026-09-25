@@ -1889,9 +1889,7 @@ def _build_run_data_bundle(optimization_id: str) -> tuple[bytes, str]:
     trials = _run_trials(run)
     pareto_trials = _run_pareto(run)
     return (
-        research_bundle.build_run_data_zip(
-            run=run, trials=trials, pareto_trials=pareto_trials
-        ),
+        research_bundle.build_run_data_zip(run=run, trials=trials, pareto_trials=pareto_trials),
         research_bundle.run_data_filename(run),
     )
 

@@ -63,7 +63,9 @@ def complete(frame: pd.DataFrame) -> pd.DataFrame:
 def parse_arff(zf: zipfile.ZipFile, filename: str) -> pd.DataFrame:
     """Parse UCI's simple numeric/categorical ARFF without another dependency."""
     lines = zf.read(filename).decode("utf-8").splitlines()
-    attributes = [line.split(maxsplit=2)[1] for line in lines if line.lower().startswith("@attribute")]
+    attributes = [
+        line.split(maxsplit=2)[1] for line in lines if line.lower().startswith("@attribute")
+    ]
     data_start = next(i for i, line in enumerate(lines) if line.lower() == "@data") + 1
     return pd.read_csv(io.StringIO("\n".join(lines[data_start:])), names=attributes)
 
@@ -73,22 +75,60 @@ def load_dataset(dataset_id: int) -> pd.DataFrame:
     zf = archive(dataset_id)
     if dataset_id == 15:
         names = [
-            "sample_id", "clump_thickness", "cell_size_uniformity", "cell_shape_uniformity",
-            "marginal_adhesion", "single_epithelial_cell_size", "bare_nuclei",
-            "bland_chromatin", "normal_nucleoli", "mitoses", "target",
+            "sample_id",
+            "clump_thickness",
+            "cell_size_uniformity",
+            "cell_shape_uniformity",
+            "marginal_adhesion",
+            "single_epithelial_cell_size",
+            "bare_nuclei",
+            "bland_chromatin",
+            "normal_nucleoli",
+            "mitoses",
+            "target",
         ]
-        return complete(read_csv(zf, "breast-cancer-wisconsin.data", names=names).drop(columns="sample_id"))
+        return complete(
+            read_csv(zf, "breast-cancer-wisconsin.data", names=names).drop(columns="sample_id")
+        )
     if dataset_id == 30:
-        names = ["wife_age", "wife_education", "husband_education", "children", "wife_religion", "wife_working", "husband_occupation", "standard_of_living", "media_exposure", "target"]
+        names = [
+            "wife_age",
+            "wife_education",
+            "husband_education",
+            "children",
+            "wife_religion",
+            "wife_working",
+            "husband_occupation",
+            "standard_of_living",
+            "media_exposure",
+            "target",
+        ]
         return complete(read_csv(zf, "cmc.data", names=names))
     if dataset_id == 53:
-        return complete(read_csv(zf, "iris.data", names=["sepal_length", "sepal_width", "petal_length", "petal_width", "target"]).dropna())
+        return complete(
+            read_csv(
+                zf,
+                "iris.data",
+                names=["sepal_length", "sepal_width", "petal_length", "petal_width", "target"],
+            ).dropna()
+        )
     if dataset_id == 161:
         # UCI documents BI-RADS as non-predictive, so it is intentionally excluded.
         names = ["birads", "age", "shape", "margin", "density", "target"]
-        return complete(read_csv(zf, "mammographic_masses.data", names=names).drop(columns="birads"))
+        return complete(
+            read_csv(zf, "mammographic_masses.data", names=names).drop(columns="birads")
+        )
     if dataset_id == 236:
-        names = ["area", "perimeter", "compactness", "kernel_length", "kernel_width", "asymmetry", "groove_length", "target"]
+        names = [
+            "area",
+            "perimeter",
+            "compactness",
+            "kernel_length",
+            "kernel_width",
+            "asymmetry",
+            "groove_length",
+            "target",
+        ]
         return complete(read_csv(zf, "seeds_dataset.txt", sep=r"\s+", names=names))
     if dataset_id == 257:
         sheets = pd.read_excel(
@@ -100,17 +140,37 @@ def load_dataset(dataset_id: int) -> pd.DataFrame:
         frame["target"] = frame["target"].str.strip().str.lower().str.replace(" ", "_")
         return complete(frame)
     if dataset_id == 267:
-        return complete(read_csv(zf, "data_banknote_authentication.txt", names=["variance", "skewness", "curtosis", "entropy", "target"]))
+        return complete(
+            read_csv(
+                zf,
+                "data_banknote_authentication.txt",
+                names=["variance", "skewness", "curtosis", "entropy", "target"],
+            )
+        )
     if dataset_id == 357:
-        parts = [read_csv(zf, name).drop(columns=["date", "\"date\""], errors="ignore") for name in ("datatraining.txt", "datatest.txt", "datatest2.txt")]
+        parts = [
+            read_csv(zf, name).drop(columns=["date", '"date"'], errors="ignore")
+            for name in ("datatraining.txt", "datatest.txt", "datatest2.txt")
+        ]
         return complete(pd.concat(parts, ignore_index=True).rename(columns={"Occupancy": "target"}))
     if dataset_id == 523:
         raw = read_csv(zf, "Exasens.csv", skiprows=2)
         raw = raw.iloc[:, :8]
-        raw.columns = ["target", "sample_id", "imaginary_min", "imaginary_avg", "real_min", "real_avg", "gender", "age"]
+        raw.columns = [
+            "target",
+            "sample_id",
+            "imaginary_min",
+            "imaginary_avg",
+            "real_min",
+            "real_avg",
+            "gender",
+            "age",
+        ]
         return complete(raw.drop(columns="sample_id"))
     if dataset_id == 545:
-        return complete(parse_arff(zf, "Rice_Cammeo_Osmancik.arff").rename(columns={"Class": "target"}))
+        return complete(
+            parse_arff(zf, "Rice_Cammeo_Osmancik.arff").rename(columns={"Class": "target"})
+        )
     if dataset_id == 850:
         nested = zipfile.ZipFile(io.BytesIO(zf.read("Raisin_Dataset.zip")))
         frame = pd.read_excel(
@@ -127,7 +187,9 @@ def main() -> None:
         frame = load_dataset(dataset_id)
         output = DATASETS_DIR / f"uci_{dataset_id}.csv.gz"
         frame.to_csv(output, index=False)
-        print(f"{dataset_id}: {len(frame)} rows, {len(frame.columns) - 1} features, {frame['target'].value_counts().to_dict()}")
+        print(
+            f"{dataset_id}: {len(frame)} rows, {len(frame.columns) - 1} features, {frame['target'].value_counts().to_dict()}"
+        )
 
 
 if __name__ == "__main__":

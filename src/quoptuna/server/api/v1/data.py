@@ -79,9 +79,7 @@ POPULAR_UCI_DATASETS = [
 # Keep the original picker entries verbatim, then append every additional
 # bundled artifact without duplicating an existing UCI id such as Banknote.
 _POPULAR_IDS = {entry["id"] for entry in POPULAR_UCI_DATASETS}
-POPULAR_UCI_DATASETS.extend(
-    entry for entry in bundled_catalog() if entry["id"] not in _POPULAR_IDS
-)
+POPULAR_UCI_DATASETS.extend(entry for entry in bundled_catalog() if entry["id"] not in _POPULAR_IDS)
 
 MAX_UNIQUE_FOR_TARGET = 20
 

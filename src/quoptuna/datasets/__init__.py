@@ -311,9 +311,7 @@ def normalize_uci_targets(dataset_id: int, targets: pd.DataFrame) -> pd.DataFram
     normalized = targets.copy()
     for column in normalized.columns:
         normalized[column] = normalized[column].map(
-            lambda value: value.strip().removesuffix(".")
-            if isinstance(value, str)
-            else value
+            lambda value: value.strip().removesuffix(".") if isinstance(value, str) else value
         )
     return normalized
 
