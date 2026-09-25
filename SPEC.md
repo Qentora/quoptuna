@@ -401,3 +401,172 @@ and the trial count wherever a result is published.
 
 Nested cross-validation for unbiased performance estimation. The held-out test
 split already serves that purpose.
+
+---
+
+## SPEC-007 — Reliable rare-class and small-sample optimization
+
+**Status:** Proposed  
+**Area:** `backend/tuners/optimizer.py`, `server/services/workflow_service.py`,
+`server/api/v1/optimize.py`, `server/api/v1/analysis.py`, frontend optimization
+and analysis metrics  
+**Motivation:** Prevent selection optimism and invalid fairness claims on
+datasets such as UCI Fertility (100 rows, 12 positive outcomes).
+
+### Problem
+
+The current three-way split can leave a tiny validation set with only one or
+two positive examples. A search over many model families, hyperparameters, and
+19 decision thresholds can then select a validation-noise winner. The held-out
+test set correctly exposes the gap, but it is currently predicted during every
+trial and its metrics are stored on each trial, weakening the intended
+train/validation/test separation.
+
+Fertility demonstrates the failure mode:
+
+```text
+rows                       100
+class counts               N=88, O=12
+trial 24 validation F1     1.0000
+trial 24 threshold          0.45
+trial 24 thresholded test F1 0.0000
+test confusion matrix      TN=21, FP=1, FN=3, TP=0
+```
+
+The reported 84% test accuracy is majority-class performance, not useful
+positive-class detection. Its fairness audit is also unsupported: the
+`child_diseases` groups contain 4 and 21 test rows. In addition, the search
+currently records fairness from default `predict()` labels while its F1
+objective may use thresholded labels; those are different classifiers.
+
+### Relationship to existing specs
+
+- **SPEC-002** decides whether threshold selection survives and how it is
+  estimated.
+- **SPEC-003** labels validation and test results distinctly in the UI.
+- **SPEC-006** provides k-fold trial scoring.
+
+This spec adds the missing operational safety rules: strict test isolation,
+minimum-support gates, threshold/fairness consistency, small-data capacity
+controls, and a reproducible resampling comparison.
+
+### Proposed design
+
+#### 1. Strict test isolation
+
+`Optimizer.objective` must fit and score only training and validation data.
+It must not call `predict`, `predict_proba`, threshold selection, fairness
+metrics, or metric recording on `test_x`/`test_y`.
+
+After Optuna selects a trial:
+
+1. reconstruct the selected configuration;
+2. fit it only on the development data allowed by the selected protocol;
+3. evaluate the untouched test split exactly once;
+4. persist final test metrics separately from per-trial selection metrics.
+
+The only exception is an explicitly marked research/debug mode that never
+publishes test results as final evidence.
+
+#### 2. One label rule per evaluated classifier
+
+Threshold selection must return both the chosen threshold and its thresholded
+validation predictions. F1, fairness disparity, per-group metrics, analysis,
+and the final test evaluation must use that same label rule.
+
+The stored record must include:
+
+```text
+metric split             train | validation | test
+decision rule            model default | threshold=<value>
+threshold source         none | validation OOF predictions
+```
+
+Do not compare default-rule fairness with thresholded-rule F1.
+
+#### 3. Support-aware protocol selection
+
+Before optimization, calculate class and protected-group support after the
+planned split. Surface the chosen protocol in the request and report.
+
+| Condition | Required behavior |
+| --- | --- |
+| Fewer than 10 validation or out-of-fold positive examples | Disable automatic threshold sweep; use the model default or a user-specified domain threshold. |
+| Fewer than 20 examples in any protected group, or fewer than 5 positive and 5 negative outcomes in a group | Disable fairness optimization and label the audit insufficiently supported. |
+| Rare-class data with adequate total support | Prefer PR-AUC, recall, F1, and class-wise confusion counts over accuracy. |
+| Small dataset with no viable validation support | Require repeated stratified CV or refuse a model-selection claim; never silently choose a lucky holdout. |
+
+Exact thresholds are configuration defaults, recorded with the run, and may be
+raised by a domain policy. They must not be silently relaxed.
+
+#### 4. Stable selection
+
+Implement SPEC-006's repeated stratified CV or shortlist re-ranking. Select by
+mean validation score and record standard deviation, fold scores, class counts,
+and selected threshold per fold. Thresholds are either selected per fold or
+from pooled out-of-fold probabilities; the choice must be measured against
+SPEC-002 before it ships.
+
+The UI must show a selection score as a distribution, for example:
+
+```text
+validation F1: 0.54 ± 0.11 across five folds
+```
+
+not as a single result claim.
+
+#### 5. Small-data capacity policy
+
+Add a data-size-aware preset for iterative quantum models:
+
+- cap encoding/re-uploading layers and maximum steps on low-support data;
+- favour simpler classical baselines and shallow quantum models;
+- use convergence/early-stop diagnostics;
+- show a warning when parameter capacity is high relative to minority-class
+  support.
+
+The preset constrains search only; it does not fabricate a generalization
+claim.
+
+#### 6. Resampling as an experiment
+
+Keep resampling strictly inside each training fold. For rare-class datasets,
+offer a paired comparison:
+
+```text
+none versus RandomOverSampler
+same fold assignments, model families, threshold policy, and seed
+```
+
+Report unique minority rows before resampling and duplicated rows after it.
+Never default to undersampling when it would discard most of a small majority
+class. Oversampling is a recall-oriented option, not a substitute for
+independent positive examples.
+
+#### 7. Confidence intervals and publication rules
+
+Final test reports must include class counts and a confidence interval or
+explicit small-sample warning for F1, recall, and PR-AUC. Runs that fail
+support gates can remain inspectable, but cannot be marked as a successful
+fairness or generalization result.
+
+### Acceptance criteria
+
+- No per-trial code path reads `test_x` or `test_y`; a regression test fails
+  when `objective` touches either.
+- A thresholded objective and fairness metric consume identical label arrays.
+- The Fertility support gate disables fairness optimization and automatic
+  threshold tuning under the documented default thresholds.
+- An oversampling comparison duplicates rows only inside a training fold; no
+  source row appears in both that fold's training and validation/test data.
+- Selection output includes fold scores, support counts, mean, and standard
+  deviation.
+- Test metrics are produced once for the selected trial and are labelled as
+  final held-out results.
+- A report cannot describe a support-gated run as a fairness success.
+
+### Non-goals
+
+Improving the intrinsic predictive signal of datasets with too few independent
+positive outcomes. Collecting more positive examples or choosing a larger
+dataset remains necessary for a credible fertility/fairness study.
