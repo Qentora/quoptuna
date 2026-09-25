@@ -8,6 +8,7 @@ import io
 import logging
 import threading
 import time
+import zipfile
 from contextvars import ContextVar
 from datetime import datetime
 from typing import Any, List, Optional, cast
@@ -1851,6 +1852,94 @@ async def get_report_prompts():
     }
 
 
+class BulkResearchBundleRequest(BaseModel):
+    optimization_ids: List[str] = Field(min_length=1, max_length=100)
+
+
+def _build_research_bundle(snapshot: dict) -> tuple[bytes, str]:
+    """Build one complete research dump from a completed analysis snapshot."""
+    context, run, trials, pareto = _report_context(snapshot, options=ReportInclusionOptions())
+    reports = [
+        report
+        for report in analysis_store.list_reports(snapshot["id"])
+        if report.get("snapshot_revision") == snapshot["revision"]
+    ]
+    try:
+        archive = research_bundle.build_zip(
+            context=context,
+            payload=snapshot.get("payload") or {},
+            reports=reports,
+            evidence_markdown=report_context.render_markdown(context),
+            prompts={
+                f"{name}.default": text for name, text in report_prompts.default_prompts().items()
+            },
+            run=run,
+            trials=trials,
+            pareto_trials=pareto,
+        )
+    except Exception as exc:
+        logger.exception("Failed to build the research bundle for snapshot %s", snapshot["id"])
+        raise HTTPException(status_code=500, detail=f"Failed to build the bundle: {exc!s}")
+    return archive, research_bundle.bundle_filename(context)
+
+
+def _build_run_data_bundle(optimization_id: str) -> tuple[bytes, str]:
+    """Build a durable metadata/trial archive for a run without analysis."""
+    run = get_job(optimization_id)
+    trials = _run_trials(run)
+    pareto_trials = _run_pareto(run)
+    return (
+        research_bundle.build_run_data_zip(run=run, trials=trials, pareto_trials=pareto_trials),
+        research_bundle.run_data_filename(run),
+    )
+
+
+@router.post("/bundles/bulk")
+async def download_bulk_research_bundles(request: BulkResearchBundleRequest):
+    """Download each selected run's latest completed research dump in one ZIP."""
+    requested_ids = (run_id.strip() for run_id in request.optimization_ids)
+    optimization_ids = tuple(dict.fromkeys(run_id for run_id in requested_ids if run_id))
+    if not optimization_ids:
+        raise HTTPException(status_code=422, detail="Select at least one optimization run")
+
+    bundles: list[tuple[str, bytes]] = []
+    for optimization_id in optimization_ids:
+        snapshots = analysis_store.list_snapshots(optimization_id)
+        if snapshots:
+            snapshot = _completed_snapshot(snapshots[0]["id"], optimization_id)
+            bundle, filename = _build_research_bundle(snapshot)
+        else:
+            bundle, filename = _build_run_data_bundle(optimization_id)
+        bundles.append((filename, bundle))
+
+    output = io.BytesIO()
+    used_filenames: set[str] = set()
+    with zipfile.ZipFile(output, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        for filename, bundle in bundles:
+            stem = filename.removesuffix(".zip")
+            candidate = filename
+            suffix = 2
+            while candidate in used_filenames:
+                candidate = f"{stem}-{suffix}.zip"
+                suffix += 1
+            used_filenames.add(candidate)
+            archive.writestr(f"runs/{candidate}", bundle)
+        lines = [
+            "# QuOptuna bulk run export",
+            "",
+            "Each selected run has one ZIP in `runs/`.",
+            "Completed analysis snapshots contain full research dumps; other runs contain metadata and available trial history.",
+            f"Included: {len(bundles)} run(s).",
+        ]
+        archive.writestr("README.md", "\n".join(lines) + "\n")
+    filename = f"quoptuna-research-dumps-{datetime.now():%Y%m%d-%H%M%S}.zip"
+    return Response(
+        content=output.getvalue(),
+        media_type="application/zip",
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
+
+
 @router.get("/snapshots/{snapshot_id}/context")
 async def get_report_context(snapshot_id: str, include_evidence_markdown: bool = True):
     """The structured evidence bundle the report agents are given.
@@ -1874,30 +1963,7 @@ async def download_research_bundle(snapshot_id: str):
     the dump is the archive of what the run produced, so it must stay complete
     even when a report deliberately left some of it out.
     """
-    snapshot = _completed_snapshot(snapshot_id)
-    context, run, trials, pareto = _report_context(snapshot, options=ReportInclusionOptions())
-    reports = [
-        report
-        for report in analysis_store.list_reports(snapshot_id)
-        if report.get("snapshot_revision") == snapshot["revision"]
-    ]
-    try:
-        archive = research_bundle.build_zip(
-            context=context,
-            payload=snapshot.get("payload") or {},
-            reports=reports,
-            evidence_markdown=report_context.render_markdown(context),
-            prompts={
-                f"{name}.default": text for name, text in report_prompts.default_prompts().items()
-            },
-            run=run,
-            trials=trials,
-            pareto_trials=pareto,
-        )
-    except Exception as exc:
-        logger.exception("Failed to build the research bundle for snapshot %s", snapshot_id)
-        raise HTTPException(status_code=500, detail=f"Failed to build the bundle: {exc!s}")
-    filename = research_bundle.bundle_filename(context)
+    archive, filename = _build_research_bundle(_completed_snapshot(snapshot_id))
     return Response(
         content=archive,
         media_type="application/zip",

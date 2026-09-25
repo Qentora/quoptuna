@@ -4,7 +4,76 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+## [1.0.0] - 2026-09-25
+First stable release. The major bump marks two things: results produced by earlier
+versions are not directly comparable (the validation-leakage, target-shape and
+determinism fixes below change the scores of affected runs), and several Python APIs
+changed shape. Re-run any study whose conclusions depend on resampled runs,
+fairness-aware search, SVC winners, or `QuantumKitchenSinks`.
+
+### Breaking changes
+- `Optimizer(sensitive_test=...)` is renamed to `sensitive_val`. The fairness
+  disparity is now measured on the **validation** split, so the sensitive column must
+  align positionally with `val_y`; a length mismatch raises `ValueError`.
+- `Optimizer` now reads the validation split from `data["val_x"]` / `data["val_y"]`.
+  Callers that resample the train split MUST supply it; without those keys a
+  stratified 20% of train is still carved as before.
+- `report_agent.generate_report` takes an evidence bundle (`report_context`) and
+  returns a result dict (final markdown, draft, rendered evidence,
+  referenced/dropped figures, lint findings) instead of a bare string.
+- Bundled datasets ship as gzipped CSVs (`*.csv.gz`). Code that opened the old
+  `*.csv` files by path must switch to the new names (pandas reads both).
+- Scores of existing runs are not reproduced bit-for-bit by this version wherever the
+  fixes below apply; stored trials are kept as-is, but a re-analysis uses the
+  corrected pipeline.
+
 ### Added
+- Class-imbalance resampling for optimization runs: `resampling` on the optimize
+  request (`"none"`, `"oversample"`, `"undersample"`; default `"none"`), exposed in the
+  UI. Only the inner training portion is resampled, and the sensitive column is
+  resampled in lockstep so fairness checks stay row-aligned. Adds the
+  `imbalanced-learn` dependency.
+- Resumable, cancellable analysis jobs. Jobs run off the event loop (one at a time),
+  report progress through preparation, training and SHAP (with per-row SHAP
+  counters), and publish partial SHAP/metrics payloads while later sections finish.
+  `GET /api/v1/analysis/jobs?optimization_id=...` lets a refreshed browser reattach to
+  a running job, `POST /api/v1/analysis/jobs/{job_id}/cancel` stops one, and jobs
+  left pending/running by a restart are marked failed on startup.
+- Analysis revision history: `GET /api/v1/analysis/snapshots/{id}/revisions` and
+  `.../revisions/{revision}`. The Analyze step browses earlier revisions; the Report
+  step shows which revision a report was grounded in and warns when it differs from
+  the one loaded. Report generation returns `analysis_revision`.
+- Bulk research dumps: select runs on the Runs page and download one zip via
+  `POST /api/v1/analysis/bundles/bulk` (1–100 optimization ids). Runs with a
+  completed analysis get the full research bundle; runs without one get a
+  metadata/trial/Pareto archive.
+- Target class-balance profiles (`quoptuna.datasets.balance.target_balance_profile`):
+  bundled catalog entries and dataset previews (`target_balance_by_column`) label a
+  target as balanced, moderately imbalanced, imbalanced or multiclass, shown in the
+  Dataset and Features steps. The label describes prevalence only, not fairness.
+- Offline bundled datasets (loaded before any network fetch):
+  - UCI: Adult / Census Income, Statlog (German Credit), Breast Cancer Wisconsin
+    (Original), Contraceptive Method Choice, Iris, Mammographic Mass, Seeds, User
+    Knowledge Modeling, Banknote Authentication, Occupancy Detection, Exasens, Rice
+    (Cammeo and Osmancik), Raisin, Wireless Indoor Localization.
+  - Fairness benchmarks and public surveys: COMPAS Two-Year Recidivism, ACS 2023
+    California Employment, ACS 2023 California Travel Time, ACS PUMS 2023 Internet
+    Access, NTIA Internet Use Survey 2023 Wearable Use.
+  - RECS 2020 Housing Tenure (owned vs rented), as a full set (id 9021) and a seeded,
+    class-stratified 2,000-row subset sized for kernel models (id 9020). Ids from
+    9000 up are reserved for bundled datasets with no UCI entry.
+  - Regeneration scripts under `scripts/` (`prepare_uci_catalog.py`,
+    `prepare_public_surveys.py`, `prepare_fairness_benchmarks.py`,
+    `prepare_recs2020.py`).
+- Cross-platform (Windows-friendly) npm task runner: a root `package.json` and
+  `scripts/run.mjs` mirroring the Makefile targets (`npm run dev`, `test`, `lint`,
+  `build`, ...), seeding `frontend/.env.local` for local API routing.
+- GPU development workflow with WSL2 support: `npm run gpu:check`, `gpu:setup` and
+  `dev:gpu`.
+- `QUOPTUNA_SAMPLING_FLOAT32` override and adaptive sampling precision for shot-based
+  PennyLane circuits.
+- `psycopg2-binary` dependency for PostgreSQL-backed deployments.
 - Report agents now receive a complete, structured evidence bundle for the run
   (`report_context`): every configuration option chosen, the trial history and
   per-model-family aggregates, hyperparameter importances, the fairness-aware search
@@ -34,6 +103,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   including the production start-up check and the public `/api/v1/health` path.
 - Added `QuantumBoltzmannMachine` to the model catalog and a new image-shaped models
   section for `QuanvolutionalNeuralNetwork`, `WeiNet`, and `ConvolutionalNeuralNetwork`.
+- Refit consistency check. The search already scores every trial on the test split;
+  the analysis recomputes the same number after retraining it. Those must agree, and
+  every silent-divergence bug above moved that delta while leaving other metrics
+  plausible. Analyses now record `refit_consistency` (both values, the drift, and
+  whether it is within tolerance) in `analysed_model`, and raise a snapshot warning —
+  visible to the UI and the report agent — when the analysed model does not reproduce
+  the trial that was selected.
+- End-to-end pipeline canary (`tests/test_pipeline_canary.py`) on Banknote
+  Authentication, which is linearly separable: a correct pipeline scores ~1.0, so any
+  of the failure modes above shows up as a number below the floor. Asserts perfect
+  F1/accuracy, a non-null ROC-AUC, search/analysis agreement, and a confusion matrix
+  that uses both classes. Runs in ~5s.
+- Determinism regression tests: `tests/test_model_isolation.py` (instances never share
+  a fitted estimator; a second fit cannot change an earlier model's predictions;
+  identical configurations refit identically) and an end-to-end check that two
+  identical runs of the shot-based model produce identical metrics.
 
 ### Changed
 - The report pipeline no longer sends the agents a `str()` of six metric keys. The
@@ -41,10 +126,13 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   grounding rule, and the markdown contract; conditional sections (fairness audit,
   fairness-aware search, Pareto front) are dropped when their evidence is absent
   instead of being invented.
-- `report_agent.generate_report` takes an evidence bundle and returns a result dict
-  (final markdown, draft, rendered evidence, referenced/dropped figures, lint findings)
-  rather than a bare string; the reviewer pass can be turned off, and a reviewer that
-  returns almost nothing no longer replaces a good draft.
+- The analysis reviewer pass can be turned off, and a reviewer that returns almost
+  nothing no longer replaces a good draft.
+- Dataset selection (API and Streamlit) loads bundled files first and only falls back
+  to a network fetch for datasets that are not bundled. All bundled datasets are
+  gzipped, shrinking the original three files from ~1.9 MB to ~223 KB.
+- `SeparableKernelClassifier` precomputes its kernel in vectorized blocks bounded by
+  `max_vmap`, reducing peak memory and removing the per-pair Python loop.
 - Clarified that the model catalog lists registry keys, while `/api/v1/models`
   returns display names.
 
@@ -109,24 +197,41 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 - Report figure selection called `random.sample(range(n), n)` — a whole-population
   sample, so the result was always `range(n)` but the call still consumed global RNG
   state. Replaced with `range(n)`.
+- The refit consistency check compared an analysis F1 computed at the trial's tuned
+  decision threshold against the trial's unthresholded F1, reporting the threshold's
+  own effect as drift (0.131 on RECS 2020). It now compares against
+  `f1_score_thresholded` when a threshold was applied and records which rule it used.
+- UCI Adult mixed `>50K.` / `<=50K.` (test file) with `>50K` / `<=50K` (training
+  file), producing four target classes instead of two. Targets are now canonicalized
+  on load.
+- `QuantumKitchenSinks` failed on Windows with a dtype callback error during
+  shot-based sampling; sampling now runs under the adaptive precision context.
+- File-based SQLite URLs whose parent directory did not exist failed at start-up; the
+  directory is now created before the engine.
+- Light-theme text contrast now meets WCAG 2.2 AA; axe-core reports no violations on
+  any audited page in either theme (report: `audits/accessibility/2026-09-25-axe-wcag.md`).
+  Darkened `--muted-foreground` and the emerald, amber, red, purple and orange accent
+  foregrounds (charts using them shift slightly darker), switched the destructive
+  badge to the red accent foreground in light mode, removed the 80% opacity from the
+  "When to use" help text in Settings and the 70% opacity from the Report history
+  count, and made the dashboard's "Open the Optimizer" gradient end at 90% opacity.
 
+## [0.1.5] - 2026-07-27
 ### Added
-- Refit consistency check. The search already scores every trial on the test split;
-  the analysis recomputes the same number after retraining it. Those must agree, and
-  every silent-divergence bug above moved that delta while leaving other metrics
-  plausible. Analyses now record `refit_consistency` (both values, the drift, and
-  whether it is within tolerance) in `analysed_model`, and raise a snapshot warning —
-  visible to the UI and the report agent — when the analysed model does not reproduce
-  the trial that was selected.
-- End-to-end pipeline canary (`tests/test_pipeline_canary.py`) on Banknote
-  Authentication, which is linearly separable: a correct pipeline scores ~1.0, so any
-  of the failure modes above shows up as a number below the floor. Asserts perfect
-  F1/accuracy, a non-null ROC-AUC, search/analysis agreement, and a confusion matrix
-  that uses both classes. Runs in ~5s.
-- Determinism regression tests: `tests/test_model_isolation.py` (instances never share
-  a fitted estimator; a second fit cannot change an earlier model's predictions;
-  identical configurations refit identically) and an end-to-end check that two
-  identical runs of the shot-based model produce identical metrics.
+- AWS infrastructure: Terraform templates, infra scripts, and AWS CLI tooling.
+
+### Changed
+- Refreshed landing page, docs theming, and spacing.
+
+## [0.1.4] - 2026-07-18
+### Added
+- SQLModel-backed persistence (SQLite or PostgreSQL) replacing the legacy SQLite app
+  store, with migration tooling and a `migrate-supabase` CLI command.
+- S3 artifact storage with presigned URLs; uploaded datasets record their object key.
+- Optuna storage helpers (`ensure_optuna_schema`, `optuna_storage_url`).
+
+### Changed
+- README overhaul, branding assets, and community profile files.
 
 ## [0.1.3]
 ### Changed

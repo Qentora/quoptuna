@@ -17,6 +17,7 @@ from quoptuna import XAI, DataPreparation, Optimizer, XAIConfig
 from quoptuna.backend.utils.data_utils.data import stratified_train_test_split
 from quoptuna.backend.utils.data_utils.resampling import resample_train_split
 from quoptuna.backend.utils.storage import DEFAULT_DB_NAME
+from quoptuna.datasets import normalize_uci_targets
 from quoptuna.server.services.sensitive import resolve_sensitive_series
 
 logger = logging.getLogger(__name__)
@@ -319,7 +320,8 @@ class WorkflowExecutor:
 
         # Fetch from UCI
         dataset = fetch_ucirepo(id=int(dataset_id))
-        df = pd.concat([dataset.data.features, dataset.data.targets], axis=1)
+        targets = normalize_uci_targets(int(dataset_id), dataset.data.targets)
+        df = pd.concat([dataset.data.features, targets], axis=1)
 
         return {
             "type": "dataset",

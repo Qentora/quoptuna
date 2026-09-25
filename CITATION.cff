@@ -9,7 +9,8 @@ authors:
 repository-code: "https://github.com/Qentora/quoptuna"
 url: "https://Qentora.github.io/quoptuna"
 license: Apache-2.0
-version: 0.1.3
+version: 1.0.0
+date-released: "2026-09-25"
 keywords:
   - quantum-computing
   - quantum-machine-learning

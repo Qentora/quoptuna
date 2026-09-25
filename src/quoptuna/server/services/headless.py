@@ -25,6 +25,7 @@ def _resolve_dataset(
 
     Returns (dataset_id, dataset_source, dataframe, default_target).
     """
+    from quoptuna.datasets import normalize_uci_targets
     from quoptuna.server.services import dataset_registry
 
     if csv_path:
@@ -46,7 +47,8 @@ def _resolve_dataset(
         from ucimlrepo import fetch_ucirepo
 
         dataset = fetch_ucirepo(id=int(uci_id))
-        df = pd.concat([dataset.data.features, dataset.data.targets], axis=1)
+        targets = normalize_uci_targets(int(uci_id), dataset.data.targets)
+        df = pd.concat([dataset.data.features, targets], axis=1)
         # Persist to a CSV and register — same shape as the UI's UCI load.
         out_dir = Path(upload_dir)
         out_dir.mkdir(exist_ok=True)
@@ -232,9 +234,7 @@ def run_headless_optimization(
 
                 # Test-side only: x_train is the inner, resampled training
                 # frame and no longer indexes into the raw file.
-                sens_test = resolve_sensitive_test_series(
-                    dataset_id, sensitive_feature, xai.x_test
-                )
+                sens_test = resolve_sensitive_test_series(dataset_id, sensitive_feature, xai.x_test)
                 # Mirror the API guard (_compute_fairness_payload): a multiclass
                 # audit is meaningless without a designated favorable class —
                 # falling back to code 1 would silently audit an arbitrary class.

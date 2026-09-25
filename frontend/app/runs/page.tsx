@@ -13,6 +13,7 @@ import {
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
 import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Metric } from '@/components/ui/metric';
@@ -30,13 +31,14 @@ import {
   type PastRun,
   type RunStatus,
   deleteOptimization,
+  downloadBulkResearchBundles,
   getOptimizationDetail,
   listAnalysisSnapshots,
   listOptimizations,
 } from '@/lib/api';
 import { saveWizardState } from '@/lib/wizardStorage';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
-import { CheckCircle2, CircleSlash, Loader2, PauseCircle, Trash2, XCircle } from 'lucide-react';
+import { CheckCircle2, CircleSlash, Download, Loader2, PauseCircle, Trash2, XCircle } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useState } from 'react';
 import toast from 'react-hot-toast';
@@ -60,11 +62,24 @@ function formatDate(value: string | null): string {
   return Number.isNaN(date.getTime()) ? '—' : date.toLocaleString();
 }
 
+function saveBlob(blob: Blob, filename: string) {
+  const url = URL.createObjectURL(blob);
+  const anchor = document.createElement('a');
+  anchor.href = url;
+  anchor.download = filename;
+  document.body.appendChild(anchor);
+  anchor.click();
+  document.body.removeChild(anchor);
+  URL.revokeObjectURL(url);
+}
+
 export default function RunsPage() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [openingId, setOpeningId] = useState<string | null>(null);
   const [pendingRemoval, setPendingRemoval] = useState<PastRun | null>(null);
+  const [selectedRunIds, setSelectedRunIds] = useState<Set<string>>(new Set());
+  const [isDownloadingSelection, setIsDownloadingSelection] = useState(false);
 
   const { data: runs = [], isLoading } = useQuery({
     queryKey: ['optimization-runs'],
@@ -77,6 +92,8 @@ export default function RunsPage() {
   const activeRuns = runs.filter((r) => ACTIVE_STATUSES.includes(r.status));
   const pastRuns = runs.filter((r) => !ACTIVE_STATUSES.includes(r.status));
   const count = (status: RunStatus) => runs.filter((r) => r.status === status).length;
+  const selectedPastRuns = pastRuns.filter((run) => selectedRunIds.has(run.id));
+  const allPastRunsSelected = pastRuns.length > 0 && selectedPastRuns.length === pastRuns.length;
 
   /** Rehydrate the wizard from a persisted run and jump into it. */
   const openRun = async (run: PastRun) => {
@@ -184,6 +201,30 @@ export default function RunsPage() {
     }
   };
 
+  const downloadSelectedRuns = async () => {
+    setIsDownloadingSelection(true);
+    try {
+      const { blob, filename } = await downloadBulkResearchBundles(
+        selectedPastRuns.map((run) => run.id)
+      );
+      saveBlob(blob, filename);
+      toast.success(`Downloaded research dumps for ${selectedPastRuns.length} selected runs`);
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Could not download selected research dumps');
+    } finally {
+      setIsDownloadingSelection(false);
+    }
+  };
+
+  const toggleRunSelection = (runId: string, checked: boolean) => {
+    setSelectedRunIds((current) => {
+      const next = new Set(current);
+      if (checked) next.add(runId);
+      else next.delete(runId);
+      return next;
+    });
+  };
+
   return (
     <PageShell title="Runs" contentClassName="mx-auto max-w-6xl">
       {/* Study status summary */}
@@ -268,7 +309,23 @@ export default function RunsPage() {
 
       {/* Past runs */}
       <section>
-        <h2 className="mb-3 text-base font-semibold tracking-tight">Past Runs &amp; Studies</h2>
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-base font-semibold tracking-tight">Past Runs &amp; Studies</h2>
+          {selectedPastRuns.length > 0 && (
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={isDownloadingSelection}
+              onClick={() => void downloadSelectedRuns()}
+            >
+              <Download className="h-4 w-4" />
+              {isDownloadingSelection
+                ? 'Preparing download…'
+                : `Download selected (${selectedPastRuns.length})`}
+            </Button>
+          )}
+        </div>
         {isLoading ? (
           <Card className="border-dashed">
             <CardContent className="p-4 text-sm text-muted-foreground">Loading runs…</CardContent>
@@ -284,6 +341,15 @@ export default function RunsPage() {
           <Table>
             <TableHeader>
               <TableRow>
+                <TableHead className="w-10">
+                  <Checkbox
+                    aria-label="Select all past runs"
+                    checked={allPastRunsSelected || (selectedPastRuns.length > 0 && "indeterminate")}
+                    onCheckedChange={(checked) =>
+                      setSelectedRunIds(checked ? new Set(pastRuns.map((run) => run.id)) : new Set())
+                    }
+                  />
+                </TableHead>
                 <TableHead>Study</TableHead>
                 <TableHead>Dataset</TableHead>
                 <TableHead>Status</TableHead>
@@ -295,8 +361,17 @@ export default function RunsPage() {
               </TableRow>
             </TableHeader>
             <TableBody>
-              {pastRuns.map((run) => (
+              {pastRuns.map((run) => {
+                const isSelectedForDownload = selectedRunIds.has(run.id);
+                return (
                 <TableRow key={run.id}>
+                  <TableCell>
+                    <Checkbox
+                      aria-label={`Select ${run.study_name ?? run.id}`}
+                      checked={isSelectedForDownload}
+                      onCheckedChange={(checked) => toggleRunSelection(run.id, checked === true)}
+                    />
+                  </TableCell>
                   <TableCell className="font-medium">{run.study_name ?? run.id}</TableCell>
                   <TableCell className="text-xs text-muted-foreground">
                     {run.dataset_name ?? '—'}
@@ -341,7 +416,8 @@ export default function RunsPage() {
                     </div>
                   </TableCell>
                 </TableRow>
-              ))}
+                );
+              })}
             </TableBody>
           </Table>
         )}
@@ -381,6 +457,7 @@ export default function RunsPage() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
     </PageShell>
   );
 }

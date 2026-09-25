@@ -316,7 +316,7 @@ export function ReportStep({ workflowData, setWorkflowData, setFooter }: StepPro
                   <TabsTrigger value="history" disabled={history.length === 0}>
                     History
                     {history.length > 0 && (
-                      <span className="ml-1.5 tabular-nums opacity-70">{history.length}</span>
+                      <span className="ml-1.5 tabular-nums">{history.length}</span>
                     )}
                   </TabsTrigger>
                 </TabsList>

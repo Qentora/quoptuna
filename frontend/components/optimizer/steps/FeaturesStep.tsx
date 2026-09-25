@@ -15,6 +15,11 @@ import {
 } from '@/components/ui/select';
 import { useDatasetPreview } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
+import {
+  targetBalanceHelp,
+  targetBalancePercentages,
+  targetBalancePresentation,
+} from '@/lib/target-balance';
 import { Check, Search, Sparkles } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { StepHeader } from '../Wizard';
@@ -160,6 +165,12 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
   // server-side and the user picks the favorable class instead of neg/pos.
   const isMulticlass = targetValues.length > 2 && targetValues.length <= MAX_TARGET_CLASSES;
   const tooManyClasses = targetValues.length > MAX_TARGET_CLASSES;
+  const targetBalance = targetColumn
+    ? preview.data?.target_balance_by_column[targetColumn]
+    : undefined;
+  const targetBalancePresentationData = targetBalance
+    ? targetBalancePresentation(targetBalance)
+    : null;
 
   // Default the binary label mapping so the step is immediately valid: the
   // lower value maps to -1 and the higher to 1 (numeric when both parse as
@@ -348,6 +359,32 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
                 <FieldDescription>The column the model learns to predict.</FieldDescription>
               </Field>
 
+              {targetBalance && targetBalancePresentationData && (
+                <div className="rounded-md border border-border bg-muted p-3">
+                  <div className="flex items-center justify-between gap-3">
+                    <p className="text-xs font-medium">Target distribution</p>
+                    <Badge
+                      variant={targetBalancePresentationData.variant}
+                      title={targetBalanceHelp(targetBalance)}
+                    >
+                      {targetBalancePresentationData.label} ·{' '}
+                      {targetBalancePercentages(targetBalance)}
+                    </Badge>
+                  </div>
+                  <div className="mt-2 space-y-1.5">
+                    {targetBalance.classes.map(({ label, count }) => (
+                      <div key={label} className="flex items-center gap-2 text-xs">
+                        <span className="min-w-0 flex-1 truncate text-muted-foreground">{label}</span>
+                        <span className="font-medium">{count.toLocaleString()}</span>
+                      </div>
+                    ))}
+                  </div>
+                  <p className="mt-2 text-xs text-muted-foreground">
+                    Based on the selected target. Training-only resampling is available below;
+                    held-out data stays representative.
+                  </p>
+                </div>
+              )}
               {targetColumn && needsMapping && (
                 <div className="rounded-md border border-border bg-muted p-3">
                   <p className="text-xs font-medium">Label mapping (binary)</p>

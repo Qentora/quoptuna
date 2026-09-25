@@ -1,0 +1,1158 @@
+{
+ "generated": "2026-09-25",
+ "engine": "axe-core 4.13.0",
+ "browser": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/150.0.0.0 Safari/537.36",
+ "tags": [
+  "wcag2a",
+  "wcag2aa",
+  "wcag21a",
+  "wcag21aa",
+  "wcag22aa"
+ ],
+ "origin": "http://localhost:3000 (next dev), backend with AUTH0_* unset",
+ "baseline_before_fixes_1366x900": {
+  "light /": {
+   "violations": [],
+   "incomplete": [
+    "color-contrastx3"
+   ],
+   "passes": 24
+  },
+  "light /optimizer": {
+   "violations": [
+    {
+     "id": "color-contrast",
+     "impact": "serious",
+     "tags": [
+      "wcag2aa",
+      "wcag143"
+     ],
+     "nodes": 11,
+     "samples": [
+      {
+       "t": ".max-w-48.items-baseline.bg-muted:nth-child(1) > .text-muted-foreground",
+       "html": "<span class=\"text-muted-foreground\">Dataset</span>",
+       "s": "  Element has insufficient color contrast of 4.34 (foreground color: #737373, background color: #f5f5f5, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+      },
+      {
+       "t": ".max-w-48.items-baseline.bg-muted:nth-child(2) > .text-muted-foreground",
+       "html": "<span class=\"text-muted-foreground\">Features</span>",
+       "s": "  Element has insufficient color contrast of 4.34 (foreground color: #737373, background color: #f5f5f5, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+      },
+      {
+       "t": ".max-w-48.items-baseline.bg-muted:nth-child(3) > .text-muted-foreground",
+       "html": "<span class=\"text-muted-foreground\">Target</span>",
+       "s": "  Element has insufficient color contrast of 4.34 (foreground color: #737373, background color: #f5f5f5, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+      },
+      {
+       "t": ".max-w-48.items-baseline.bg-muted:nth-child(4) > .text-muted-foreground",
+       "html": "<span class=\"text-muted-foreground\">Trials</span>",
+       "s": "  Element has insufficient color contrast of 4.34 (foreground color: #737373, background color: #f5f5f5, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+      },
+      {
+       "t": ".px-2\\.5.py-2.hover\\:border-foreground:nth-child(3) > .justify-between.gap-2.flex > .shrink-0.gap-1.flex > .bg-accent-emerald.text-accent-emerald-foreground[data-variant=\"emerald\"]",
+       "html": "<span data-slot=\"badge\" data-variant=\"emerald\" class=\"group/badge inline-f...\" title=\"Balanced: 56 / 44. B...\">",
+       "s": "  Element has insufficient color contrast of 3.4 (foreground color: #059467, background color: #d1fae5, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+      }
+     ]
+    }
+   ],
+   "incomplete": [],
+   "passes": 26
+  },
+  "light /runs": {
+   "violations": [
+    {
+     "id": "color-contrast",
+     "impact": "serious",
+     "tags": [
+      "wcag2aa",
+      "wcag143"
+     ],
+     "nodes": 12,
+     "samples": [
+      {
+       "t": "tr:nth-child(1) > td:nth-child(4) > .bg-accent-emerald.text-accent-emerald-foreground[data-variant=\"emerald\"]",
+       "html": "<span data-slot=\"badge\" data-variant=\"emerald\" class=\"group/badge inline-f...\">",
+       "s": "  Element has insufficient color contrast of 3.4 (foreground color: #059467, background color: #d1fae5, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+      },
+      {
+       "t": "tr:nth-child(2) > td:nth-child(4) > .bg-accent-emerald.text-accent-emerald-foreground[data-variant=\"emerald\"]",
+       "html": "<span data-slot=\"badge\" data-variant=\"emerald\" class=\"group/badge inline-f...\">",
+       "s": "  Element has insufficient color contrast of 3.4 (foreground color: #059467, background color: #d1fae5, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+      },
+      {
+       "t": "tr:nth-child(3) > td:nth-child(4) > .bg-accent-orange.text-accent-orange-foreground[data-variant=\"classical\"]",
+       "html": "<span data-slot=\"badge\" data-variant=\"classical\" class=\"group/badge inline-f...\">",
+       "s": "  Element has insufficient color contrast of 3.1 (foreground color: #e9590c, background color: #ffedd6, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+      },
+      {
+       "t": "tr:nth-child(5) > td:nth-child(4) > .bg-accent-orange.text-accent-orange-foreground[data-variant=\"classical\"]",
+       "html": "<span data-slot=\"badge\" data-variant=\"classical\" class=\"group/badge inline-f...\">",
+       "s": "  Element has insufficient color contrast of 3.1 (foreground color: #e9590c, background color: #ffedd6, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+      },
+      {
+       "t": "tr:nth-child(6) > td:nth-child(4) > .bg-accent-emerald.text-accent-emerald-foreground[data-variant=\"emerald\"]",
+       "html": "<span data-slot=\"badge\" data-variant=\"emerald\" class=\"group/badge inline-f...\">",
+       "s": "  Element has insufficient color contrast of 3.4 (foreground color: #059467, background color: #d1fae5, font size: 7.5pt (10px), font weight: normal). Expected contrast ratio of 4.5:1"
+      }
+     ]
+    }
+   ],
+   "incomplete": [
+    "color-contrastx11"
+   ],
+   "passes": 26
+  },
+  "light /settings": {
+   "violations": [
+    {
+     "id": "color-contrast",
+     "impact": "serious",
+     "tags": [
+      "wcag2aa",
+      "wcag143"
+     ],
+     "nodes": 11,
+     "samples": [
+      {
+       "t": ".group\\/field.data-\\[invalid\\=true\\]\\:text-destructive.\\*\\:w-full:nth-child(2) > .text-muted-foreground\\/80.leading-normal.font-normal",
+       "html": "<p data-slot=\"field-description\" class=\"text-left text-xs/relaxed leading-normal font-normal group-has-data-horizontal/field:text-balance [[",
+       "s": "  Element has insufficient color contrast of 3.23 (foreground color: #8f8f8f, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+      },
+      {
+       "t": ".group\\/field.data-\\[invalid\\=true\\]\\:text-destructive.\\*\\:w-full:nth-child(3) > .text-muted-foreground\\/80.leading-normal.font-normal",
+       "html": "<p data-slot=\"field-description\" class=\"text-left text-xs/relaxed leading-normal font-normal group-has-data-horizontal/field:text-balance [[",
+       "s": "  Element has insufficient color contrast of 3.23 (foreground color: #8f8f8f, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+      },
+      {
+       "t": ".group\\/field.data-\\[invalid\\=true\\]\\:text-destructive.\\*\\:w-full:nth-child(4) > .text-muted-foreground\\/80.leading-normal.font-normal",
+       "html": "<p data-slot=\"field-description\" class=\"text-left text-xs/relaxed leading-normal font-normal group-has-data-horizontal/field:text-balance [[",
+       "s": "  Element has insufficient color contrast of 3.23 (foreground color: #8f8f8f, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+      },
+      {
+       "t": ".group\\/field.data-\\[invalid\\=true\\]\\:text-destructive.\\*\\:w-full:nth-child(5) > .text-muted-foreground\\/80.leading-normal.font-normal",
+       "html": "<p data-slot=\"field-description\" class=\"text-left text-xs/relaxed leading-normal font-normal group-has-data-horizontal/field:text-balance [[",
+       "s": "  Element has insufficient color contrast of 3.23 (foreground color: #8f8f8f, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+      },
+      {
+       "t": ".group\\/field.data-\\[invalid\\=true\\]\\:text-destructive.\\*\\:w-full:nth-child(6) > .text-muted-foreground\\/80.leading-normal.font-normal",
+       "html": "<p data-slot=\"field-description\" class=\"text-left text-xs/relaxed leading-normal font-normal group-has-data-horizontal/field:text-balance [[",
+       "s": "  Element has insufficient color contrast of 3.23 (foreground color: #8f8f8f, background color: #ffffff, font size: 9.0pt (12px), font weight: normal). Expected contrast ratio of 4.5:1"
+      }
+     ]
+    }
+   ],
+   "incomplete": [],
+   "passes": 28
+  },
+  "light /preview-report": {
+   "violations": [],
+   "incomplete": [
+    "color-contrastx1"
+   ],
+   "passes": 32
+  },
+  "dark /": {
+   "violations": [],
+   "incomplete": [
+    "color-contrastx3"
+   ],
+   "passes": 24
+  },
+  "dark /optimizer": {
+   "violations": [],
+   "incomplete": [],
+   "passes": 26
+  },
+  "dark /runs": {
+   "violations": [],
+   "incomplete": [
+    "color-contrastx11"
+   ],
+   "passes": 26
+  },
+  "dark /settings": {
+   "violations": [],
+   "incomplete": [],
+   "passes": 28
+  },
+  "dark /preview-report": {
+   "violations": [],
+   "incomplete": [
+    "color-contrastx1"
+   ],
+   "passes": 32
+  }
+ },
+ "final": {
+  "1366x900 light /": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "light",
+   "violations": [],
+   "incomplete": [
+    {
+     "id": "color-contrast",
+     "impact": "serious",
+     "help": "Elements must meet minimum color contrast ratio thresholds",
+     "tags": [
+      "wcag2aa",
+      "wcag143"
+     ],
+     "nodes": [
+      {
+       "target": ".bg-linear-to-br > .p-5[data-slot=\"card-content\"] > .mb-1.text-base",
+       "html": "<h3 class=\"mb-1 text-base font-semibold\">Open the Optimizer</h3>",
+       "message": "Element's background color could not be determined due to a background gradient"
+      },
+      {
+       "target": ".opacity-90",
+       "html": "<p class=\"text-sm opacity-90\">Load data, run hyperparameter optimization, explore SHAP analysis and generate an AI report.</p>",
+       "message": "Element's background color could not be determined due to a background gradient"
+      },
+      {
+       "target": ".mt-3",
+       "html": "<a class=\"mt-3 inline-block text-sm text-muted-foreground hover:text-foreground hover:underline\" href=\"/optimizer/\">+20 more — open the Optimizer to browse all<",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      }
+     ]
+    }
+   ],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "html-has-lang",
+    "html-lang-valid",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "scrollable-region-focusable",
+    "target-size"
+   ],
+   "inapplicable": 39
+  },
+  "1366x900 light /optimizer": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "light",
+   "violations": [],
+   "incomplete": [],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "form-field-multiple-labels",
+    "html-has-lang",
+    "html-lang-valid",
+    "label",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "scrollable-region-focusable",
+    "target-size"
+   ],
+   "inapplicable": 37
+  },
+  "1366x900 light /runs": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "light",
+   "violations": [],
+   "incomplete": [
+    {
+     "id": "color-contrast",
+     "impact": "serious",
+     "help": "Elements must meet minimum color contrast ratio thresholds",
+     "tags": [
+      "wcag2aa",
+      "wcag143"
+     ],
+     "nodes": [
+      {
+       "target": "tr:nth-child(11) > .font-medium",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 font-medium\">UCI_ADULT_LOCAL_SMAL</td>",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(11) > .text-xs.text-muted-foreground:nth-child(3)",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-xs text-muted-foreground\">Adult / Census Income</td>",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(11) > .font-semibold.tabular-nums.text-right",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-right font-semibold tabular-nums\">0.3741</td>",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(11) > .tabular-nums.text-right.text-xs",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-right text-xs text-muted-foreground tabular-nums\">2/",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(11) > .text-xs.text-muted-foreground:nth-child(7)",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-xs text-muted-foreground\">9/6/2026, 10:05:07 AM</td>",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(12) > .font-medium",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 font-medium\">test_fair_resample</td>",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(12) > .text-xs.text-muted-foreground:nth-child(3)",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-xs text-muted-foreground\">iris_imbalanced2</td>",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(12) > .tabular-nums.text-right.text-xs",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-right text-xs text-muted-foreground tabular-nums\">0/",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(13) > .font-medium",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 font-medium\">s</td>",
+       "message": "Element content is too short to determine if it is actual text content"
+      },
+      {
+       "target": "tr:nth-child(13) > .text-xs.text-muted-foreground:nth-child(3)",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-xs text-muted-foreground\">x</td>",
+       "message": "Element content is too short to determine if it is actual text content"
+      },
+      {
+       "target": "tr:nth-child(13) > .tabular-nums.text-right.text-xs",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-right text-xs text-muted-foreground tabular-nums\">0/",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      }
+     ]
+    }
+   ],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "html-has-lang",
+    "html-lang-valid",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "scrollable-region-focusable",
+    "target-size",
+    "td-headers-attr",
+    "th-has-data-cells"
+   ],
+   "inapplicable": 37
+  },
+  "1366x900 light /settings": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "light",
+   "violations": [],
+   "incomplete": [],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "duplicate-id-aria",
+    "form-field-multiple-labels",
+    "html-has-lang",
+    "html-lang-valid",
+    "label",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "scrollable-region-focusable",
+    "summary-name",
+    "target-size"
+   ],
+   "inapplicable": 35
+  },
+  "1366x900 light /preview-report": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "light",
+   "violations": [],
+   "incomplete": [],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-required-children",
+    "aria-required-parent",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "duplicate-id-aria",
+    "form-field-multiple-labels",
+    "html-has-lang",
+    "html-lang-valid",
+    "image-alt",
+    "label",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "scrollable-region-focusable",
+    "target-size",
+    "td-headers-attr",
+    "th-has-data-cells"
+   ],
+   "inapplicable": 31
+  },
+  "1366x900 dark /": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "dark",
+   "violations": [],
+   "incomplete": [
+    {
+     "id": "color-contrast",
+     "impact": "serious",
+     "help": "Elements must meet minimum color contrast ratio thresholds",
+     "tags": [
+      "wcag2aa",
+      "wcag143"
+     ],
+     "nodes": [
+      {
+       "target": ".bg-linear-to-br > .p-5[data-slot=\"card-content\"] > .mb-1.text-base",
+       "html": "<h3 class=\"mb-1 text-base font-semibold\">Open the Optimizer</h3>",
+       "message": "Element's background color could not be determined due to a background gradient"
+      },
+      {
+       "target": ".opacity-90",
+       "html": "<p class=\"text-sm opacity-90\">Load data, run hyperparameter optimization, explore SHAP analysis and generate an AI report.</p>",
+       "message": "Element's background color could not be determined due to a background gradient"
+      },
+      {
+       "target": ".mt-3",
+       "html": "<a class=\"mt-3 inline-block text-sm text-muted-foreground hover:text-foreground hover:underline\" href=\"/optimizer/\">+20 more — open the Optimizer to browse all<",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      }
+     ]
+    }
+   ],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "html-has-lang",
+    "html-lang-valid",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "scrollable-region-focusable",
+    "target-size"
+   ],
+   "inapplicable": 39
+  },
+  "1366x900 dark /optimizer": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "dark",
+   "violations": [],
+   "incomplete": [],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "form-field-multiple-labels",
+    "html-has-lang",
+    "html-lang-valid",
+    "label",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "scrollable-region-focusable",
+    "target-size"
+   ],
+   "inapplicable": 37
+  },
+  "1366x900 dark /runs": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "dark",
+   "violations": [],
+   "incomplete": [
+    {
+     "id": "color-contrast",
+     "impact": "serious",
+     "help": "Elements must meet minimum color contrast ratio thresholds",
+     "tags": [
+      "wcag2aa",
+      "wcag143"
+     ],
+     "nodes": [
+      {
+       "target": "tr:nth-child(11) > .font-medium",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 font-medium\">UCI_ADULT_LOCAL_SMAL</td>",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(11) > .text-xs.text-muted-foreground:nth-child(3)",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-xs text-muted-foreground\">Adult / Census Income</td>",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(11) > .font-semibold.tabular-nums.text-right",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-right font-semibold tabular-nums\">0.3741</td>",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(11) > .tabular-nums.text-right.text-xs",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-right text-xs text-muted-foreground tabular-nums\">2/",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(11) > .text-xs.text-muted-foreground:nth-child(7)",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-xs text-muted-foreground\">9/6/2026, 10:05:07 AM</td>",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(12) > .font-medium",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 font-medium\">test_fair_resample</td>",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(12) > .text-xs.text-muted-foreground:nth-child(3)",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-xs text-muted-foreground\">iris_imbalanced2</td>",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(12) > .tabular-nums.text-right.text-xs",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-right text-xs text-muted-foreground tabular-nums\">0/",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      },
+      {
+       "target": "tr:nth-child(13) > .font-medium",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 font-medium\">s</td>",
+       "message": "Element content is too short to determine if it is actual text content"
+      },
+      {
+       "target": "tr:nth-child(13) > .text-xs.text-muted-foreground:nth-child(3)",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-xs text-muted-foreground\">x</td>",
+       "message": "Element content is too short to determine if it is actual text content"
+      },
+      {
+       "target": "tr:nth-child(13) > .tabular-nums.text-right.text-xs",
+       "html": "<td data-slot=\"table-cell\" class=\"p-2 align-middle whitespace-nowrap [&amp;:has([role=checkbox])]:pr-0 text-right text-xs text-muted-foreground tabular-nums\">0/",
+       "message": "Element's background color could not be determined because it's partially obscured by another element"
+      }
+     ]
+    }
+   ],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "html-has-lang",
+    "html-lang-valid",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "scrollable-region-focusable",
+    "target-size",
+    "td-headers-attr",
+    "th-has-data-cells"
+   ],
+   "inapplicable": 37
+  },
+  "1366x900 dark /settings": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "dark",
+   "violations": [],
+   "incomplete": [],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "duplicate-id-aria",
+    "form-field-multiple-labels",
+    "html-has-lang",
+    "html-lang-valid",
+    "label",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "scrollable-region-focusable",
+    "summary-name",
+    "target-size"
+   ],
+   "inapplicable": 35
+  },
+  "1366x900 dark /preview-report": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "dark",
+   "violations": [],
+   "incomplete": [],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-required-children",
+    "aria-required-parent",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "duplicate-id-aria",
+    "form-field-multiple-labels",
+    "html-has-lang",
+    "html-lang-valid",
+    "image-alt",
+    "label",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "scrollable-region-focusable",
+    "target-size",
+    "td-headers-attr",
+    "th-has-data-cells"
+   ],
+   "inapplicable": 31
+  },
+  "1366x2400 light /": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "light",
+   "violations": [],
+   "incomplete": [
+    {
+     "id": "color-contrast",
+     "impact": "serious",
+     "help": "Elements must meet minimum color contrast ratio thresholds",
+     "tags": [
+      "wcag2aa",
+      "wcag143"
+     ],
+     "nodes": [
+      {
+       "target": ".bg-linear-to-br > .p-5[data-slot=\"card-content\"] > .mb-1.text-base",
+       "html": "<h3 class=\"mb-1 text-base font-semibold\">Open the Optimizer</h3>",
+       "message": "Element's background color could not be determined due to a background gradient"
+      },
+      {
+       "target": ".opacity-90",
+       "html": "<p class=\"text-sm opacity-90\">Load data, run hyperparameter optimization, explore SHAP analysis and generate an AI report.</p>",
+       "message": "Element's background color could not be determined due to a background gradient"
+      }
+     ]
+    }
+   ],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "html-has-lang",
+    "html-lang-valid",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "target-size"
+   ],
+   "inapplicable": 40
+  },
+  "1366x2400 light /optimizer": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "light",
+   "violations": [],
+   "incomplete": [],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "form-field-multiple-labels",
+    "html-has-lang",
+    "html-lang-valid",
+    "label",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "target-size"
+   ],
+   "inapplicable": 38
+  },
+  "1366x2400 light /runs": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "light",
+   "violations": [],
+   "incomplete": [],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "html-has-lang",
+    "html-lang-valid",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "target-size",
+    "td-headers-attr",
+    "th-has-data-cells"
+   ],
+   "inapplicable": 38
+  },
+  "1366x2400 light /settings": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "light",
+   "violations": [],
+   "incomplete": [],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "duplicate-id-aria",
+    "form-field-multiple-labels",
+    "html-has-lang",
+    "html-lang-valid",
+    "label",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "scrollable-region-focusable",
+    "summary-name",
+    "target-size"
+   ],
+   "inapplicable": 35
+  },
+  "1366x2400 light /preview-report": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "light",
+   "violations": [],
+   "incomplete": [],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-required-children",
+    "aria-required-parent",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "duplicate-id-aria",
+    "form-field-multiple-labels",
+    "html-has-lang",
+    "html-lang-valid",
+    "image-alt",
+    "label",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "target-size",
+    "td-headers-attr",
+    "th-has-data-cells"
+   ],
+   "inapplicable": 32
+  },
+  "1366x2400 dark /": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "dark",
+   "violations": [],
+   "incomplete": [
+    {
+     "id": "color-contrast",
+     "impact": "serious",
+     "help": "Elements must meet minimum color contrast ratio thresholds",
+     "tags": [
+      "wcag2aa",
+      "wcag143"
+     ],
+     "nodes": [
+      {
+       "target": ".bg-linear-to-br > .p-5[data-slot=\"card-content\"] > .mb-1.text-base",
+       "html": "<h3 class=\"mb-1 text-base font-semibold\">Open the Optimizer</h3>",
+       "message": "Element's background color could not be determined due to a background gradient"
+      },
+      {
+       "target": ".opacity-90",
+       "html": "<p class=\"text-sm opacity-90\">Load data, run hyperparameter optimization, explore SHAP analysis and generate an AI report.</p>",
+       "message": "Element's background color could not be determined due to a background gradient"
+      }
+     ]
+    }
+   ],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "html-has-lang",
+    "html-lang-valid",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "target-size"
+   ],
+   "inapplicable": 40
+  },
+  "1366x2400 dark /optimizer": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "dark",
+   "violations": [],
+   "incomplete": [],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "form-field-multiple-labels",
+    "html-has-lang",
+    "html-lang-valid",
+    "label",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "target-size"
+   ],
+   "inapplicable": 38
+  },
+  "1366x2400 dark /runs": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "dark",
+   "violations": [],
+   "incomplete": [],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "html-has-lang",
+    "html-lang-valid",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "target-size",
+    "td-headers-attr",
+    "th-has-data-cells"
+   ],
+   "inapplicable": 38
+  },
+  "1366x2400 dark /settings": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "dark",
+   "violations": [],
+   "incomplete": [],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "duplicate-id-aria",
+    "form-field-multiple-labels",
+    "html-has-lang",
+    "html-lang-valid",
+    "label",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "scrollable-region-focusable",
+    "summary-name",
+    "target-size"
+   ],
+   "inapplicable": 35
+  },
+  "1366x2400 dark /preview-report": {
+   "axe": "4.13.0",
+   "title": "QuOptuna",
+   "themeClass": "dark",
+   "violations": [],
+   "incomplete": [],
+   "passes": [
+    "aria-allowed-attr",
+    "aria-conditional-attr",
+    "aria-deprecated-role",
+    "aria-hidden-body",
+    "aria-hidden-focus",
+    "aria-prohibited-attr",
+    "aria-required-attr",
+    "aria-required-children",
+    "aria-required-parent",
+    "aria-roles",
+    "aria-valid-attr",
+    "aria-valid-attr-value",
+    "avoid-inline-spacing",
+    "button-name",
+    "bypass",
+    "color-contrast",
+    "document-title",
+    "duplicate-id-aria",
+    "form-field-multiple-labels",
+    "html-has-lang",
+    "html-lang-valid",
+    "image-alt",
+    "label",
+    "link-name",
+    "list",
+    "listitem",
+    "meta-viewport",
+    "nested-interactive",
+    "target-size",
+    "td-headers-attr",
+    "th-has-data-cells"
+   ],
+   "inapplicable": 32
+  }
+ }
+}

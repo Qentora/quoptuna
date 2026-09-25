@@ -572,26 +572,23 @@ def delete_for_run(optimization_id: str) -> None:
         snapshots = session.exec(
             select(AnalysisSnapshot).where(AnalysisSnapshot.optimization_id == optimization_id)
         ).all()
-        snapshot_ids = [s.id for s in snapshots]
-        for snapshot_id in snapshot_ids:
+        for snapshot in snapshots:
             for job_row in session.exec(
-                select(AnalysisJob).where(AnalysisJob.snapshot_id == snapshot_id)
+                select(AnalysisJob).where(AnalysisJob.snapshot_id == snapshot.id)
             ).all():
                 session.delete(job_row)
             for report_row in session.exec(
-                select(AnalysisReport).where(AnalysisReport.snapshot_id == snapshot_id)
+                select(AnalysisReport).where(AnalysisReport.snapshot_id == snapshot.id)
             ).all():
                 session.delete(report_row)
             for artifact_row in session.exec(
-                select(AnalysisArtifact).where(AnalysisArtifact.snapshot_id == snapshot_id)
+                select(AnalysisArtifact).where(AnalysisArtifact.snapshot_id == snapshot.id)
             ).all():
                 session.delete(artifact_row)
             for revision_row in session.exec(
-                select(AnalysisRevision).where(AnalysisRevision.snapshot_id == snapshot_id)
+                select(AnalysisRevision).where(AnalysisRevision.snapshot_id == snapshot.id)
             ).all():
                 session.delete(revision_row)
-            snapshot_row = session.get(AnalysisSnapshot, snapshot_id)
-            if snapshot_row is not None:
-                session.delete(snapshot_row)
+            session.delete(snapshot)
         session.commit()
     shutil.rmtree(ARTIFACT_ROOT / optimization_id, ignore_errors=True)
