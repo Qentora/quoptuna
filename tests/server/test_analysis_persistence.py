@@ -151,6 +151,41 @@ def test_context_and_bundle_endpoints_serve_a_completed_snapshot(isolated_store)
         assert archive.read("figures/shap_bar.png") == b"bundle-png"
 
 
+
+def test_bulk_bundle_download_includes_every_selected_run(isolated_store, monkeypatch):
+    for run_id in ("run-1", "run-2"):
+        job = analysis_store.create_job(run_id, {})
+        analysis_store.complete_job(job["id"], {"metrics": {"accuracy": 0.9}, "plots": {}})
+
+    monkeypatch.setattr(
+        analysis,
+        "get_job",
+        lambda run_id: {
+            "id": run_id,
+            "status": "failed",
+            "request": {"study_name": f"study-{run_id}", "database_name": "results"},
+            "trials": [],
+        },
+    )
+    response = asyncio.run(
+        analysis.download_bulk_research_bundles(
+            analysis.BulkResearchBundleRequest(optimization_ids=["run-1", "run-2", "no-analysis", "run-1"])
+        )
+    )
+
+    assert response.media_type == "application/zip"
+    with zipfile.ZipFile(io.BytesIO(response.body)) as archive:
+        bundles = [name for name in archive.namelist() if name.startswith("runs/") and name.endswith(".zip")]
+        assert len(bundles) == 3
+        bundle_contents = []
+        for name in bundles:
+            with zipfile.ZipFile(io.BytesIO(archive.read(name))) as bundle:
+                bundle_contents.append(set(bundle.namelist()))
+        assert any({"README.md", "run.json", "trials.json"} <= contents for contents in bundle_contents)
+        assert sum("context.json" in contents for contents in bundle_contents) == 2
+
+
+
 def test_a_running_analysis_is_findable_without_its_job_id(isolated_store):
     """A refreshed browser loses the job id; the work keeps going without it.
 

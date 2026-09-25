@@ -256,8 +256,50 @@ def build_zip(
     return buffer.getvalue()
 
 
+def build_run_data_zip(
+    *, run: dict[str, Any], trials: Sequence[dict], pareto_trials: Sequence[dict]
+) -> bytes:
+    """Archive durable run data when no completed analysis snapshot exists."""
+    request = run.get("request") or {}
+    study_name = run.get("study_name") or request.get("study_name") or "unnamed-study"
+    public_run = {
+        key: value
+        for key, value in run.items()
+        if key not in ("api_key", "result", "trials", "pareto_trials")
+    }
+    readme = "\n".join(
+        [
+            f"# QuOptuna run export: {study_name}",
+            "",
+            "No completed analysis snapshot exists for this run.",
+            "This archive contains durable run metadata and its available trial history.",
+            "",
+        ]
+    )
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, "w", compression=zipfile.ZIP_DEFLATED) as archive:
+        archive.writestr("README.md", readme)
+        archive.writestr("run.json", json.dumps(public_run, indent=2, default=str))
+        archive.writestr("trials.json", json.dumps(list(trials), indent=2, default=str))
+        if pareto_trials:
+            archive.writestr(
+                "pareto_trials.json", json.dumps(list(pareto_trials), indent=2, default=str)
+            )
+    return buffer.getvalue()
+
+
+def run_data_filename(run: dict[str, Any]) -> str:
+    """Filename for a durable run-data export without analysis artifacts."""
+    request = run.get("request") or {}
+    study_name = run.get("study_name") or request.get("study_name") or "unnamed-study"
+    stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
+    return f"quoptuna-run-{_safe(study_name)}-{stamp}.zip"
+
+
 def bundle_filename(context: dict) -> str:
-    run = (context.get("run") or {}).get("optimization_id") or "run"
+    run = context.get("run") or {}
+    study_name = run.get("study_name") or "unnamed-study"
+    label = _safe(study_name)
     analysis = context.get("analysis") or {}
     stamp = datetime.now().strftime("%Y%m%d-%H%M%S")
-    return f"quoptuna-research-dump-{_safe(run)}-rev{analysis.get('revision') or 0}-{stamp}.zip"
+    return f"quoptuna-research-dump-{label}-rev{analysis.get('revision') or 0}-{stamp}.zip"

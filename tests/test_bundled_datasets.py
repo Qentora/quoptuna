@@ -14,6 +14,11 @@ from quoptuna.server.api.v1.data import POPULAR_UCI_DATASETS
 
 # id -> the target column a user is expected to select.
 EXPECTED_TARGETS = {
+    2: "income",
+    144: "class",
+    9024: "target",
+    9025: "target",
+    9026: "target",
     15: "target",
     30: "target",
     53: "target",

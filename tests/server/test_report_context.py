@@ -326,6 +326,13 @@ def test_bundle_contains_figures_tables_and_the_exact_agent_evidence(snapshot, r
                 assert figure["bundle_path"] in names
 
 
+
+def test_bundle_filename_includes_study_and_run_names(snapshot, run):
+    filename = research_bundle.bundle_filename(build(snapshot, run))
+
+    assert "study-a-rev" in filename
+    assert "opt_1" not in filename
+
 def test_bundle_never_exports_the_live_result_or_a_key(snapshot, run, payload):
     context = build(snapshot, run)
     archive = research_bundle.build_zip(

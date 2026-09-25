@@ -57,12 +57,27 @@ export async function uploadDataset(file: File): Promise<DatasetUploadResponse> 
   });
 }
 
+export interface TargetBalanceClass {
+  label: string;
+  count: number;
+}
+
+export interface TargetBalanceProfile {
+  kind: 'binary' | 'multiclass';
+  label: 'balanced' | 'moderate_imbalance' | 'imbalanced' | 'multiclass';
+  classes: TargetBalanceClass[];
+  minority_fraction: number;
+}
+
 export interface UCIDataset {
   id: number;
   name: string;
   description?: string;
   num_instances?: number;
   num_features?: number;
+  target_column?: string;
+  target_balance?: TargetBalanceProfile;
+
 }
 
 export async function listUCIDatasets(): Promise<UCIDataset[]> {
@@ -96,6 +111,8 @@ export interface DatasetPreview {
   missing: Record<string, number>;
   unique_counts: Record<string, number>;
   target_values_by_column: Record<string, Array<string | number>>;
+  target_balance_by_column: Record<string, TargetBalanceProfile>;
+
 }
 
 export async function getDatasetPreview(datasetId: string): Promise<DatasetPreview> {
@@ -268,6 +285,7 @@ export async function getOptimizationDetail(id: string): Promise<OptimizationDet
 export async function deleteOptimization(id: string): Promise<{ message: string }> {
   return request<{ message: string }>(`/api/v1/optimize/${id}`, { method: 'DELETE' });
 }
+
 
 const POLL_MAX_CONSECUTIVE_FAILURES = 5;
 
@@ -679,6 +697,34 @@ export async function downloadResearchBundle(
   return {
     blob: await response.blob(),
     filename: match?.[1] || `quoptuna-research-dump-${snapshotId}.zip`,
+  };
+}
+
+/** Fetch one ZIP containing the latest completed research dump for each selected run. */
+export async function downloadBulkResearchBundles(
+  optimizationIds: string[]
+): Promise<{ blob: Blob; filename: string }> {
+  const response = await fetch(`${API_BASE_URL}/api/v1/analysis/bundles/bulk`, {
+    method: 'POST',
+    credentials: 'include',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ optimization_ids: optimizationIds }),
+  });
+  if (!response.ok) {
+    let detail = response.statusText;
+    try {
+      detail = (await response.json()).detail || detail;
+    } catch {
+      // no JSON body
+    }
+    if (response.status === 401) throw new UnauthorizedError(detail);
+    throw new Error(detail);
+  }
+  const disposition = response.headers.get('content-disposition') || '';
+  const match = /filename="?([^";]+)"?/.exec(disposition);
+  return {
+    blob: await response.blob(),
+    filename: match?.[1] || `quoptuna-research-dumps-${Date.now()}.zip`,
   };
 }
 

@@ -11,7 +11,14 @@ import pandas as pd
 from fastapi import APIRouter, File, HTTPException, UploadFile
 from fastapi.responses import JSONResponse
 
-from quoptuna.datasets import BUNDLED_DATASETS, bundled_catalog, bundled_dataset_path
+from quoptuna.datasets import (
+    BUNDLED_DATASETS,
+    bundled_catalog,
+    bundled_catalog_with_balance,
+    bundled_dataset_path,
+    normalize_uci_targets,
+)
+from quoptuna.datasets.balance import target_balance_profile
 from quoptuna.server.core.config import settings
 from quoptuna.server.services import dataset_registry
 from quoptuna.server.services.analysis_store import get_artifact_store
@@ -137,8 +144,9 @@ async def upload_dataset(file: UploadFile = File(...)):
 
 @router.get("/uci")
 async def list_uci_datasets():
-    """List curated, popular UCI datasets with numeric ids."""
-    return {"datasets": POPULAR_UCI_DATASETS}
+    """List curated datasets, enriching bundled entries with target balance."""
+    bundled = {entry["id"]: entry for entry in bundled_catalog_with_balance()}
+    return {"datasets": [bundled.get(entry["id"], entry) for entry in POPULAR_UCI_DATASETS]}
 
 
 @router.post("/uci/{dataset_id}/load")
@@ -160,7 +168,8 @@ async def load_uci_dataset(dataset_id: int):
             dataset = fetch_ucirepo(id=dataset_id)
 
             if dataset.data.targets is not None:
-                df = pd.concat([dataset.data.features, dataset.data.targets], axis=1)
+                targets = normalize_uci_targets(dataset_id, dataset.data.targets)
+                df = pd.concat([dataset.data.features, targets], axis=1)
             else:
                 df = dataset.data.features
 
@@ -222,13 +231,16 @@ async def preview_dataset(dataset_id: str):
     head = json.loads(df.head(10).to_json(orient="records"))
 
     target_values_by_column: dict[str, list] = {}
+    target_balance_by_column: dict[str, dict] = {}
     unique_counts: dict[str, int] = {}
     for col in df.columns:
         unique = df[col].dropna().unique()
         unique_counts[col] = len(unique)
         if len(unique) <= MAX_UNIQUE_FOR_TARGET:
             target_values_by_column[col] = json.loads(pd.Series(unique).to_json(orient="values"))
-
+            profile = target_balance_profile(df[col])
+            if profile is not None:
+                target_balance_by_column[col] = profile
     return {
         "id": dataset_id,
         "columns": list(df.columns),
@@ -238,6 +250,7 @@ async def preview_dataset(dataset_id: str):
         "missing": missing,
         "unique_counts": unique_counts,
         "target_values_by_column": target_values_by_column,
+        "target_balance_by_column": target_balance_by_column,
     }
 
 

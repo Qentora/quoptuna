@@ -20,6 +20,11 @@ import {
   useUploadDataset,
 } from '@/lib/hooks';
 import { cn } from '@/lib/utils';
+import {
+  targetBalanceHelp,
+  targetBalancePercentages,
+  targetBalancePresentation,
+} from '@/lib/target-balance';
 import { Loader2, Search, Upload } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ErrorBanner } from '../NavButtons';
@@ -202,6 +207,8 @@ export function DatasetStep({ workflowData, setWorkflowData, setFooter }: StepPr
             <div className="space-y-1.5">
               {filteredDatasets.map((dataset) => {
                 const isSelected = selected?.source === 'uci' && selected.name === dataset.name;
+                const balance = dataset.target_balance;
+                const balancePresentation = balance ? targetBalancePresentation(balance) : null;
                 return (
                   <button
                     key={dataset.id}
@@ -215,9 +222,17 @@ export function DatasetStep({ workflowData, setWorkflowData, setFooter }: StepPr
                   >
                     <div className="flex items-center justify-between gap-2">
                       <span className="truncate text-xs font-semibold">{dataset.name}</span>
-                      <span className="shrink-0 text-[10px] text-muted-foreground">
-                        ID: {dataset.id}
-                      </span>
+                      <div className="flex shrink-0 items-center gap-1">
+                        {balance && balancePresentation && (
+                          <Badge
+                            variant={balancePresentation.variant}
+                            title={targetBalanceHelp(balance)}
+                          >
+                            {balancePresentation.label} · {targetBalancePercentages(balance)}
+                          </Badge>
+                        )}
+                        <span className="text-[10px] text-muted-foreground">ID: {dataset.id}</span>
+                      </div>
                     </div>
                     {dataset.description && (
                       <p className="mt-0.5 line-clamp-1 text-[11px] text-muted-foreground">

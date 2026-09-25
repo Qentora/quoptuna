@@ -7,7 +7,7 @@ import streamlit as st
 from ucimlrepo import fetch_ucirepo
 
 from quoptuna.backend.utils.data_utils.data import mock_csv_data
-from quoptuna.datasets import BUNDLED_DATASETS, bundled_dataset_path
+from quoptuna.datasets import BUNDLED_DATASETS, bundled_dataset_path, normalize_uci_targets
 
 
 def initialize_session_state():
@@ -86,9 +86,8 @@ def fetch_uci_dataset():
                 else:
                     dataset = fetch_ucirepo(id=dataset_id)
 
-                    # Combine features and targets
                     X = dataset.data.features
-                    y = dataset.data.targets
+                    y = normalize_uci_targets(dataset_id, dataset.data.targets)
                     df = pd.concat([X, y], axis=1)
                     metadata = dataset.metadata
 

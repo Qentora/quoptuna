@@ -25,6 +25,7 @@ def _resolve_dataset(
 
     Returns (dataset_id, dataset_source, dataframe, default_target).
     """
+    from quoptuna.datasets import normalize_uci_targets
     from quoptuna.server.services import dataset_registry
 
     if csv_path:
@@ -46,7 +47,8 @@ def _resolve_dataset(
         from ucimlrepo import fetch_ucirepo
 
         dataset = fetch_ucirepo(id=int(uci_id))
-        df = pd.concat([dataset.data.features, dataset.data.targets], axis=1)
+        targets = normalize_uci_targets(int(uci_id), dataset.data.targets)
+        df = pd.concat([dataset.data.features, targets], axis=1)
         # Persist to a CSV and register — same shape as the UI's UCI load.
         out_dir = Path(upload_dir)
         out_dir.mkdir(exist_ok=True)
