@@ -1,6 +1,6 @@
 # Contributing to QuOptuna
 
-Thanks for your interest in improving QuOptuna! This is the short, practical guide; the long-form contributor documentation lives at [Qentora.github.io/quoptuna/contributing](https://Qentora.github.io/quoptuna/contributing/).
+Thanks for your interest in improving QuOptuna! This is the short, practical guide; the long-form contributor documentation lives at [quoptuna.org/contributing](https://quoptuna.org/contributing/).
 
 ## Development setup
 

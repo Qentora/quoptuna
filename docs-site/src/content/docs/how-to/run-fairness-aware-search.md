@@ -22,8 +22,10 @@ Set `fairness_metric`:
 | Metric | Notes |
 | --- | --- |
 | `equal_opportunity_difference` (default) | Difference in true-positive rate across groups. |
-| disparate impact / four-fifths rule | Ratio-based; the classic 80% rule. |
-| demographic-parity difference | Difference in positive-prediction rate across groups. |
+| `disparate_impact` | Ratio-based four-fifths rule: feasible when the ratio is at or above the threshold (default `0.8`). |
+| `demographic_parity_difference` | Difference in positive-prediction rate across groups. |
+
+For the difference metrics, `fairness_threshold` defaults to `0.1` (feasible when disparity is at or below it). `constrained` mode requires `sampler="tpe"` (the API returns 422 otherwise); `multi_objective` mode forces the pruner to `none`.
 
 Fairness search is available via `POST /api/v1/optimize`, the `Optimizer`, and the CLI (`--sensitive-feature`, `--fairness-mode`, `--fairness-metric`, `--fairness-threshold`, `--favorable-class`).
 
@@ -32,7 +34,8 @@ Fairness search is available via `POST /api/v1/optimize`, the `Optimizer`, and t
 Keep every kept trial within a disparity budget:
 
 ```bash
-quoptuna optimize \
+quoptuna optimize --csv data.csv --target label \
+  --sampler tpe \
   --sensitive-feature sex \
   --fairness-mode constrained \
   --fairness-metric equal_opportunity_difference \
@@ -46,7 +49,7 @@ Only trials whose disparity is within `0.1` are treated as feasible; TPE steers 
 Explore the trade-off instead of committing to one threshold:
 
 ```bash
-quoptuna optimize \
+quoptuna optimize --csv data.csv --target label \
   --sensitive-feature sex \
   --fairness-mode multi_objective \
   --fairness-metric equal_opportunity_difference

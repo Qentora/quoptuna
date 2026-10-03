@@ -5,6 +5,38 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+## [1.0.1] - 2026-10-03
+Patch release. Results of valid runs are unchanged from 1.0.0; only inputs that
+previously trained on a wrong target are now rejected.
+
+### Fixed
+- The Features step never blocked targets with more than 20 classes. The preview only
+  lists values for columns with at most 20 distinct values, so a continuous target
+  reached the guard as zero classes and the step allowed Next; the server then failed the run.
+  The class count now comes from `unique_counts`, which covers every column.
+- A binary `label_mapping` with the same value for `neg` and `pos` was accepted and
+  silently trained on a wrong target. `POST /api/v1/optimize` now returns 422
+  (`1` and `"1"` count as the same label), and `TaskSpec.from_target` also rejects a
+  mapping whose values are not exactly the target's two classes, which previously
+  encoded every row as -1.
+
+### Changed
+- Docs brought in line with the code: model counts (21 = 16 quantum + 5 classical),
+  missing CLI flags and REST routes, report `api_key` passed per request (the
+  `*_API_KEY` settings are unused), SQLite as the default deploy database, `uv sync`
+  for dev setup, resampling, analysis jobs and the decision-threshold handling.
+- CI tests Python 3.11 and 3.12. The 3.10 job never tested 3.10: `uv sync` fell back
+  to the runner's 3.12 because the package requires `>=3.11`.
+- Homepage, documentation and citation URLs point to <https://quoptuna.org> instead of
+  the redirecting `Qentora.github.io/quoptuna` (`pyproject.toml`, `CITATION.cff`, CLI
+  banner, README, CONTRIBUTING, issue template, docs deploy page).
+
+### Removed
+- Untracked `.sesskey` and seven `.DS_Store` files, and added `.sesskey` to
+  `.gitignore`. `.sesskey` held a FastHTML session-signing key (a UUID) committed in
+  2024; nothing in the project imports FastHTML any more, and neither file was in
+  the published 1.0.0 sdist or wheel.
+
 ## [1.0.0] - 2026-09-25
 First stable release. The major bump marks two things: results produced by earlier
 versions are not directly comparable (the validation-leakage, target-shape and

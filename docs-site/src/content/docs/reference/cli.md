@@ -61,7 +61,7 @@ Launch the QuOptuna application. Serves the Web UI, the JSON API, and interactiv
 | Option | Default | Description |
 | --- | --- | --- |
 | `--streamlit` | off | Launch the legacy Streamlit dashboard instead of the full stack |
-| `--host <h>` | access host | Access host used in generated URLs and links |
+| `--host <h>` | `localhost` | Access host used in generated URLs and links |
 | `--port <n>` | `8000` | Port for the QuOptuna server (auto-increments if busy) |
 | `--no-browser` | off | Do not auto-open the browser |
 
@@ -94,6 +94,8 @@ Run a single optimization headless through the exact UI pipeline and print a JSO
 | `--study-name <s>` | — | Optuna study name |
 | `--db-name <s>` | `cli_runs` | Optuna storage database name |
 | `--subset-size <n>` | `30` | Analysis subset size |
+| `--background-size <n>` | `25` | SHAP background rows; model calls scale linearly with it |
+| `--shap-max-evals <n>` | `3 * (2 * n_features + 1)` | Masked SHAP evaluations per explained row |
 | `--no-analyze` | off | Skip the post-run analysis summary |
 
 ### Examples

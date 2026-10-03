@@ -1,6 +1,6 @@
 [project]
 name = "quoptuna"
-version = "1.0.0"
+version = "1.0.1"
 description = "Fairness-aware, explainable AutoML for quantum and classical machine learning, powered by Optuna and PennyLane."
 authors = [
     {name = "Edwin Jose", email = "edwinjose900@gmail.com"},
@@ -82,9 +82,9 @@ keywords = [
 ]
 
 [project.urls]
-homepage = "https://Qentora.github.io/quoptuna"
+homepage = "https://quoptuna.org"
 repository = "https://github.com/Qentora/quoptuna"
-documentation = "https://Qentora.github.io/quoptuna"
+documentation = "https://quoptuna.org"
 
 [project.scripts]
 quoptuna = "quoptuna.cli:main"

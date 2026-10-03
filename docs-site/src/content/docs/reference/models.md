@@ -6,7 +6,7 @@ description: Quantum and classical models available in QuOptuna and their search
 QuOptuna searches over quantum models (PennyLane) and classical models (scikit-learn). Searchable hyperparameters below come from `MODEL_PARAM_KEYS`.
 
 :::note
-**Kernel** models (IQPKernelClassifier, ProjectedQuantumKernel, QuantumKitchenSinks, SeparableKernelClassifier) have no iterative training steps and are **not prunable**. **Variational** models are trained iteratively and **are prunable**. Variational quantum models are OvR-wrapped for multiclass. `TreeTensorClassifier` is a **quantum** model despite the name.
+**Kernel** models (IQPKernelClassifier, ProjectedQuantumKernel, QuantumKitchenSinks, SeparableKernelClassifier) have no iterative training steps and are **not prunable**. **Variational** models are trained iteratively and **are prunable**. Variational models (including the image-shaped models and `ConvolutionalNeuralNetwork`) have a binary readout and are wrapped one-vs-rest for multiclass targets; kernel and scikit-learn models handle multiclass natively. `TreeTensorClassifier` is a **quantum** model despite the name.
 :::
 
 :::note
@@ -48,7 +48,7 @@ count is a perfect square. They are **not** suitable for general tabular data.
 
 | Model | Description | Searchable hyperparameters |
 | --- | --- | --- |
-| SVC | Support vector classifier (RBF) | gamma, C, class_weight |
+| SVC | Support vector classifier (RBF; always built with `probability=True, random_state=42` so probability metrics and SHAP work) | gamma, C, class_weight |
 | SVClinear | Linear SVC (`LinearSVC`) | C, class_weight |
 | MLPClassifier | Multi-layer perceptron (`hidden_layer_sizes` required) | batch_size, hidden_layer_sizes, alpha, learning_rate |
 | Perceptron | Linear perceptron | eta0, class_weight |

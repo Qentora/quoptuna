@@ -8,19 +8,19 @@ After a run, QuOptuna can generate a governance-ready report summarizing perform
 ## Requirements
 
 - Internet access.
-- A provider API key (see the [configuration reference](/reference/configuration/) for the exact environment variable names).
+- A provider API key, entered in the web UI's Settings and sent with each report request (the `api_key` field). Requests without a key are rejected with 400.
 
 ## Providers
 
-You can select and key one of:
+Set `llm_provider` to one of:
 
-| Provider | |
+| `llm_provider` | Provider |
 | --- | --- |
-| OpenAI | Selected/keyed via environment variables. |
-| Google Gemini | Selected/keyed via environment variables. |
-| Anthropic Claude | Selected/keyed via environment variables. |
+| `openai` | OpenAI |
+| `google` (default) | Google Gemini |
+| `anthropic` | Anthropic Claude |
 
-The provider and its API key are set through environment variables. See the [configuration reference](/reference/configuration/) for the exact variable names.
+Pick the model with `model_name` (default `gpt-4o`; choose one that matches your provider). Requests are routed through LiteLLM as `<provider>/<model_name>`.
 
 ## Generate from the web UI
 
@@ -32,7 +32,7 @@ The report is the final wizard step, **Report**. Run through the wizard, then pr
 POST /api/v1/analysis/report
 ```
 
-Call this after a study has completed to generate the report programmatically.
+Call this after a study and its analysis snapshot have completed. Required body fields: `optimization_id`, `analysis_snapshot_id`, `analysis_revision`, `api_key`. Optional: `trial_number`, `llm_provider`, `model_name`, `dataset_description`, `sensitive_feature`, `analyst_instructions`/`reviewer_instructions` (prompt overrides), and `enable_review` (default `true`; runs the reviewer pass).
 
 :::caution
 Report generation calls an external LLM provider, so it needs internet access and a valid provider API key. Without both, the step fails.

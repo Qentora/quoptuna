@@ -160,11 +160,15 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
   const targetValues = targetColumn
     ? (preview.data?.target_values_by_column[targetColumn] ?? [])
     : [];
+  // The preview only lists values for columns with at most MAX_TARGET_CLASSES
+  // distinct values, so targetValues is empty for high-cardinality columns.
+  // Count classes from unique_counts, which covers every column.
+  const targetClassCount = targetColumn ? (uniqueCounts[targetColumn] ?? targetValues.length) : 0;
   const needsMapping = targetValues.length === 2;
   // K>2 targets take the multiclass path: labels are encoded to 0..K-1
   // server-side and the user picks the favorable class instead of neg/pos.
-  const isMulticlass = targetValues.length > 2 && targetValues.length <= MAX_TARGET_CLASSES;
-  const tooManyClasses = targetValues.length > MAX_TARGET_CLASSES;
+  const isMulticlass = targetClassCount > 2 && targetClassCount <= MAX_TARGET_CLASSES;
+  const tooManyClasses = targetClassCount > MAX_TARGET_CLASSES;
   const targetBalance = targetColumn
     ? preview.data?.target_balance_by_column[targetColumn]
     : undefined;
@@ -223,7 +227,7 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
     missing.push('Select the favorable class (required for the fairness audit)');
   if (tooManyClasses)
     missing.push(
-      `Target has ${targetValues.length} classes — the maximum supported is ${MAX_TARGET_CLASSES}`
+      `Target has ${targetClassCount} classes — the maximum supported is ${MAX_TARGET_CLASSES}`
     );
 
   useEffect(() => {
@@ -461,7 +465,7 @@ export function FeaturesStep({ workflowData, setWorkflowData, setFooter }: StepP
               {targetColumn && tooManyClasses && (
                 <div className="rounded-md border border-destructive/50 bg-destructive/10 p-3">
                   <p className="text-xs font-medium text-destructive">
-                    Target has {targetValues.length} distinct values
+                    Target has {targetClassCount} distinct values
                   </p>
                   <p className="mt-1 text-xs text-muted-foreground">
                     Classification supports up to {MAX_TARGET_CLASSES} classes. This column may be

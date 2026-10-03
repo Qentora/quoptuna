@@ -17,16 +17,18 @@ QuOptuna combines quantum and classical machine learning under a single hyperpar
 - **Samplers and pruners** — `tpe`/`random`/`grid` samplers and `asha`/`hyperband`/`none` pruners, with early stopping for iterative quantum models. See [How the optimization engine works](/explanation/optimization-engine/).
 - **Fairness-aware search** — off, constrained (feasibility constraint on disparity), or multi-objective (F1 vs disparity Pareto front), using equal-opportunity, disparate-impact, and demographic-parity metrics on a sensitive feature. See [How the optimization engine works](/explanation/optimization-engine/).
 - **Multiclass and One-vs-Rest** — macro-F1 scoring with OvR-wrapped variational models for K-class problems. See [How the optimization engine works](/explanation/optimization-engine/).
+- **Class-imbalance resampling** — optional `oversample`/`undersample` of the inner training split (default `none`), with the sensitive column resampled in lockstep. See [How the optimization engine works](/explanation/optimization-engine/).
 
 ## Analysis and reporting
 
-- **SHAP and XAI** — SHAP plots and feature-importance analysis for the best model. See [The workflow engine](/explanation/workflow-engine/).
-- **LLM reports** — analyst + reviewer agents (OpenAI/Gemini/Anthropic providers) generate a written report of results. See [The workflow engine](/explanation/workflow-engine/).
+- **SHAP and XAI** — SHAP plots, metrics, curves, confusion matrices and feature importance for the best (or any chosen) trial, run as a resumable, cancellable background job with revision history. See [Analysis pipeline](/explanation/analysis-pipeline/).
+- **LLM reports** — analyst + reviewer agents (OpenAI/Gemini/Anthropic providers) generate a written report grounded in a specific analysis revision. See [Analysis pipeline](/explanation/analysis-pipeline/).
+- **Bulk research dumps** — select runs on the Runs page and download one zip (`POST /api/v1/analysis/bundles/bulk`, 1–100 runs).
 
 ## Data and persistence
 
-- **UCI + CSV ingestion** — load data from an uploaded CSV or a UCI dataset. See [The workflow engine](/explanation/workflow-engine/).
-- **Persistence and crash rehydration** — durable SQLite stores (`run_store`, `analysis_store`, `dataset_registry`) plus Optuna studies as source of truth; stale runs are recovered on restart. See [Architecture](/explanation/architecture/).
+- **Bundled, UCI and CSV ingestion** — load an uploaded CSV, a dataset bundled with the package (gzipped CSVs, available offline), or a UCI dataset; targets are labelled with a class-balance profile. See [The workflow engine](/explanation/workflow-engine/).
+- **Persistence and crash rehydration** — a SQLModel application database (SQLite by default, PostgreSQL supported) behind `run_store`, `analysis_store` and `dataset_registry`, plus Optuna studies as source of truth; stale runs are recovered on restart. See [Architecture](/explanation/architecture/).
 
 ## Deployment and access
 

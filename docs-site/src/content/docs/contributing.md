@@ -12,10 +12,11 @@ Contributions are welcome. QuOptuna is Apache 2.0 licensed. This page covers the
 
 ## Setup
 
-Install the package with dev extras:
+Install the package and its dependencies (pytest, pytest-cov, ruff, and mypy
+are regular project dependencies, so no extra is needed):
 
 ```bash
-uv pip install -e ".[dev]"
+uv sync
 ```
 
 Backend and frontend dependencies can also be installed via Make:
@@ -71,11 +72,19 @@ dependencies — Node 18+ is all you need), exposed as npm scripts in the root
 | `make clean_python_cache` | `npm run clean:cache` |
 | `make clean_all` | `npm run clean:all` |
 | `make help` | `npm run help` |
+| — | `npm run gpu:check` (report whether the GPU path is usable) |
+| — | `npm run gpu:setup` (create the CUDA environment, one-off) |
+| — | `npm run dev:gpu` (backend on GPU + frontend) |
 
 `npm run dev` starts both servers and stops both on Ctrl+C, killing the whole
 process tree so ports 8000 and 3000 are released. It also creates
 `frontend/.env.local` from `.env.example` when missing, so the UI on `:3000`
 calls the API on `:8000` rather than 404-ing against itself.
+
+The GPU scripts (`scripts/gpu.mjs`) exist because JAX ships CUDA wheels for
+Linux only: on Windows the GPU backend runs inside WSL2 (distro chosen by
+`QUOPTUNA_WSL_DISTRO`, else the default) while the frontend stays on Windows.
+macOS has no CUDA backend for this stack.
 
 ## Quality checks
 
@@ -97,6 +106,7 @@ uv run mypy .
 - **`frontend/`** — Next.js dev source.
 - **`backend/`** — legacy dev sub-project (its server code now lives in `src/quoptuna/server`).
 - **`db/`** — SQLite stores.
+- **`infra/`** — Terraform, deployment scripts, and runtime files for the AWS deployment (see [Deploy the AWS infrastructure](/how-to/deploy-infrastructure/)).
 - **`docs-site/`** — this Astro docs site.
 - **`tests/`** — the pytest suite.
 

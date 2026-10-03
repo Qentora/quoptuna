@@ -9,7 +9,7 @@ explanation).
 
 ```bash
 npm install
-npm run dev        # live preview at http://localhost:4321/quoptuna/
+npm run dev        # live preview at http://localhost:4321/
 npm run build      # static output in dist/ (mirrors CI)
 npm run preview    # serve the built dist/
 ```
@@ -18,15 +18,16 @@ npm run preview    # serve the built dist/
 
 - `src/content/docs/**` — page content (Markdown / MDX with Starlight frontmatter)
 - `src/content/docs/index.mdx` — marketing landing page (renders `src/components/Landing.astro`)
-- `src/components/` — landing-page components + `landing.css`
+- `src/components/` — landing-page components, `SiteTitle.astro`, and `landing.css`
 - `src/styles/theme.css` — brand theme (maps QuOptuna's quantum-purple / classical-orange onto Starlight tokens)
-- `astro.config.mjs` — site config + Diátaxis sidebar. `site`/`base` default to the
-  GitHub Pages project URL and can be overridden with the `DOCS_SITE` / `DOCS_BASE`
-  environment variables (used for PR previews).
+- `astro.config.mjs` — site config + Diátaxis sidebar. `site`/`base` default to
+  `https://quoptuna.org` and `/` and can be overridden with the `DOCS_SITE` /
+  `DOCS_BASE` environment variables (used for PR previews).
 
 ## Deploy
 
-Pushed to GitHub Pages at `https://Qentora.github.io/quoptuna/` by
+Pushed to GitHub Pages at `https://quoptuna.org` by
 [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) on changes to
-`docs-site/`. Pull requests get a build check plus a preview via
-[`docs-preview.yml`](../.github/workflows/docs-preview.yml).
+`docs-site/`. Pull requests get a build check via
+[`docs-preview.yml`](../.github/workflows/docs-preview.yml); no preview host is
+configured yet, so it posts a build-status comment rather than a preview URL.
