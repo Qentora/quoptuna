@@ -4,6 +4,11 @@ All notable changes to this project will be documented in this file.
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/), and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## Unreleased
+
+## [1.0.1] - 2026-10-03
+Patch release. Results of valid runs are unchanged from 1.0.0; only inputs that
+previously trained on a wrong target are now rejected.
+
 ### Fixed
 - The Features step never blocked targets with more than 20 classes. The preview only
   lists values for columns with at most 20 distinct values, so a continuous target
