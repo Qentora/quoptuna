@@ -100,6 +100,18 @@ class TaskSpec:
         if n_classes == BINARY_N_CLASSES:
             if label_mapping:
                 neg, pos = str(label_mapping["neg"]), str(label_mapping["pos"])
+                # Encoding compares against pos only, so an identical pair or a
+                # value missing from the target silently yields a wrong or
+                # one-class training target instead of failing.
+                if neg == pos:
+                    msg = f"label_mapping neg and pos must differ, both are '{neg}'"
+                    raise ValueError(msg)
+                if {neg, pos} != set(unique):
+                    msg = (
+                        f"label_mapping ({neg!r} -> -1, {pos!r} -> 1) must cover exactly "
+                        f"the target values {unique}"
+                    )
+                    raise ValueError(msg)
             else:
                 neg, pos = unique[0], unique[1]
             return cls(kind="binary", n_classes=2, class_labels=(neg, pos))

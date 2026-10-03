@@ -3,7 +3,7 @@ title: Deploy the documentation site
 description: Build, preview, and deploy the Astro + Starlight docs site to GitHub Pages.
 ---
 
-This docs site is an **Astro + Starlight** project in `docs-site/`. It deploys to GitHub Pages at <https://Qentora.github.io/quoptuna> via a GitHub Actions workflow.
+This docs site is an **Astro + Starlight** project in `docs-site/`. It deploys to GitHub Pages at <https://quoptuna.org> (custom domain, set by `docs-site/public/CNAME`) via a GitHub Actions workflow.
 
 ## Build locally
 
@@ -28,12 +28,12 @@ The dev server defaults to <http://localhost:4321>.
 
 A GitHub Actions workflow triggers on pushes to `main` that touch `docs-site/**`. The workflow runs `npm ci && npm run build` and publishes `dist/` with `actions/deploy-pages`.
 
-Because this is a project page (not a user/org root page), `astro.config.mjs` sets:
+The site is served from the root of the custom domain, so `astro.config.mjs` sets:
 
 | Setting | Value | Overridable via |
 | --- | --- | --- |
-| `site` | `https://Qentora.github.io` | `DOCS_SITE` env |
-| `base` | `/quoptuna` | `DOCS_BASE` env |
+| `site` | `https://quoptuna.org` | `DOCS_SITE` env |
+| `base` | `/` | `DOCS_BASE` env |
 
 The env overrides exist for PR preview builds.
 

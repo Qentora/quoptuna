@@ -4,7 +4,7 @@
 
 The documentation site lives in [`docs-site/`](../../docs-site) and is built
 with **[Astro](https://astro.build) + [Starlight](https://starlight.astro.build)**.
-It deploys to GitHub Pages at `https://Qentora.github.io/quoptuna/`.
+It deploys to GitHub Pages at `https://quoptuna.org`.
 
 ### docs.yml — Deploy Documentation
 
@@ -92,7 +92,7 @@ Template updates for the project.
 
 3. **Check deployment:**
    - Go to the **Actions** tab and monitor the *Deploy Documentation* run
-   - Visit `https://Qentora.github.io/quoptuna/` once complete
+   - Visit `https://quoptuna.org` once complete
 
 ## Local Testing
 

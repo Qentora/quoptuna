@@ -26,7 +26,7 @@ npm run preview    # serve the built dist/
 
 ## Deploy
 
-Pushed to GitHub Pages at `https://Qentora.github.io/quoptuna/` by
+Pushed to GitHub Pages at `https://quoptuna.org` by
 [`.github/workflows/docs.yml`](../.github/workflows/docs.yml) on changes to
 `docs-site/`. Pull requests get a build check plus a preview via
 [`docs-preview.yml`](../.github/workflows/docs-preview.yml).

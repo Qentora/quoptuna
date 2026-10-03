@@ -1,7 +1,7 @@
 name: Deploy Documentation
 
 # Builds the Astro + Starlight docs site in docs-site/ and publishes it to
-# GitHub Pages at https://Qentora.github.io/quoptuna.
+# GitHub Pages at https://quoptuna.org.
 
 on:
   push:

@@ -44,7 +44,7 @@ _LOGO = r"""
 """
 
 GITHUB_URL = "https://github.com/Qentora/quoptuna"
-DOCS_URL = "https://Qentora.github.io/quoptuna"
+DOCS_URL = "https://quoptuna.org"
 
 console = Console()
 

@@ -9,7 +9,7 @@
 [![Tests](https://img.shields.io/github/actions/workflow/status/Qentora/quoptuna/test.yml?branch=main&label=tests)](https://github.com/Qentora/quoptuna/actions/workflows/test.yml)
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://pypi.org/project/quoptuna/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](https://github.com/Qentora/quoptuna/blob/main/LICENSE)
-[![Docs](https://img.shields.io/badge/docs-online-teal)](https://Qentora.github.io/quoptuna)
+[![Docs](https://img.shields.io/badge/docs-online-teal)](https://quoptuna.org)
 
 <!-- DEMO GIF PLACEHOLDER: capture the 6-step wizard (Dataset → Optimize → Analyze)
      and save as assets/branding/demo.gif (< 8 MB), then uncomment:
@@ -98,12 +98,12 @@ print(f"Best model:    {best_trials[0].params['model_type']}")
 
 ## 📖 Documentation
 
-Full documentation lives at **[Qentora.github.io/quoptuna](https://Qentora.github.io/quoptuna)**:
+Full documentation lives at **[quoptuna.org](https://quoptuna.org)**:
 
-- [Quickstart](https://Qentora.github.io/quoptuna/getting-started/quickstart/) — first optimization in five minutes
-- [Samplers & pruning](https://Qentora.github.io/quoptuna/how-to/choose-samplers-and-pruners/) — TPE vs. random vs. grid, ASHA/Hyperband
-- [Fairness-aware search](https://Qentora.github.io/quoptuna/how-to/run-fairness-aware-search/) — constrained & multi-objective modes
-- [Tuning for speed & quality](https://Qentora.github.io/quoptuna/how-to/tune-for-speed-and-quality/) — vectorization, devices, validation splits
+- [Quickstart](https://quoptuna.org/getting-started/quickstart/) — first optimization in five minutes
+- [Samplers & pruning](https://quoptuna.org/how-to/choose-samplers-and-pruners/) — TPE vs. random vs. grid, ASHA/Hyperband
+- [Fairness-aware search](https://quoptuna.org/how-to/run-fairness-aware-search/) — constrained & multi-objective modes
+- [Tuning for speed & quality](https://quoptuna.org/how-to/tune-for-speed-and-quality/) — vectorization, devices, validation splits
 
 ## 📄 Publications & Citation
 
@@ -130,7 +130,7 @@ If you use QuOptuna in your research, please cite the magazine article (GitHub's
 
 ## 🤝 Contributing
 
-Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup and workflow, and the [contributor docs](https://Qentora.github.io/quoptuna/contributing/) for the long-form guide. Please follow our [Code of Conduct](CODE_OF_CONDUCT.md).
+Contributions are welcome! See [CONTRIBUTING.md](CONTRIBUTING.md) for the dev setup and workflow, and the [contributor docs](https://quoptuna.org/contributing/) for the long-form guide. Please follow our [Code of Conduct](CODE_OF_CONDUCT.md).
 
 ```bash
 git clone https://github.com/Qentora/quoptuna.git && cd quoptuna
@@ -154,6 +154,6 @@ Built on the shoulders of [Optuna](https://optuna.org), [PennyLane](https://penn
 
 [![Star History Chart](https://api.star-history.com/svg?repos=Qentora/quoptuna&type=Date)](https://star-history.com/#Qentora/quoptuna&Date)
 
-**[Documentation](https://Qentora.github.io/quoptuna)** • **[Report Bug](https://github.com/Qentora/quoptuna/issues)** • **[Request Feature](https://github.com/Qentora/quoptuna/issues)**
+**[Documentation](https://quoptuna.org)** • **[Report Bug](https://github.com/Qentora/quoptuna/issues)** • **[Request Feature](https://github.com/Qentora/quoptuna/issues)**
 
 </div>

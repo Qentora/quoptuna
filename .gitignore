@@ -128,6 +128,8 @@ src/quoptuna/web/
 # misc
 .DS_Store
 *.pem
+# FastHTML session-signing key, generated on first run
+.sesskey
 
 # debug
 npm-debug.log*
@@ -159,5 +161,3 @@ next-env.d.ts
 /frontend/playwright/.cache/
 /.agents/skills/shadcn
 /.agents/skills/migrate-radix-to-base
-.DS_Store
-.DS_Store

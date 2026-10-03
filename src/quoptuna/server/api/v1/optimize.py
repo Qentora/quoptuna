@@ -31,6 +31,15 @@ class LabelMapping(BaseModel):
     neg: Any
     pos: Any
 
+    @model_validator(mode="after")
+    def _distinct(self) -> "LabelMapping":
+        # Labels are compared as strings downstream (TaskSpec), so 1 and "1"
+        # are the same class.
+        if str(self.neg) == str(self.pos):
+            msg = f"label_mapping neg and pos must differ, both are {self.neg!r}"
+            raise ValueError(msg)
+        return self
+
 
 class OptimizationRequest(BaseModel):
     # Several fields start with "model_", which Pydantic reserves; opt out so it

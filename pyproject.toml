@@ -82,9 +82,9 @@ keywords = [
 ]
 
 [project.urls]
-homepage = "https://Qentora.github.io/quoptuna"
+homepage = "https://quoptuna.org"
 repository = "https://github.com/Qentora/quoptuna"
-documentation = "https://Qentora.github.io/quoptuna"
+documentation = "https://quoptuna.org"
 
 [project.scripts]
 quoptuna = "quoptuna.cli:main"

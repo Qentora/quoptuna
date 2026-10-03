@@ -61,6 +61,23 @@ class TestTaskSpec:
         with pytest.raises(ValueError, match="at least 2"):
             TaskSpec.from_target(["a", "a"])
 
+    def test_identical_label_mapping_raises(self):
+        with pytest.raises(ValueError, match="must differ"):
+            TaskSpec.from_target(["a", "b"], label_mapping={"neg": "a", "pos": "a"})
+
+    def test_label_mapping_outside_target_raises(self):
+        with pytest.raises(ValueError, match="cover exactly"):
+            TaskSpec.from_target(["a", "b"], label_mapping={"neg": "a", "pos": "c"})
+
+    def test_api_rejects_identical_label_mapping(self):
+        from pydantic import ValidationError  # noqa: PLC0415
+
+        from quoptuna.server.api.v1.optimize import LabelMapping  # noqa: PLC0415
+
+        # 1 and "1" are the same class once TaskSpec stringifies them.
+        with pytest.raises(ValidationError, match="must differ"):
+            LabelMapping(neg=1, pos="1")
+
 
 # ---------------------------------------------------------------------------
 # Label encoding (workflow split + legacy preprocess paths)
