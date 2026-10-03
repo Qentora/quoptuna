@@ -4,9 +4,12 @@ description: Prerequisites, the quoptuna infra console, and the create/deploy/pa
 ---
 
 QuOptuna deploys as a single stoppable EC2 instance running the application
-container behind Caddy. Supabase stores application and Optuna data, and S3
-stores datasets and analysis artifacts. There is no Kubernetes cluster, load
-balancer, NAT Gateway, RDS instance, or open SSH port.
+container behind Caddy. By default the application and Optuna databases are
+SQLite files on the instance's encrypted EBS root volume
+(`/opt/quoptuna/data/db`, mounted at `/app/db`); you can point them at a managed
+PostgreSQL database such as Supabase instead. S3 stores datasets and analysis
+artifacts. There is no Kubernetes cluster, load balancer, NAT Gateway, RDS
+instance, or open SSH port.
 
 Terraform lives in `infra/terraform/` (a `foundation` stack for persistent
 resources and an `application` stack for compute), and every operation is driven
@@ -32,7 +35,10 @@ with `Required command not found` if any is missing.
 
 - **AWS account** with permissions for EC2, S3, ECR, Route 53, Secrets Manager,
   IAM, and SSM.
-- **Supabase PostgreSQL URL**. The EC2 network is dual-stack, so Supabase's
+- **Optional: a Supabase PostgreSQL URL**. Without one, the deployment keeps
+  SQLite on the instance (`DATABASE_URL=sqlite:////app/db/quoptuna_app.db`, an
+  empty `OPTUNA_DATABASE_URL`). To use Supabase, set both URLs to a
+  `postgresql://` endpoint. The EC2 network is dual-stack, so Supabase's
   IPv6-only direct endpoint works. An IPv4-compatible session-pooler URL with
   `sslmode=require` is also supported.
 - **A domain** registered anywhere and delegated to an existing Route 53 hosted
@@ -80,8 +86,8 @@ runtime variable does.
 
 :::note
 The deployment derives `APP_ENV=production`, `APP_BASE_URL`, `CORS_ORIGINS`,
-`ARTIFACT_STORAGE=s3`, and the `S3_*` settings automatically from your domain,
-bucket, and region. Do not set them in `.env.deploy`.
+`ARTIFACT_STORAGE=s3`, `ARTIFACT_ROOT`, and the `S3_*` settings automatically
+from your domain, bucket, and region. Do not set them in `.env.deploy`.
 :::
 
 ### Auth0 setup
@@ -134,7 +140,7 @@ environment name exactly.
 | **Pause** | Refuse while work is active, remove DNS, and stop EC2 |
 | **Resume** | Start EC2, restore DNS, and wait for HTTPS |
 | **Status** | Report EC2 state, app health, image, and active work |
-| **Destroy** | Delete compute/network resources, preserving Supabase and AWS data |
+| **Destroy** | Back up instance data to S3, then delete compute/network resources, preserving Supabase and AWS data |
 
 The same operations run directly as scripts:
 
@@ -172,8 +178,16 @@ To delete the persistent AWS foundation too:
 infra/scripts/destroy.sh dev --env-file .env.deploy --delete-data
 ```
 
-This requires two typed confirmations. It deletes the artifact bucket, images,
-and runtime secret. It never deletes Supabase or the Terraform-state bucket.
+Before destroying compute, and before every **Update** of an existing instance,
+the scripts archive the instance data directory (SQLite databases and uploads)
+to `s3://ARTIFACT_BUCKET/backups/ENV/TIMESTAMP/quoptuna-data.tar.gz`; if the
+update replaces the instance, the archive is restored onto the new one. The root
+volume is deleted on termination, so this backup is the only copy of on-instance
+SQLite data.
+
+`--delete-data` requires two typed confirmations (the environment name, then
+`DELETE-ENV`). It deletes the artifact bucket (including backups), images, and
+runtime secret. It never deletes Supabase or the Terraform-state bucket.
 
 ## Check deployment health
 

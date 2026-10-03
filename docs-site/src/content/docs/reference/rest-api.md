@@ -3,10 +3,10 @@ title: REST API reference
 description: Endpoint groups exposed by the QuOptuna Next FastAPI server.
 ---
 
-The FastAPI server (title **QuOptuna Next API**) serves interactive OpenAPI docs at [`http://localhost:8000/api/docs`](http://localhost:8000/api/docs). Treat those docs as the source of truth for request and response schemas.
+The FastAPI server (title **QuOptuna Next API**) serves interactive OpenAPI docs at [`http://localhost:8000/api/docs`](http://localhost:8000/api/docs) (ReDoc at `/api/redoc`). Treat those docs as the source of truth for request and response schemas. `GET /api` returns basic API metadata.
 
 :::note
-All `/api/v1/*` routes require an authenticated user **only when Auth0 is configured**. When Auth0 is unset, the API is open (suitable for local/dev). See [Configuration reference](/reference/configuration/).
+All `/api/v1/*` routes except `/api/v1/health` require an authenticated user **only when Auth0 is configured**. When Auth0 is unset, the API is open (suitable for local/dev). `/auth/*`, `/api/v1/health` and the OpenAPI docs are always open. See [Configuration reference](/reference/configuration/).
 :::
 
 ## System — `/api/v1`
@@ -21,7 +21,7 @@ All `/api/v1/*` routes require an authenticated user **only when Auth0 is config
 
 | Method | Path | Purpose |
 | --- | --- | --- |
-| POST | `/upload` | CSV upload |
+| POST | `/upload` | CSV upload (`.csv` files only) |
 | GET | `/uci` | List UCI datasets |
 | POST | `/uci/{dataset_id}/load` | Load a UCI dataset |
 | GET | `/uci/{dataset_id}` | UCI dataset metadata |
@@ -46,11 +46,19 @@ The main request contract is the **`OptimizationRequest`** (dataset, features, t
 | Method | Path | Purpose |
 | --- | --- | --- |
 | POST | `/jobs` | Start an async analysis job |
+| GET | `/jobs?optimization_id=…` | Active (pending/running) job for a run, or `null` — lets a client reattach after a refresh |
 | GET | `/jobs/{job_id}` | Analysis job status |
-| GET | `/snapshots` | List snapshots |
+| POST | `/jobs/{job_id}/cancel` | Request cooperative cancellation of a running job |
+| GET | `/snapshots?optimization_id=…` | List snapshots for a run |
 | GET | `/snapshots/{id}` | Snapshot detail |
+| GET | `/snapshots/{id}/revisions` | List snapshot revisions |
+| GET | `/snapshots/{id}/revisions/{revision}` | Snapshot revision detail |
+| GET | `/snapshots/{id}/artifacts/{filename}` | Download a snapshot artifact |
 | GET | `/snapshots/{id}/reports` | Snapshot reports |
+| GET | `/snapshots/{id}/context` | Report context (`include_evidence_markdown`, default `true`) |
+| GET | `/snapshots/{id}/bundle` | Download the research bundle (ZIP) |
 | POST | `/snapshots/{id}/fairness` | Snapshot fairness audit |
+| POST | `/bundles/bulk` | Latest completed research bundles for several runs in one ZIP |
 | POST | `/shap` | SHAP analysis |
 | POST | `/shap/data` | SHAP plot data |
 | POST | `/metrics` | Metrics |
@@ -60,6 +68,7 @@ The main request contract is the **`OptimizationRequest`** (dataset, features, t
 | POST | `/feature-importance/data` | Feature-importance data |
 | POST | `/study-plots` | Optuna study plots |
 | POST | `/fairness` | Fairness metrics |
+| GET | `/report-prompts` | Default report-agent prompts and settings |
 | POST | `/report` | AI report |
 
 ## Auth — `/auth`

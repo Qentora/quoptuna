@@ -1,7 +1,10 @@
 # QuOptuna AWS deployment
 
-This deployment runs QuOptuna and Caddy on one stoppable EC2 instance. Supabase
-stores application and Optuna data; S3 stores datasets and analysis artifacts.
+This deployment runs QuOptuna and Caddy on one stoppable EC2 instance. By default
+application and Optuna data live in SQLite on the instance's encrypted EBS volume
+(backed up to S3 before every update and destroy); set `DATABASE_URL` and
+`OPTUNA_DATABASE_URL` to a Supabase PostgreSQL URL to use Supabase instead. S3
+stores datasets and analysis artifacts.
 There is no Kubernetes cluster, load balancer, NAT Gateway, RDS instance, or SSH
 port.
 
@@ -11,7 +14,7 @@ port.
 - AWS CLI v2 authenticated with an AWS profile
 - Docker with Buildx
 - `jq`, `curl`, Git, and Python 3
-- A Supabase PostgreSQL URL
+- Optional: a Supabase PostgreSQL URL
 - A domain registered anywhere and delegated to an existing Route 53 hosted zone
 
 Copy the deployment template and fill it in:

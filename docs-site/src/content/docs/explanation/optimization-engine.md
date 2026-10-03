@@ -12,7 +12,7 @@ A naive multi-model search would declare every hyperparameter of every model up 
 The reason is statistical. TPE (Tree-structured Parzen Estimator) builds a probabilistic model of the search space. If irrelevant parameters — say, a kernel's bandwidth while a variational model is selected — are always present, they pollute that model with meaningless dimensions and dilute its signal. Conditional suggestion keeps each model's sub-space clean, so TPE learns useful structure faster.
 
 :::note
-Grid mode is the exception: it keeps a static, flat product of all parameters because a grid search has no learned model to protect.
+Grid mode is the exception: it keeps a static, flat product of all parameters because a grid search has no learned model to protect. Grid and random samplers also ignore Optuna's constraint function, so `fairness_mode="constrained"` requires `sampler="tpe"` and is rejected otherwise.
 :::
 
 ## Samplers vs pruners
@@ -22,14 +22,14 @@ These are two orthogonal knobs:
 - **Samplers** decide *which* configuration to try next: `tpe` (default, model-based), `random`, or `grid` (exhaustive).
 - **Pruners** decide whether to *stop* a running trial early: `asha` (SuccessiveHalving, default), `hyperband`, or `none`.
 
-Pruning only helps models that train iteratively. **JAX-trained variational (quantum) models** report intermediate values through a per-step callback — the pruner treats report indices as resource units and the intermediate metric is f1, accuracy, or neg_loss. **Kernel and classical models have no training steps**, so they always train to completion regardless of the pruner.
+Pruning only helps models that train iteratively. **JAX-trained variational (quantum) models** report intermediate values through a per-step callback — the pruner treats report indices as resource units and the intermediate metric is f1, accuracy, or neg_loss. **Kernel and classical models have no training steps**, so they always train to completion regardless of the pruner. Multi-objective fairness studies cannot be pruned (Optuna limitation), so the pruner is coerced to `none` with a warning.
 
 ## A single trial
 
 ```mermaid
 flowchart TD
   A["Suggest model_type"] --> B["Suggest only that model's params"]
-  B --> C["Split validation (20%) from train, stratified"]
+  B --> C["Validation split: caller-supplied val_x/val_y, else stratified 20% of train"]
   C --> D["Train (iterative models report to pruner)"]
   D --> E["Tune decision threshold on validation"]
   E --> F["Score on validation"]
@@ -38,9 +38,13 @@ flowchart TD
 
 ## Scoring on a validation split
 
-Every trial is scored on a **validation split carved from the training data (20%)**, not on the test set. This is deliberate: if the optimizer selected configurations by their test performance, it would be tuning *to* the test set, and the final reported test metric would be optimistically biased. Holding the test set out of selection keeps it an honest estimate.
+Every trial is scored on a **validation split**, not on the test set. This is deliberate: if the optimizer selected configurations by their test performance, it would be tuning *to* the test set, and the final reported test metric would be optimistically biased. Holding the test set out of selection keeps it an honest estimate.
 
-Splits are **stratified** so class proportions are preserved — important for imbalanced data and for the small validation slice. For binary tasks the engine also runs **decision-threshold tuning** (a 19-point grid) on that validation split, so the reported score reflects the best operating point rather than a fixed 0.5 cutoff.
+The validation split comes from `data["val_x"]` / `data["val_y"]` when the caller provides them; otherwise the engine carves a stratified 20% of the training data. The server always supplies its own split, because it can apply **class-imbalance resampling** (`resampling`: `none`, `oversample`, or `undersample`): the validation slice is carved first and only the inner training portion is resampled, so no duplicated row leaks into validation. Callers that resample the train split themselves MUST supply `val_x`/`val_y`.
+
+Splits are **stratified** so class proportions are preserved — important for imbalanced data and for the small validation slice. For binary tasks the engine also runs **decision-threshold tuning** (a 19-point grid from 0.05 to 0.95) on that validation split, so the reported score reflects the best operating point rather than a fixed 0.5 cutoff.
+
+Fairness disparity is measured on the same validation split: the sensitive column is passed as `sensitive_val` and must align positionally with `val_y` (a length mismatch raises `ValueError`).
 
 ## FAILED-trial isolation
 
@@ -55,7 +59,7 @@ Task handling lives in `backend/task_type.py` (`TaskSpec`):
 
 ## Device and training
 
-Quantum circuits run on PennyLane's `default.qubit` or `lightning.qubit` devices, and variational training is **JAX-based** — which is what makes the per-step pruning reports (and thus early stopping) possible.
+Quantum circuits run on PennyLane's `default.qubit` (default) or `lightning.qubit` devices (falling back to `default.qubit` with a warning if Lightning is unavailable), and variational training is **JAX-based** — which is what makes the per-step pruning reports (and thus early stopping) possible.
 
 ## Next steps
 

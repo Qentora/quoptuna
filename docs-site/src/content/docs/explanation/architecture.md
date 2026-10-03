@@ -20,8 +20,8 @@ flowchart TD
   Browser["Browser (Next.js UI)"] -->|REST| API["FastAPI server"]
   CLI["CLI"] --> Engine["Optimization engine (Optuna)"]
   API --> Engine
-  Engine --> Study[("Optuna study (SQLite in db/)")]
-  API --> Stores[("run_store / analysis_store / dataset_registry")]
+  Engine --> Study[("Optuna study (SQLite in db/, or PostgreSQL)")]
+  API --> Stores[("App database: runs, datasets, analysis tables")]
   API -->|mounts| Browser
 ```
 
@@ -33,21 +33,21 @@ In **dev mode**, two processes run side by side: FastAPI on `:8000` and the Next
 
 ## Request flow
 
-Starting a run is asynchronous. The browser (or CLI) issues `POST /api/v1/optimize`, and the server launches the optimization as a **FastAPI background task** so the request returns immediately. The engine then writes trials into an Optuna study on disk. The UI polls `GET /api/v1/optimize/{id}/trials` for live progress rather than holding a long connection open.
+Starting a run is asynchronous. The browser issues `POST /api/v1/optimize`, and the server launches the optimization as a **FastAPI background task** so the request returns immediately. The engine then writes trials into an Optuna study. The UI polls `GET /api/v1/optimize/{id}/trials` for live progress rather than holding a long connection open. The CLI skips HTTP and runs the same workflow in-process (`server/services/headless.py`).
 
 :::note
-Optuna studies live as separate SQLite files under `db/` and are the **source of truth** for trials and best-value. The API re-reads them on each status or detail request, so progress reflects the study itself, not a cached copy.
+With the default SQLite configuration, Optuna studies live as separate SQLite files under `db/`; when `DATABASE_URL` (or `OPTUNA_DATABASE_URL`) points at PostgreSQL, studies are stored there in an isolated schema (`OPTUNA_DB_SCHEMA`, default `optuna`). Either way the study is the **source of truth** for trials and best-value. The API re-reads it on each status or detail request, so progress reflects the study itself, not a cached copy.
 :::
 
 ## Persistence model
 
-Three SQLite stores hold server-side state:
+Server-side state lives in one SQLModel application database (`DATABASE_URL`, default `sqlite:///./db/quoptuna_app.db`), accessed through three service modules:
 
-- **`run_store`** — durable optimization-run records. On startup it marks any stale `running`/`pending` runs as `interrupted`, which enables crash rehydration: a restarted server can recover and reconcile in-flight work.
-- **`analysis_store`** — analysis snapshots and reports (SHAP, confusion matrices, LLM reports).
-- **`dataset_registry`** — maps each `dataset_id` to its persisted CSV path.
+- **`run_store`** — durable optimization-run records (`quoptuna_runs`). On startup it marks any stale `running`/`pending` runs as `interrupted`, which enables crash rehydration: a restarted server can recover and reconcile in-flight work.
+- **`analysis_store`** — analysis snapshots, revisions, jobs, reports and artifacts (SHAP, confusion matrices, LLM reports). Analysis jobs left pending/running by a restart are marked failed on startup. Figure artifacts are written to `ARTIFACT_ROOT` (default `db/analysis`) or to S3 when `ARTIFACT_STORAGE=s3`.
+- **`dataset_registry`** — maps each `dataset_id` (`quoptuna_datasets`) to its persisted CSV path.
 
-These are distinct from the per-study Optuna SQLite files. The stores track orchestration and results metadata; the Optuna studies own the trial-level truth.
+These are distinct from the Optuna study storage. The stores track orchestration and results metadata; the Optuna studies own the trial-level truth.
 
 ## Auth model
 

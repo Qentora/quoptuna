@@ -28,10 +28,11 @@ Or with pip:
 pip install quoptuna
 ```
 
-For an editable development install with extra tooling:
+For a development install from a clone of the repository (as in
+[Contributing](/contributing/)):
 
 ```bash
-uv pip install -e ".[dev]"
+uv sync
 ```
 
 ## Choose a run mode

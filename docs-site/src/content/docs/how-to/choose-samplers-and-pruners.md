@@ -14,7 +14,7 @@ QuOptuna's optimizer supports a **sampler** (proposes hyperparameter configs) an
 | `intermediate_metric` | `f1` (validation F1, same averaging as the objective), `accuracy`, `neg_loss` (negated recent training loss) | `f1` |
 | `max_steps` | optional cap on training steps for iterative models | model default |
 
-All fields are on the `POST /api/v1/optimize` request and the `Optimizer` constructor; the web UI exposes sampler + pruner in the Configure step.
+All fields are on the `POST /api/v1/optimize` request and the `Optimizer` constructor (the defaults above apply there); the web UI exposes sampler + pruner in the Configure step. The `quoptuna optimize` CLI exposes `--sampler`, `--seed`, `--pruner`, `--max-steps`, `--convergence-interval`, and `--max-vmap`, but with smoke-run defaults: `--sampler random`, `--seed 0`, `--pruner none`, `--max-steps 20`, `--convergence-interval 5`.
 
 ## How pruning works
 

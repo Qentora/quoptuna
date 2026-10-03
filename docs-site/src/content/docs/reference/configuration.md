@@ -17,7 +17,7 @@ Settings can be supplied via a `.env` file or the process environment.
 | `DEFAULT_N_TRIALS` | `100` | Default number of Optuna trials |
 | `DEFAULT_TIMEOUT` | `3600` s | Default run timeout |
 | `APP_ENV` | `development` | Set to `production` to enable production safety checks |
-| `CORS_ORIGINS` | — | Comma-separated list of allowed origins |
+| `CORS_ORIGINS` | `http://localhost:5173,http://localhost:3000,http://localhost:8000` | Comma-separated list of allowed origins |
 | `APP_BASE_URL` | `http://localhost:8000` | Base URL for generated links |
 
 ## Artifact and dataset storage
@@ -30,6 +30,7 @@ MinIO, or another compatible provider.
 | --- | --- | --- |
 | `ARTIFACT_STORAGE` | `local` | `local` or `s3` |
 | `ARTIFACT_ROOT` | `db/analysis` | Local artifact directory |
+| `ANALYSIS_HISTORY_LIMIT` | `5` | Analysis revisions per snapshot whose figure directories are kept on disk; older revisions remain as metadata-only history. `0` disables pruning |
 | `S3_ENDPOINT_URL` | empty | S3-compatible endpoint; empty for AWS S3 |
 | `S3_BUCKET` | empty | Bucket name |
 | `S3_REGION` | empty | Provider region |
@@ -58,13 +59,13 @@ the browser should never receive them.
 
 ## LLM report providers
 
-Set the API key for your chosen report provider. All default to empty.
+The report endpoint does not read provider keys from the environment. Pass the key
+per request as `api_key` in `POST /api/v1/analysis/report` (the endpoint returns 400
+without it); see [Generate reports](/how-to/generate-reports/).
 
-| Variable | Default | Purpose |
-| --- | --- | --- |
-| `OPENAI_API_KEY` | empty | OpenAI provider key |
-| `ANTHROPIC_API_KEY` | empty | Anthropic provider key |
-| `GOOGLE_API_KEY` | empty | Google provider key |
+`Settings` still declares `OPENAI_API_KEY`, `ANTHROPIC_API_KEY` and `GOOGLE_API_KEY`
+(default empty), and the infra env-file tooling forwards them, but no code path
+consumes them today.
 
 ## Auth0 (optional)
 

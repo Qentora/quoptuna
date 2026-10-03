@@ -48,8 +48,9 @@ Here are the representative flags used above:
 | `--features` | Comma-separated feature columns |
 | `--trials` | Number of trials (default 3) |
 | `--models` | Comma-separated models (default SVC) |
-| `--sampler` | `tpe`, `random`, or `grid` |
-| `--pruner` | `none`, `asha`, or `hyperband` |
+| `--sampler` | `tpe`, `random`, or `grid` (default `random`) |
+| `--seed` | Sampler seed for reproducible runs (default 0) |
+| `--pruner` | `none`, `asha`, or `hyperband` (default `none`) |
 | `--study-name` | Name for the Optuna study |
 | `--db-name` | SQLite database name (default `cli_runs`) |
 

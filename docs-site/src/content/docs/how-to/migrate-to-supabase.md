@@ -24,7 +24,9 @@ OPTUNA_DB_SCHEMA=optuna
 `DATABASE_URL` stores QuOptuna application data such as runs, sessions,
 datasets, analysis snapshots, and reports. `OPTUNA_DATABASE_URL` stores Optuna
 studies and trials. They may point to the same Supabase database; QuOptuna
-places Optuna tables in the separate `optuna` schema.
+places Optuna tables in the separate `optuna` schema. If `OPTUNA_DATABASE_URL`
+is empty and `DATABASE_URL` is PostgreSQL, Optuna uses `DATABASE_URL`; if both
+are SQLite/empty, Optuna keeps one SQLite file per study database under `db/`.
 
 ## Migrate application metadata
 
@@ -56,8 +58,9 @@ uv run quoptuna migrate-optuna db/results-trial-june15.db
 ```
 
 The command migrates every study in that file. Use `--study-name` when only one
-study is needed. It copies trials, parameters, values, states, and study/trial
-attributes.
+study is needed, and `--target-url` to override `OPTUNA_DATABASE_URL` (one of
+the two is required). It copies trials, parameters, values, states, and
+study/trial attributes.
 
 ## Configure S3-compatible artifacts
 
@@ -117,14 +120,17 @@ the configured object storage.
 
 ### `No module named psycopg2`
 
-Use the `psycopg` URL form and reinstall dependencies:
+Both drivers (`psycopg` 3 and `psycopg2-binary`) are project dependencies;
+reinstall them:
 
 ```bash
 uv sync
 ```
 
-The URL should be accepted as either `postgresql://...` or
-`postgresql+psycopg://...`; QuOptuna normalizes the former.
+The URL is accepted as either `postgresql://...` or
+`postgresql+psycopg://...`. The application store uses psycopg 3, while Optuna
+storage always rewrites the URL to `postgresql+psycopg2://` to avoid a psycopg 3
+enum-comparison error in Optuna's queries.
 
 ### `copy_study() got an unexpected keyword argument study_name`
 

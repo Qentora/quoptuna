@@ -33,8 +33,10 @@ Now choose which columns feed the model:
 - Select the **feature** columns (the four Iris measurements).
 - Select the **target** column (the species).
 
-This step also lets you remap or label-encode values and pick the categorical
-encoding — **ordinal** or **onehot**. Iris features are numeric, so you can
+This step also lets you remap or label-encode values, pick the categorical
+encoding — **ordinal** or **onehot** — and choose **class-imbalance resampling**
+(**none**, **oversample**, or **undersample**; applied to the training split
+only). Iris features are numeric and its classes are balanced, so you can
 accept the defaults.
 
 :::note

@@ -16,6 +16,10 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
   encoded every row as -1.
 
 ### Changed
+- Docs brought in line with the code: model counts (21 = 16 quantum + 5 classical),
+  missing CLI flags and REST routes, report `api_key` passed per request (the
+  `*_API_KEY` settings are unused), SQLite as the default deploy database, `uv sync`
+  for dev setup, resampling, analysis jobs and the decision-threshold handling.
 - CI tests Python 3.11 and 3.12. The 3.10 job never tested 3.10: `uv sync` fell back
   to the runner's 3.12 because the package requires `>=3.11`.
 - Homepage, documentation and citation URLs point to <https://quoptuna.org> instead of

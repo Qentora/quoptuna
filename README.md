@@ -29,7 +29,7 @@ The framework is peer-reviewed: it is published in the *IEEE Systems, Man, and C
 
 |  | Plain Optuna | Classical AutoML | **QuOptuna** |
 | --- | :---: | :---: | :---: |
-| Quantum models (PennyLane/JAX) | manual wiring | ✗ | ✅ 17 built in |
+| Quantum models (PennyLane/JAX) | manual wiring | ✗ | ✅ 16 built in |
 | Quantum **and** classical in one search | manual | ✗ | ✅ |
 | Fairness-aware search (constrained / multi-objective) | manual | rare | ✅ built in |
 | SHAP explainability + AI-written reports | ✗ | partial | ✅ built in |
@@ -37,9 +37,9 @@ The framework is peer-reviewed: it is published in the *IEEE Systems, Man, and C
 
 ## ✨ Features
 
-- **21 models, one search** — 17 quantum classifiers (Data Reuploading, Circuit-Centric, IQP & Projected Quantum Kernels, Quantum Kitchen Sinks, Quantum Metric Learner, Quantum Boltzmann Machines, Tree Tensor, Quanvolutional NN, WeiNet, separable & dressed variants) alongside classical baselines (SVC, LinearSVC, MLP, Perceptron), with automatic one-vs-rest multiclass support.
+- **21 models, one search** — 16 quantum classifiers (Data Reuploading, Circuit-Centric, IQP & Projected Quantum Kernels, Quantum Kitchen Sinks, Quantum Metric Learner, Quantum Boltzmann Machines, Tree Tensor, Quanvolutional NN, WeiNet, separable & dressed variants) alongside classical baselines (SVC, LinearSVC, MLP, Perceptron, CNN), with automatic one-vs-rest multiclass support.
 - **Smart optimization** — Optuna TPE / random / grid samplers with ASHA & Hyperband pruning, conditional per-model search spaces, and vectorized (JAX `vmap`) circuit evaluation for fast trials.
-- **Fairness in the loop** — don't just measure bias, *search under it*: constrained mode (feasibility threshold on disparity) or multi-objective mode (accuracy-vs-fairness Pareto front), using demographic parity, equalized odds, or equal-opportunity metrics via [fairlearn](https://fairlearn.org).
+- **Fairness in the loop** — don't just measure bias, *search under it*: constrained mode (feasibility threshold on disparity) or multi-objective mode (accuracy-vs-fairness Pareto front), using equal-opportunity difference, demographic-parity difference, or disparate-impact metrics via [fairlearn](https://fairlearn.org).
 - **Explainability built in** — SHAP bar / beeswarm / violin / heatmap / waterfall plots, ROC & PR curves, confusion matrices for every trained model.
 - **AI-written reports** — a two-agent analyst + reviewer pipeline turns your run into a readable research report (works with OpenAI, Anthropic, and Google Gemini keys).
 - **6-step web wizard** — Dataset → Features → Configure → Optimize → Analyze → Report. A Next.js UI served by a FastAPI backend on a single port, with live trial monitoring and restart-safe run persistence.

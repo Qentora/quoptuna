@@ -28,8 +28,9 @@ when the trade-off matters.
 
 The model is **rebuilt and refitted**, not loaded from a serialized artifact.
 `build_xai` reads the trial's sampled hyperparameters from Optuna and refits on
-`x_train`. The split is deterministic under a fixed `random_state`, so the
-training data matches what the trial saw.
+`x_train` — the same inner (and, if `resampling` was set, resampled) training
+frame the trial fitted on. The split is deterministic under a fixed
+`random_state`, so the training data matches what the trial saw.
 
 Optuna records only what it *sampled*, and the search passes three further
 arguments to `create_model` that are not hyperparameters:
@@ -48,17 +49,31 @@ so runs predating these knobs keep the class defaults.
 Only the iterative JAX-trained models consume this budget; `create_model`
 applies it via `hasattr`, so kernel and classical models are unaffected.
 
-### Known gap: the decision threshold
+### The decision threshold
 
 `_tune_decision_threshold` sweeps the binary decision cutoff on the validation
 split and records it as a `decision_threshold` user attr — not in
-`trial.params`. The rebuilt model therefore predicts at the default 0.5, and
-Analyze reports the unthresholded metrics. This is deliberate and internally
-consistent (the reported `f1_score` attr is also unthresholded), but it means
-the analysed classifier is not the thresholded one whose score won the search.
+`trial.params`. `build_xai` reads that attr and passes it into `XAIConfig`, so
+`XAI.predictions` labels rows at the search's cutoff and the snapshot's
+`analysed_model` records it. Probability-based metrics (ROC-AUC, average
+precision, log loss) are unaffected; only the label decision rule changes.
 
 The attr only exists for binary runs on models with `predict_proba` where the
-sweep beat the baseline, so many studies have nothing to restore.
+sweep beat the baseline, so many studies have nothing to restore. Because the
+threshold was chosen against a different fit, it can fall outside the refitted
+model's probability range; in that case the analysis falls back to the model's
+own `predict` and records `threshold_discarded` instead of reporting
+degenerate zero metrics.
+
+## Job lifecycle
+
+An analysis is started as a background job and runs **off the event loop** in
+Starlette's threadpool, so the server keeps answering progress polls. Jobs run
+**one at a time**: pyplot's global figure state is not thread-safe, so a lock
+serialises them. A refreshed browser reattaches to a running job via
+`GET /api/v1/analysis/jobs?optimization_id=...`, a job can be stopped with
+`POST /api/v1/analysis/jobs/{job_id}/cancel`, and jobs left pending or running
+by a server restart are marked failed on startup.
 
 ## What runs before SHAP
 
@@ -71,10 +86,9 @@ Three steps precede SHAP, and the first two can dominate the total time:
 2. **`training`** — `build_xai` calls `model.fit(...)`. On a variational
    quantum model at the searched budget this is the slowest step of the entire
    analysis.
-3. **`shap`** — the SHAP computation itself.
+3. **`shap`** — the SHAP computation itself, with per-row progress counters.
 
 Each publishes its own `current_section` so the UI can report honest progress.
-All three previously reported as `shap`, which made a working job look frozen.
 
 These steps form a hard dependency chain — the model cannot be fitted before
 the data exists, and SHAP cannot run before the model is fitted — so they
@@ -93,13 +107,14 @@ guarantees: one section failing records a warning instead of cancelling its
 siblings, and there are no serialised per-section stalls.
 
 :::caution[This is ordering, not true parallelism]
-These endpoints are `async def` but perform blocking CPU work (SHAP, sklearn,
-matplotlib) with no internal `await`. `asyncio.gather` overlaps awaits, not
-compute, so on a single event loop the sections still execute one at a time.
+The section coroutines are `async def` but perform blocking CPU work (SHAP,
+sklearn, matplotlib) with no internal `await`. `asyncio.gather` overlaps
+awaits, not compute, so within the job's event loop the sections still execute
+one at a time.
 
-Real parallelism requires `run_in_threadpool`, which is blocked on matplotlib:
-the plotting endpoints use the stateful `pyplot` API, which is not
-thread-safe. Migrating them to the object-oriented API is a prerequisite.
+Running the sections in parallel threads is blocked on matplotlib: the
+plotting endpoints use the stateful `pyplot` API, which is not thread-safe.
+Migrating them to the object-oriented API is a prerequisite.
 :::
 
 ### Shared state
@@ -157,7 +172,9 @@ Known gaps and their designs are specified in `SPEC.md` at the repository root:
 
 - **SPEC-001** — cache the fitted model across analyses (the dominant cost in
   the pipeline).
-- **SPEC-002** — reattach the tuned decision threshold.
+- **SPEC-002** — decide whether the threshold sweep is worth keeping (the
+  reattachment described above has shipped).
 - **SPEC-003** — distinguish validation and test metrics in the UI.
 - **SPEC-004** — true parallelism for the analysis sections, blocked on
   matplotlib thread-safety.
+- **SPEC-006** — k-fold cross-validated trial scoring.
