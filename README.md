@@ -10,6 +10,7 @@
 [![Python](https://img.shields.io/badge/python-3.11%20%7C%203.12-blue)](https://pypi.org/project/quoptuna/)
 [![License](https://img.shields.io/badge/license-Apache--2.0-green)](https://github.com/Qentora/quoptuna/blob/main/LICENSE)
 [![Docs](https://img.shields.io/badge/docs-online-teal)](https://quoptuna.org)
+[![DOI](https://zenodo.org/badge/853668633.svg)](https://doi.org/10.5281/zenodo.23126588)
 
 <!-- DEMO GIF PLACEHOLDER: capture the 6-step wizard (Dataset → Optimize → Analyze)
      and save as assets/branding/demo.gif (< 8 MB), then uncomment:
