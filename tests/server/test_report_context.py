@@ -111,7 +111,7 @@ def run() -> dict:
     }
 
 
-TRIALS = [
+TRIALS: list[dict] = [
     {
         "trial": 0,
         "value": 0.62,

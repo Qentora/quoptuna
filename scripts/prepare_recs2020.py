@@ -49,6 +49,8 @@ Re-run this only when refreshing the committed files; they live in
 ``src/quoptuna/datasets/``.
 """
 
+from __future__ import annotations
+
 import sys
 from pathlib import Path
 
@@ -72,7 +74,7 @@ TENURE_LABELS = {1: "owned", 2: "rented"}
 
 # Decoded from the RECS 2020 codebook. Columns absent from this mapping are kept
 # as their raw numeric value.
-CODEBOOK = {
+CODEBOOK: dict[str, dict[int, str] | dict[str, str]] = {
     "TYPEHUQ": {
         1: "Mobile home",
         2: "Single-family detached",
@@ -152,9 +154,7 @@ def main(raw_path: str = SOURCE_URL) -> None:
         rows.sample(n=round(SAMPLE_ROWS * shares[label]), random_state=RANDOM_STATE)
         for label, rows in data.groupby(TARGET_COLUMN)
     ]
-    subset = (
-        pd.concat(sampled).sample(frac=1, random_state=RANDOM_STATE).reset_index(drop=True)
-    )
+    subset = pd.concat(sampled).sample(frac=1, random_state=RANDOM_STATE).reset_index(drop=True)
 
     DATASETS_DIR.mkdir(parents=True, exist_ok=True)
     for frame, output in ((data.reset_index(drop=True), FULL_OUTPUT), (subset, SUBSET_OUTPUT)):

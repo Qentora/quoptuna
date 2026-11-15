@@ -213,13 +213,15 @@ def build_zip(
             "figures/index.md", report_context.figure_manifest_markdown(enriched) + "\n"
         )
         for figure in figures:
-            asset = assets.get(figure["id"])
-            if not asset:
+            bundled = assets.get(figure["id"])
+            if not bundled:
                 continue
-            if asset["kind"] == "image":
-                archive.writestr(asset["path"], asset["bytes"])
-            elif asset["kind"] == "plotly":
-                archive.writestr(asset["path"], json.dumps(asset["json"], indent=2, default=str))
+            if bundled["kind"] == "image":
+                archive.writestr(bundled["path"], bundled["bytes"])
+            elif bundled["kind"] == "plotly":
+                archive.writestr(
+                    bundled["path"], json.dumps(bundled["json"], indent=2, default=str)
+                )
 
         for name, rows in report_context.context_tables(context).items():
             archive.writestr(f"tables/{_safe(name)}.csv", _csv_text(rows))
