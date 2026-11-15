@@ -54,10 +54,10 @@ jobs:
           else
             from="${{ github.event.before }}"
             to="${{ github.sha }}"
-            # New branch / first push reports an all-zero before SHA; fall back to full scan.
+            # A new branch's first push reports an all-zero before SHA: check
+            # what the branch adds over the default branch, as the PR run does.
             if ! git rev-parse --quiet --verify "$from^{commit}" >/dev/null; then
-              uv run pre-commit run --all-files --show-diff-on-failure
-              exit $?
+              from=$(git merge-base "origin/${{ github.event.repository.default_branch }}" "$to")
             fi
           fi
           uv run pre-commit run --from-ref "$from" --to-ref "$to" --show-diff-on-failure
