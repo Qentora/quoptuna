@@ -653,6 +653,7 @@ class WorkflowExecutor:
             "fairness_mode": config.get("fairness_mode", "off"),
             "fairness_metric": config.get("fairness_metric", "equal_opportunity_difference"),
             "fairness_threshold": config.get("fairness_threshold"),
+            "tune_decision_threshold": config.get("tune_decision_threshold", True),
             "sensitive_feature": config.get("sensitive_feature"),
             "dataset_id": config.get("dataset_id"),
         }
@@ -749,6 +750,7 @@ class WorkflowExecutor:
             fairness_mode=fairness_mode,
             fairness_metric=opt_config.get("fairness_metric", "equal_opportunity_difference"),
             fairness_threshold=opt_config.get("fairness_threshold"),
+            tune_decision_threshold=opt_config.get("tune_decision_threshold", True),
             sensitive_val=sensitive_val,
             task_spec=task_spec,
         )

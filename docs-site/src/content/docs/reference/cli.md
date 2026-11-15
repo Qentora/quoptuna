@@ -84,6 +84,7 @@ Run a single optimization headless through the exact UI pipeline and print a JSO
 | `--fairness-mode <m>` | `off` | `off` \| `constrained` \| `multi_objective` |
 | `--fairness-metric <m>` | `equal_opportunity_difference` | Disparity metric |
 | `--fairness-threshold <f>` | — | Constrained-mode disparity threshold |
+| `--no-threshold-tuning` | off | Binary tasks: score validation F1 at the default cutoff instead of sweeping the decision threshold |
 | `--sampler <s>` | `random` | `tpe` \| `random` \| `grid` |
 | `--seed <n>` | `0` | Sampler seed for reproducible runs |
 | `--pruner <p>` | `none` | `none` \| `asha` \| `hyperband` |

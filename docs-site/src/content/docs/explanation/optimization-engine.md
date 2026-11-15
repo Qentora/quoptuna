@@ -42,9 +42,9 @@ Every trial is scored on a **validation split**, not on the test set. This is de
 
 The validation split comes from `data["val_x"]` / `data["val_y"]` when the caller provides them; otherwise the engine carves a stratified 20% of the training data. The server always supplies its own split, because it can apply **class-imbalance resampling** (`resampling`: `none`, `oversample`, or `undersample`): the validation slice is carved first and only the inner training portion is resampled, so no duplicated row leaks into validation. Callers that resample the train split themselves MUST supply `val_x`/`val_y`.
 
-Splits are **stratified** so class proportions are preserved — important for imbalanced data and for the small validation slice. For binary tasks the engine also runs **decision-threshold tuning** (a 19-point grid from 0.05 to 0.95) on that validation split, so the reported score reflects the best operating point rather than a fixed 0.5 cutoff.
+Splits are **stratified** so class proportions are preserved — important for imbalanced data and for the small validation slice. For binary tasks the engine also runs **decision-threshold tuning** (a 19-point grid from 0.05 to 0.95) on that validation split, so the reported score reflects the best operating point rather than a fixed 0.5 cutoff. Turn it off with `tune_decision_threshold=False` (API field of the same name, CLI `--no-threshold-tuning`) to score F1 at the default cutoff.
 
-Fairness disparity is measured on the same validation split: the sensitive column is passed as `sensitive_val` and must align positionally with `val_y` (a length mismatch raises `ValueError`).
+Fairness disparity is measured on the same validation split: the sensitive column is passed as `sensitive_val` and must align positionally with `val_y` (a length mismatch raises `ValueError`). The disparity is always measured at the default cutoff, so with threshold tuning on, a trial's F1 and disparity can describe two different classifiers; fairness-aware searches that need both numbers for one classifier should disable tuning.
 
 ## FAILED-trial isolation
 

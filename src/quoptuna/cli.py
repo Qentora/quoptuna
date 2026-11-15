@@ -314,6 +314,12 @@ def optimize(  # noqa: PLR0913
     fairness_threshold: float = typer.Option(
         None, "--fairness-threshold", help="Constrained-mode disparity threshold."
     ),
+    no_threshold_tuning: bool = typer.Option(
+        False,
+        "--no-threshold-tuning",
+        help="Binary tasks: score validation F1 at the default cutoff instead of "
+        "sweeping the decision threshold (keeps F1 and fairness on one classifier).",
+    ),
     sampler: str = typer.Option("random", "--sampler", help="tpe | random | grid."),
     sampler_seed: int = typer.Option(0, "--seed", help="Sampler seed (reproducible runs)."),
     pruner: str = typer.Option("none", "--pruner", help="none | asha | hyperband."),
@@ -380,6 +386,7 @@ def optimize(  # noqa: PLR0913
             fairness_mode=fairness_mode,
             fairness_metric=fairness_metric,
             fairness_threshold=fairness_threshold,
+            tune_decision_threshold=not no_threshold_tuning,
             max_steps=max_steps,
             convergence_interval=convergence_interval,
             max_vmap=max_vmap,

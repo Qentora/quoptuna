@@ -462,6 +462,41 @@ def test_decision_threshold_tuning_improves_val_f1(monkeypatch):
     assert attrs["f1_score_thresholded"] == 1.0
 
 
+def test_threshold_tuning_disabled_scores_default_cutoff(monkeypatch):
+    """tune_decision_threshold=False keeps the objective at the default cutoff,
+    so F1 and the fairness disparity describe the same classifier."""
+
+    class _ProbaModel(_FakeModel):
+        def fit(self, _x, _y):
+            return self
+
+        def predict(self, x):
+            return np.zeros(len(x))
+
+        def predict_proba(self, x):
+            pos = np.where(np.asarray(x)[:, 0] > 0.5, 0.4, 0.2)  # noqa: PLR2004
+            return np.column_stack([1 - pos, pos])
+
+    labels = np.array([0, 1] * 10)
+    features = np.column_stack([labels.astype(float), np.zeros(20)])
+    data = {"train_x": features, "train_y": labels, "test_x": features, "test_y": labels}
+    monkeypatch.setattr(
+        optimizer_module,
+        "create_model",
+        lambda model_type, **kwargs: _ProbaModel(model_type=model_type),
+    )
+    opt = Optimizer(
+        db_name="unit_thresh_off",
+        data=data,
+        model_types=["SVC"],
+        search_space=TINY_SEARCH_SPACE,
+        tune_decision_threshold=False,
+    )
+    trial = FixedTrial({"C": 1.0, "model_type": "SVC"})
+    assert opt.objective(trial) == 0.0
+    assert "decision_threshold" not in trial.user_attrs
+
+
 def test_threshold_tuning_skipped_without_predict_proba(tiny_data, monkeypatch):
     monkeypatch.setattr(
         optimizer_module,

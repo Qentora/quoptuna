@@ -105,6 +105,7 @@ class Optimizer:
         fairness_threshold: Optional[float] = None,  # noqa: FA100
         sensitive_val: Optional[np.ndarray] = None,  # noqa: FA100
         task_spec: Optional[dict] = None,  # noqa: FA100
+        tune_decision_threshold: bool = True,  # noqa: FBT001, FBT002
     ):
         """Initialize the Optimizer class.
 
@@ -158,6 +159,14 @@ class Optimizer:
                 with the VALIDATION split. Required when ``fairness_mode`` != "off":
                 the search's disparity objective/constraint must be measured on data
                 the final report does not also use as its held-out test set.
+            tune_decision_threshold: Binary tasks only. When True (default),
+                each trial's validation F1 is raised by sweeping the decision
+                threshold (``THRESHOLD_GRID``) and the best cutoff is stored as
+                the ``decision_threshold`` user attr. The fairness disparity
+                is always measured at the model's default cutoff, so with
+                fairness search on, a tuned trial's F1 and disparity describe
+                two different classifiers. Set False to score both objectives
+                at the same (default) cutoff.
 
         Attributes:
             db_name: The name of the database.
@@ -202,6 +211,7 @@ class Optimizer:
         self.intermediate_metric = intermediate_metric
         self.max_steps = max_steps
         self.convergence_interval = convergence_interval
+        self.tune_decision_threshold = tune_decision_threshold
         self._disparity_threshold: float | None = None
         self._warned_pruner_noop = False
         if max_vmap is not None and "max_vmap" in self.search_space:
@@ -407,7 +417,8 @@ class Optimizer:
             # the Analyze tab and reports stay consistent.
             val_pred = model.predict(self.val_x)
             val_f1 = f1_score(self.val_y, val_pred, average=self.f1_average, zero_division=0)
-            val_f1 = self._tune_decision_threshold(trial, model, float(val_f1))
+            if self.tune_decision_threshold:
+                val_f1 = self._tune_decision_threshold(trial, model, float(val_f1))
             y_pred = model.predict(self.test_x)
             f_score_ = f1_score(self.test_y, y_pred, average=self.f1_average)
             acc_ = accuracy_score(self.test_y, y_pred)

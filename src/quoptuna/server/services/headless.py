@@ -91,6 +91,7 @@ def run_headless_optimization(
     fairness_mode: str = "off",
     fairness_metric: str = "equal_opportunity_difference",
     fairness_threshold: float | None = None,
+    tune_decision_threshold: bool = True,
     max_steps: int | None = None,
     convergence_interval: int | None = None,
     max_vmap: int | None = None,
@@ -141,6 +142,7 @@ def run_headless_optimization(
         fairness_mode=fairness_mode,  # type: ignore[arg-type]
         fairness_metric=fairness_metric,  # type: ignore[arg-type]
         fairness_threshold=fairness_threshold,
+        tune_decision_threshold=tune_decision_threshold,
         max_steps=max_steps,
         convergence_interval=convergence_interval,
         max_vmap=max_vmap,

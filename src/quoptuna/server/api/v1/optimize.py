@@ -108,6 +108,10 @@ class OptimizationRequest(BaseModel):
     # threshold (default 0.1); disparate_impact when the DI ratio >= threshold
     # (default 0.8, the four-fifths rule).
     fairness_threshold: Optional[float] = Field(default=None, ge=0, le=1)
+    # Binary tasks: sweep the decision threshold to raise validation F1. The
+    # fairness disparity is measured at the default cutoff either way, so set
+    # False to score F1 and disparity on the same classifier.
+    tune_decision_threshold: bool = True
 
     @model_validator(mode="after")
     def _validate_fairness(self):
@@ -235,6 +239,7 @@ def build_workflow(
                     "fairness_mode": request.fairness_mode,
                     "fairness_metric": request.fairness_metric,
                     "fairness_threshold": request.fairness_threshold,
+                    "tune_decision_threshold": request.tune_decision_threshold,
                     "sensitive_feature": request.sensitive_feature,
                     "dataset_id": request.dataset_id,
                 },

@@ -29,6 +29,10 @@ For the difference metrics, `fairness_threshold` defaults to `0.1` (feasible whe
 
 Fairness search is available via `POST /api/v1/optimize`, the `Optimizer`, and the CLI (`--sensitive-feature`, `--fairness-mode`, `--fairness-metric`, `--fairness-threshold`, `--favorable-class`).
 
+:::caution[One classifier for both objectives]
+For binary tasks the search raises each trial's F1 by tuning the decision threshold, but measures the disparity at the default cutoff, so a "feasible" trial's F1 and disparity can describe two different classifiers. Pass `--no-threshold-tuning` (or `tune_decision_threshold=False`) to score both at the same cutoff. The [smart-thermostat outreach example](https://github.com/Qentora/quoptuna/tree/main/examples/smart_thermostat_outreach) does this.
+:::
+
 ## Constrained search (CLI)
 
 Keep every kept trial within a disparity budget:
