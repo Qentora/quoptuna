@@ -1,6 +1,6 @@
 [project]
 name = "quoptuna"
-version = "1.0.1"
+version = "1.1.0"
 description = "Fairness-aware, explainable AutoML for quantum and classical machine learning, powered by Optuna and PennyLane."
 authors = [
     {name = "Edwin Jose", email = "edwinjose900@gmail.com"},
@@ -156,6 +156,22 @@ ignore = [
     "EM102",    # exception message string placement
     "PERF401",  # manual list comprehension (kept to mirror the source notebook)
     "PLR2004",  # magic-value comparison
+]
+# Research example scripts: kept close to the code behind the published
+# results so a reader can diff them; they print progress and use plain loops
+# over the survey splits.
+"examples/**" = [
+    "T201",     # print
+    "INP001",   # implicit namespace package
+    "TRY003",
+    "EM101",    # exception message string placement
+    "PLR2004",  # magic-value comparison
+    "PLR0913",  # too many arguments
+    "PERF102",  # dict iteration kept as in the source
+    "PLW2901",  # loop variable reassignment kept as in the source
+    "FBT003",   # boolean positional value in call
+    "PD011",    # pandas .values
+    "TC003",    # runtime Path import
 ]
 # FastAPI/service application code relocated from the backend sub-project, which
 # used a deliberately relaxed ruleset. Correctness rules (F, E, W, N, I) stay

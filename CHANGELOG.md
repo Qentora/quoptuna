@@ -5,6 +5,22 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 
 ## Unreleased
 
+## [1.1.0] - 2026-11-14
+Minor release. Defaults are unchanged, so existing runs reproduce exactly.
+
+### Added
+- `tune_decision_threshold` option (default `True`) on `Optimizer`,
+  `POST /api/v1/optimize` and `run_headless_optimization`, and the
+  `--no-threshold-tuning` CLI flag. The fairness disparity is measured at the
+  default cutoff, while threshold tuning raises the trial's F1 at a different
+  cutoff, so a "feasible" trial's two numbers could describe two classifiers;
+  disabling tuning scores both at the same cutoff.
+- `examples/smart_thermostat_outreach/`: an end-to-end fairness audit of a
+  connected-thermostat demand-response outreach program on the U.S. RECS 2020
+  survey (data preparation, accuracy-only / constrained / multi-objective
+  searches, budgeted held-out audit with bootstrap intervals, and a
+  release-gate cutoff fix).
+
 ## [1.0.1] - 2026-10-03
 Patch release. Results of valid runs are unchanged from 1.0.0; only inputs that
 previously trained on a wrong target are now rejected.
