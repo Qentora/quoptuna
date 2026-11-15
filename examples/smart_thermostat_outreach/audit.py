@@ -35,6 +35,7 @@ from __future__ import annotations
 import json
 import pickle
 import time
+from typing import Any
 
 import numpy as np
 import pandas as pd
@@ -83,6 +84,15 @@ def val_f1(t: dict) -> float:
 def gap(t: dict) -> float | None:
     v = t["user_attrs"].get("fairness_disparity")
     return None if v is None else float(v)
+
+
+def known_gap(t: dict) -> float:
+    """gap(t) for a trial already filtered to those that recorded one."""
+    g = gap(t)
+    if g is None:
+        msg = f"trial {t['number']} has no fairness_disparity"
+        raise ValueError(msg)
+    return g
 
 
 def duplicates(trials: list[dict]) -> list[dict]:
@@ -157,9 +167,9 @@ def search_cost(run: dict) -> dict:
     if run["meta"]["arm"] != "off":
         scored = [t for t in done if gap(t) is not None]
         out["degenerate"] = sum(val_f1(t) == 0 for t in scored)
-        out["feasible"] = sum(gap(t) <= EO_TOLERANCE for t in scored)
+        out["feasible"] = sum(known_gap(t) <= EO_TOLERANCE for t in scored)
         out["feasible_nondegenerate"] = sum(
-            gap(t) <= EO_TOLERANCE and val_f1(t) > 0 for t in scored
+            known_gap(t) <= EO_TOLERANCE and val_f1(t) > 0 for t in scored
         )
     return out
 
@@ -171,8 +181,8 @@ def pareto_front(trials: list[dict]) -> list[dict]:
         for t in pts
         if not any(
             val_f1(o) >= val_f1(t)
-            and gap(o) <= gap(t)
-            and (val_f1(o) > val_f1(t) or gap(o) < gap(t))
+            and known_gap(o) <= known_gap(t)
+            and (val_f1(o) > val_f1(t) or known_gap(o) < known_gap(t))
             for o in pts
         )
     ]
@@ -184,7 +194,7 @@ def select(run: dict) -> dict | None:
     if arm == "off":
         return max(done, key=val_f1)
     if arm == "constrained":
-        ok = [t for t in done if val_f1(t) > 0 and gap(t) is not None and gap(t) <= EO_TOLERANCE]
+        ok = [t for t in done if val_f1(t) > 0 and (g := gap(t)) is not None and g <= EO_TOLERANCE]
         return max(ok, key=val_f1) if ok else None
     front = pareto_front(done)
     best = max(val_f1(t) for t in front)
@@ -211,7 +221,7 @@ def weighted_quantile(values: np.ndarray, weights: np.ndarray, q: float) -> floa
 
 
 def program_metrics(invite: np.ndarray, own: np.ndarray, grp: np.ndarray, w: np.ndarray) -> dict:
-    out = {"tpr": {}, "offer_share": {}}
+    out: dict[str, Any] = {"tpr": {}, "offer_share": {}}
     total_offers = (w * invite).sum()
     for g in GROUPS:
         m = grp == g
@@ -373,7 +383,7 @@ def main() -> None:
     cal = pd.read_csv(DATA / "calibration.csv")
     aud = pd.read_csv(DATA / "audit.csv")
 
-    summary = {
+    summary: dict[str, Any] = {
         "budget": BUDGET,
         "access_gap": access_gap(),
         "search": [],

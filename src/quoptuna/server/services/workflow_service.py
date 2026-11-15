@@ -180,13 +180,16 @@ def build_xai(
     # whose sweep found nothing better than the default cutoff.
     decision_threshold = trial.user_attrs.get("decision_threshold")
 
+    background_kwargs: dict[str, Any] = (
+        {} if background_size is None else {"background_size": background_size}
+    )
     xai_config = XAIConfig(
         use_proba=use_proba,
         onsubset=True,
         subset_size=subset_size,
         max_evals=max_evals,
         decision_threshold=decision_threshold,
-        **({} if background_size is None else {"background_size": background_size}),
+        **background_kwargs,
     )
     try:
         return XAI(model=model, data=data_dict, config=xai_config)

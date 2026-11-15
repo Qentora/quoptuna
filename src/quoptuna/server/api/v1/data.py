@@ -18,7 +18,7 @@ from quoptuna.datasets import (
     bundled_dataset_path,
     normalize_uci_targets,
 )
-from quoptuna.datasets.balance import target_balance_profile
+from quoptuna.datasets.balance import TargetBalanceProfile, target_balance_profile
 from quoptuna.server.core.config import settings
 from quoptuna.server.services import dataset_registry
 from quoptuna.server.services.analysis_store import get_artifact_store
@@ -229,7 +229,7 @@ async def preview_dataset(dataset_id: str):
     head = json.loads(df.head(10).to_json(orient="records"))
 
     target_values_by_column: dict[str, list] = {}
-    target_balance_by_column: dict[str, dict] = {}
+    target_balance_by_column: dict[str, TargetBalanceProfile] = {}
     unique_counts: dict[str, int] = {}
     for col in df.columns:
         unique = df[col].dropna().unique()
